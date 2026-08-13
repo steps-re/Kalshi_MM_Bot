@@ -16,6 +16,7 @@ class CreateOrderRequest:
     price: int
     count: int
     client_order_id: str | None = None
+    expiration_time: int | None = None
     time_in_force: str = "good_till_canceled"
     self_trade_prevention_type: str = "taker_at_cross"
     post_only: bool = True
@@ -30,6 +31,7 @@ class CreateOrderRequest:
             price=self.price,
             count=self.count,
             client_order_id=self.client_order_id,
+            expiration_time=self.expiration_time,
             time_in_force=self.time_in_force,
             self_trade_prevention_type=self.self_trade_prevention_type,
             post_only=self.post_only,
@@ -275,6 +277,7 @@ def _order_payload(
     count: int,
     client_order_id: str | None = None,
     updated_client_order_id: str | None = None,
+    expiration_time: int | None = None,
     time_in_force: str | None = None,
     self_trade_prevention_type: str | None = None,
     post_only: bool | None = None,
@@ -294,6 +297,9 @@ def _order_payload(
 
     if updated_client_order_id is not None:
         payload["updated_client_order_id"] = updated_client_order_id
+
+    if expiration_time is not None:
+        payload["expiration_time"] = expiration_time
 
     if time_in_force is not None:
         payload["time_in_force"] = time_in_force

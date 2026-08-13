@@ -5,6 +5,7 @@ from asyncio import TimeoutError
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from math import ceil
 from typing import Any
 from uuid import uuid4
 
@@ -20,6 +21,7 @@ from kalshi_mm_bot.api.parser import ParsedWsMessage
 from kalshi_mm_bot.api.rest import CancelOrderRequest, CreateOrderRequest, KalshiRestClient
 from kalshi_mm_bot.api.websocket import KalshiWebSocketClient
 from kalshi_mm_bot.config import load_settings
+from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import (
     COUNT_SCALE,
     format_count_fp,
@@ -49,6 +51,7 @@ TERMINAL_ORDER_STATUSES = {
     "cancelled",
     "executed",
     "filled",
+    "expired",
     "rejected",
 }
 
@@ -84,8 +87,11 @@ class LiveOrder:
     action: OrderAction
     side: OutcomeSide
     yes_price: int
+    initial_count: int
     remaining_count: int
     created_monotonic: float
+    fill_message_count: int = 0
+    user_order_fill_count: int = 0
 
     @classmethod
     def from_intent(
@@ -105,8 +111,11 @@ class LiveOrder:
             action=intent.action,
             side=intent.side,
             yes_price=intent.yes_price,
+            initial_count=intent.count,
             remaining_count=intent.count if remaining_count is None else remaining_count,
             created_monotonic=created_monotonic,
+            fill_message_count=_filled_count_from_remaining(intent.count, remaining_count),
+            user_order_fill_count=_filled_count_from_remaining(intent.count, remaining_count),
         )
 
     def matches(self, intent: QuoteIntent) -> bool:
@@ -134,11 +143,14 @@ class LiveOrderManager:
         min_order_rest_seconds: float = 0.0,
         requote_price_threshold: int = 0,
         requote_size_threshold_bps: int = 0,
+        order_expiration_seconds: float | None = None,
         rejection_cooldown_seconds: float = 1.0,
         status: StatusCallback | None = None,
     ) -> None:
         if rejection_cooldown_seconds < 0:
             raise ValueError("rejection_cooldown_seconds must be non-negative")
+        if order_expiration_seconds is not None and order_expiration_seconds <= 0:
+            raise ValueError("order_expiration_seconds must be greater than zero")
 
         normalized_prefix = client_prefix.strip().rstrip("-")
 
@@ -155,6 +167,7 @@ class LiveOrderManager:
             size_change_threshold_bps=requote_size_threshold_bps,
         )
         self.rejection_cooldown_seconds = rejection_cooldown_seconds
+        self.order_expiration_seconds = order_expiration_seconds
         self.status = status
         self.orders: dict[str, LiveOrder] = {}
 
@@ -163,6 +176,7 @@ class LiveOrderManager:
         self._last_sync_by_ticker: dict[str, float] = {}
         self._rejected_quote_until: dict[str, float] = {}
         self._recently_canceled_order_ids: set[str] = set()
+        self._seen_fill_trade_ids: set[str] = set()
 
     async def cancel_stale_bot_orders(
         self,
@@ -297,18 +311,60 @@ class LiveOrderManager:
             return
 
         remaining_count = _optional_count(data, "remaining_count_fp", "remaining_count")
+        fill_count = _optional_count(data, "fill_count_fp", "fill_count")
 
-        if remaining_count is None:
+        if fill_count is not None:
+            order.user_order_fill_count = max(order.user_order_fill_count, fill_count)
+
+        if remaining_count is not None:
+            order.remaining_count = remaining_count
+            observed_fill_count = max(0, order.initial_count - remaining_count)
+            order.user_order_fill_count = max(
+                order.user_order_fill_count,
+                observed_fill_count,
+            )
+        elif fill_count is not None:
+            _sync_remaining_from_fill_counts(order)
+        else:
             return
 
-        if remaining_count <= 0:
+        if order.remaining_count <= 0:
             self.orders.pop(client_order_id, None)
             return
 
-        order.remaining_count = remaining_count
+    def handle_fill(self, fill: OrderFill) -> None:
+        if fill.trade_id in self._seen_fill_trade_ids:
+            return
+
+        self._seen_fill_trade_ids.add(fill.trade_id)
+
+        for client_order_id, order in tuple(self.orders.items()):
+            if order.order_id != fill.order_id:
+                continue
+
+            order.fill_message_count += fill.count
+            _sync_remaining_from_fill_counts(order)
+
+            if order.remaining_count <= 0:
+                self.orders.pop(client_order_id, None)
+
+            return
+
+    def external_orderbook(self, orderbook: Orderbook) -> Orderbook:
+        own_orders = tuple(
+            order
+            for order in self.orders.values()
+            if order.market_ticker == orderbook.market_ticker and order.remaining_count > 0
+        )
+
+        if not own_orders:
+            return orderbook
+
+        return _orderbook_without_orders(orderbook, own_orders)
 
     async def _create(self, intents: list[QuoteIntent], *, now: float) -> int:
         client_ids = [self._next_client_order_id() for _ in intents]
+        expiration_time = _expiration_time(self.order_expiration_seconds)
         requests = [
             CreateOrderRequest(
                 ticker=intent.market_ticker,
@@ -316,6 +372,7 @@ class LiveOrderManager:
                 price=intent.yes_price,
                 count=intent.count,
                 client_order_id=client_order_id,
+                expiration_time=expiration_time,
             )
             for intent, client_order_id in zip(intents, client_ids, strict=True)
         ]
@@ -411,7 +468,8 @@ class LiveOrderManager:
             self._recently_canceled_order_ids.add(order_id)
             return
 
-        await self.rest.batch_cancel_orders([CancelOrderRequest(order_id=order_id)])
+        data = await self.rest.batch_cancel_orders([CancelOrderRequest(order_id=order_id)])
+        _validate_cancel_response(data, {order_id})
         self._recently_canceled_order_ids.add(order_id)
         self._emit(f"Canceled {order_id} ({reason})")
 
@@ -449,6 +507,7 @@ async def run_live_strategy(
     min_order_rest_seconds: float = 0.0,
     requote_price_threshold: int = 0,
     requote_size_threshold_bps: int = 0,
+    order_expiration_seconds: float | None = None,
     cancel_on_stop: bool = True,
     status: StatusCallback | None = None,
     stop_requested: StopRequested | None = None,
@@ -472,6 +531,7 @@ async def run_live_strategy(
         min_order_rest_seconds=min_order_rest_seconds,
         requote_price_threshold=requote_price_threshold,
         requote_size_threshold_bps=requote_size_threshold_bps,
+        order_expiration_seconds=order_expiration_seconds,
         status=status,
     )
     stats = LiveRunStats(dry_run=dry_run)
@@ -514,6 +574,7 @@ async def run_live_strategy(
 
             if isinstance(update.parsed, OrderFill):
                 stats.fill_count += 1
+                order_manager.handle_fill(update.parsed)
 
             order_manager.handle_user_order(update.raw_msg)
 
@@ -531,7 +592,13 @@ async def run_live_strategy(
                 offset_seconds=time.monotonic() - started,
                 observed_at_utc=utc_now_iso(),
             )
-            intents = strategy.on_orderbook(context, update.updated_ticker, book, portfolio)
+            external_book = order_manager.external_orderbook(book)
+            intents = strategy.on_orderbook(
+                context,
+                update.updated_ticker,
+                external_book,
+                portfolio,
+            )
             created, canceled = await order_manager.sync_quotes(update.updated_ticker, intents)
             stats.create_count += created
             stats.cancel_count += canceled
@@ -595,6 +662,94 @@ def _optional_count(data: dict[str, Any], *names: str) -> int | None:
             return parse_count_fp(str(raw_count))
 
     return None
+
+
+def _filled_count_from_remaining(initial_count: int, remaining_count: int | None) -> int:
+    if remaining_count is None:
+        return 0
+
+    return max(0, initial_count - remaining_count)
+
+
+def _sync_remaining_from_fill_counts(order: LiveOrder) -> None:
+    filled_count = min(
+        order.initial_count,
+        max(order.fill_message_count, order.user_order_fill_count),
+    )
+    order.remaining_count = max(0, order.initial_count - filled_count)
+
+
+def _orderbook_without_orders(
+    orderbook: Orderbook,
+    own_orders: Iterable[LiveOrder],
+) -> Orderbook:
+    bids = list(orderbook.bids)
+    asks = list(orderbook.asks)
+
+    for order in own_orders:
+        levels = bids if order_book_side(order.action, order.side) == "bid" else asks
+
+        if 0 <= order.yes_price < len(levels):
+            levels[order.yes_price] = max(0, levels[order.yes_price] - order.remaining_count)
+
+    return Orderbook(
+        market_ticker=orderbook.market_ticker,
+        seq=orderbook.seq,
+        bids=bids,
+        asks=asks,
+        price_levels=orderbook.price_levels,
+        best_bid=_best_bid(bids, orderbook.price_levels),
+        best_ask=_best_ask(asks, orderbook.price_levels),
+    )
+
+
+def _best_bid(levels: list[int], price_levels: tuple[int, ...]) -> int | None:
+    for price in reversed(price_levels):
+        if levels[price] > 0:
+            return price
+
+    return None
+
+
+def _best_ask(levels: list[int], price_levels: tuple[int, ...]) -> int | None:
+    for price in price_levels:
+        if levels[price] > 0:
+            return price
+
+    return None
+
+
+def _expiration_time(order_expiration_seconds: float | None) -> int | None:
+    if order_expiration_seconds is None:
+        return None
+
+    return ceil(time.time() + order_expiration_seconds)
+
+
+def _validate_cancel_response(data: dict[str, Any], expected_order_ids: set[str]) -> None:
+    raw_orders = data.get("orders")
+
+    if not isinstance(raw_orders, list):
+        raise RuntimeError(f"cancel response missing orders list: {data!r}")
+
+    canceled_order_ids: set[str] = set()
+
+    for raw_order in raw_orders:
+        if not isinstance(raw_order, dict):
+            raise RuntimeError(f"cancel response contains non-object entry: {raw_order!r}")
+
+        order_id = raw_order.get("order_id")
+
+        if order_id is not None and order_id != "":
+            canceled_order_ids.add(str(order_id))
+
+    missing = expected_order_ids - canceled_order_ids
+
+    if missing:
+        raise RuntimeError(
+            "cancel response missing expected order_id(s): "
+            + ", ".join(sorted(missing))
+        )
 
 
 def _ordered_create_response(

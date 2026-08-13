@@ -61,6 +61,7 @@ async def _run(args: argparse.Namespace):
         min_order_rest_seconds=args.min_order_rest_sec,
         requote_price_threshold=args.requote_price_threshold,
         requote_size_threshold_bps=args.requote_size_threshold_bps,
+        order_expiration_seconds=args.order_expiration_sec,
         cancel_on_stop=not args.leave_orders,
         status=print,
     )
@@ -126,6 +127,15 @@ def _parse_args() -> argparse.Namespace:
         help="Client order ID prefix used to identify this bot's orders. Default: kmm.",
     )
     parser.add_argument(
+        "--order-expiration-sec",
+        type=float,
+        default=30.0,
+        help=(
+            "Seconds until each live order self-expires. Use 0 to disable. "
+            "Default: 30."
+        ),
+    )
+    parser.add_argument(
         "--execute",
         action="store_true",
         help="Submit/cancel real orders. Omit for dry-run.",
@@ -173,6 +183,12 @@ def _parse_args() -> argparse.Namespace:
 
     if args.requote_size_threshold_bps < 0:
         parser.error("--requote-size-threshold-bps must be non-negative")
+
+    if args.order_expiration_sec < 0:
+        parser.error("--order-expiration-sec must be non-negative")
+
+    if args.order_expiration_sec == 0:
+        args.order_expiration_sec = None
 
     try:
         args.requote_price_threshold = _parse_price_delta(args.requote_price_threshold)

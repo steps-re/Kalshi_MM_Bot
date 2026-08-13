@@ -4,9 +4,14 @@ import pytest
 
 from kalshi_mm_bot.live import LiveOrderManager, LivePortfolio
 from kalshi_mm_bot.live.trader import _cancel_on_shutdown
+from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import COUNT_SCALE, parse_price_fp
-from kalshi_mm_bot.market.types import MarketPosition, OrderFill
-from kalshi_mm_bot.strategy.types import QuoteIntent
+from kalshi_mm_bot.market.types import MarketPosition, OrderFill, PriceRange
+from kalshi_mm_bot.strategy import DumbMarketMakerStrategy
+from kalshi_mm_bot.strategy.types import QuoteIntent, StrategyContext
+
+
+PRICE_RANGES = (PriceRange(start=0, end=10000, step=100),)
 
 
 class FakeRest:
@@ -14,6 +19,7 @@ class FakeRest:
         self.created: list[dict] = []
         self.canceled: list[dict] = []
         self.create_response: dict | None = None
+        self.cancel_response: dict | None = None
         self.reverse_create_response = False
         self.cancel_failures: set[str] = set()
         self.resting_orders_by_ticker: dict[str, list[dict]] = {}
@@ -47,7 +53,19 @@ class FakeRest:
             if payload["order_id"] in self.cancel_failures:
                 raise RuntimeError(f"cancel failed for {payload['order_id']}")
 
-        return {}
+        if self.cancel_response is not None:
+            return self.cancel_response
+
+        return {
+            "orders": [
+                {
+                    "order_id": payload["order_id"],
+                    "client_order_id": "",
+                    "reduced_by": "1.00",
+                }
+                for payload in payloads
+            ]
+        }
 
     async def get_available_balance_cents(self) -> int:
         return self.available_balance_cents
@@ -71,6 +89,35 @@ def buy_intent(
     )
 
 
+def sell_intent(
+    price: str = "0.5100",
+    count: int = COUNT_SCALE,
+    quote_id: str = "M1:adaptive:yes:sell",
+) -> QuoteIntent:
+    return QuoteIntent(
+        quote_id=quote_id,
+        market_ticker="M1",
+        action="sell",
+        side="yes",
+        yes_price=parse_price_fp(price),
+        count=count,
+    )
+
+
+def make_book(
+    *,
+    bids: tuple[tuple[str, str], ...] = (("0.5000", "1.00"),),
+    asks: tuple[tuple[str, str], ...] = (("0.5100", "1.00"),),
+) -> Orderbook:
+    return Orderbook.from_snapshot(
+        market_ticker="M1",
+        seq=1,
+        bids_raw=bids,
+        asks_raw=asks,
+        price_ranges=PRICE_RANGES,
+    )
+
+
 def test_live_order_manager_dry_run_replaces_changed_quotes() -> None:
     async def run() -> None:
         manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
@@ -82,6 +129,62 @@ def test_live_order_manager_dry_run_replaces_changed_quotes() -> None:
         created, canceled = await manager.sync_quotes("M1", [buy_intent("0.4900")], now=2)
         assert (created, canceled) == (1, 1)
         assert len(manager.orders) == 1
+
+    asyncio.run(run())
+
+
+def test_live_order_manager_removes_own_quotes_from_strategy_book() -> None:
+    async def run() -> None:
+        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        await manager.sync_quotes(
+            "M1",
+            [buy_intent("0.5000"), sell_intent("0.5100")],
+            now=1,
+        )
+        book = make_book(
+            bids=(("0.4900", "2.00"), ("0.5000", "1.00")),
+            asks=(("0.5100", "1.00"), ("0.5200", "2.00")),
+        )
+
+        external_book = manager.external_orderbook(book)
+
+        assert book.best_bid == parse_price_fp("0.5000")
+        assert book.best_ask == parse_price_fp("0.5100")
+        assert external_book.best_bid == parse_price_fp("0.4900")
+        assert external_book.best_ask == parse_price_fp("0.5200")
+        assert external_book.bids[parse_price_fp("0.5000")] == 0
+        assert external_book.asks[parse_price_fp("0.5100")] == 0
+
+        strategy = DumbMarketMakerStrategy(count=COUNT_SCALE)
+        intents = strategy.on_orderbook(
+            context=StrategyContext(event_count=1, offset_seconds=1),
+            market_ticker="M1",
+            orderbook=external_book,
+            portfolio=LivePortfolio(),
+        )
+
+        assert [(intent.action, intent.yes_price) for intent in intents] == [
+            ("buy", parse_price_fp("0.4900")),
+            ("sell", parse_price_fp("0.5200")),
+        ]
+
+    asyncio.run(run())
+
+
+def test_live_order_manager_external_book_clamps_oversized_tracked_order() -> None:
+    async def run() -> None:
+        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        await manager.sync_quotes(
+            "M1",
+            [buy_intent("0.5000", count=2 * COUNT_SCALE)],
+            now=1,
+        )
+        book = make_book(bids=(("0.5000", "1.00"),))
+
+        external_book = manager.external_orderbook(book)
+
+        assert external_book.best_bid is None
+        assert external_book.bids[parse_price_fp("0.5000")] == 0
 
     asyncio.run(run())
 
@@ -337,6 +440,24 @@ def test_live_order_manager_tracks_created_entries_when_other_create_entries_rej
     asyncio.run(run())
 
 
+def test_live_order_manager_sets_live_order_expiration_time() -> None:
+    async def run() -> None:
+        rest = FakeRest()
+        manager = LiveOrderManager(
+            rest,
+            dry_run=False,
+            min_requote_seconds=0,
+            order_expiration_seconds=30,
+        )
+
+        assert await manager.sync_quotes("M1", [buy_intent()], now=1) == (1, 0)
+
+        assert isinstance(rest.created[0]["expiration_time"], int)
+        assert rest.created[0]["time_in_force"] == "good_till_canceled"
+
+    asyncio.run(run())
+
+
 def test_live_order_manager_updates_remaining_count_from_user_orders() -> None:
     async def run() -> None:
         manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
@@ -364,6 +485,114 @@ def test_live_order_manager_updates_remaining_count_from_user_orders() -> None:
     asyncio.run(run())
 
 
+def test_live_order_manager_updates_remaining_count_from_fills() -> None:
+    async def run() -> None:
+        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+
+        await manager.sync_quotes("M1", [buy_intent()], now=1)
+        order = next(iter(manager.orders.values()))
+
+        fill = OrderFill(
+            trade_id="t1",
+            order_id=order.order_id,
+            market_ticker="M1",
+            action="buy",
+            side="yes",
+            yes_price=parse_price_fp("0.5000"),
+            count=COUNT_SCALE // 2,
+            post_position=COUNT_SCALE // 2,
+            is_taker=False,
+        )
+
+        manager.handle_fill(fill)
+        assert next(iter(manager.orders.values())).remaining_count == COUNT_SCALE // 2
+
+        manager.handle_fill(fill)
+        assert next(iter(manager.orders.values())).remaining_count == COUNT_SCALE // 2
+
+        manager.handle_fill(
+            OrderFill(
+                trade_id="t2",
+                order_id=order.order_id,
+                market_ticker="M1",
+                action="buy",
+                side="yes",
+                yes_price=parse_price_fp("0.5000"),
+                count=COUNT_SCALE // 2,
+                post_position=COUNT_SCALE,
+                is_taker=False,
+            )
+        )
+
+        assert manager.orders == {}
+
+    asyncio.run(run())
+
+
+def test_live_order_manager_does_not_double_count_fill_after_user_order_update() -> None:
+    async def run() -> None:
+        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+
+        await manager.sync_quotes("M1", [buy_intent()], now=1)
+        client_order_id = next(iter(manager.orders))
+        order = manager.orders[client_order_id]
+
+        manager.handle_user_order(
+            {
+                "type": "user_order",
+                "msg": {
+                    "order_id": order.order_id,
+                    "client_order_id": client_order_id,
+                    "status": "resting",
+                    "fill_count_fp": "0.50",
+                    "remaining_count_fp": "0.50",
+                },
+            }
+        )
+        manager.handle_fill(
+            OrderFill(
+                trade_id="t1",
+                order_id=order.order_id,
+                market_ticker="M1",
+                action="buy",
+                side="yes",
+                yes_price=parse_price_fp("0.5000"),
+                count=COUNT_SCALE // 2,
+                post_position=COUNT_SCALE // 2,
+                is_taker=False,
+            )
+        )
+
+        assert manager.orders[client_order_id].remaining_count == COUNT_SCALE // 2
+
+    asyncio.run(run())
+
+
+def test_live_order_manager_drops_expired_user_orders() -> None:
+    async def run() -> None:
+        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+
+        await manager.sync_quotes("M1", [buy_intent()], now=1)
+        client_order_id = next(iter(manager.orders))
+        order = manager.orders[client_order_id]
+
+        manager.handle_user_order(
+            {
+                "type": "user_order",
+                "msg": {
+                    "order_id": order.order_id,
+                    "client_order_id": client_order_id,
+                    "status": "expired",
+                    "remaining_count_fp": "1.00",
+                },
+            }
+        )
+
+        assert manager.orders == {}
+
+    asyncio.run(run())
+
+
 def test_live_order_manager_does_not_track_fully_filled_create_response() -> None:
     async def run() -> None:
         rest = FakeRest()
@@ -379,6 +608,22 @@ def test_live_order_manager_does_not_track_fully_filled_create_response() -> Non
 
         assert await manager.sync_quotes("M1", [buy_intent()], now=1) == (1, 0)
         assert manager.orders == {}
+
+    asyncio.run(run())
+
+
+def test_live_order_manager_keeps_order_tracked_when_cancel_response_mismatches() -> None:
+    async def run() -> None:
+        rest = FakeRest()
+        rest.cancel_response = {"orders": [{"order_id": "different-order"}]}
+        manager = LiveOrderManager(rest, dry_run=False, min_requote_seconds=0)
+
+        await manager.sync_quotes("M1", [buy_intent()], now=1)
+
+        with pytest.raises(RuntimeError, match="cancel response missing"):
+            await manager.sync_quotes("M1", [], now=2)
+
+        assert len(manager.orders) == 1
 
     asyncio.run(run())
 
