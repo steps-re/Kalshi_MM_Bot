@@ -67,10 +67,50 @@ def _num(value) -> float:
         return 0.0
 
 
-def pick_liquid_tickers(count: int, *, min_volume: float) -> list[str]:
-    """The most active two-sided markets right now, via /events."""
+def pick_liquid_tickers(
+    count: int,
+    *,
+    min_volume: float,
+    series: tuple[str, ...] = (),
+    probe: bool = True,
+) -> list[str]:
+    """Markets whose books are actually moving right now.
+
+    Ranking by 24h volume picks markets with high *cumulative* turnover, which
+    on Kalshi means long-dated political markets that accumulated volume over
+    months and are currently static. A 25 minute recording of those produced
+    1,164 deltas and a single fill across three strategies - technically real
+    data, useless as a test.
+
+    So volume is only a shortlist. The ranking is churn measured directly:
+    sample each candidate's book twice a few seconds apart and count how much
+    actually changed. That is the property a market-making backtest needs.
+    """
 
     candidates: list[tuple[float, str]] = []
+
+    # Seed from named series first. Paging /events by volume never reaches the
+    # crypto ladders, because it ranks on cumulative turnover and the political
+    # markets have months of it. Measured churn on the BTC/ETH hourlies is ~70x
+    # the best political market, so if they are wanted they have to be asked for.
+    for series_ticker in series:
+        try:
+            data = get(
+                "/markets",
+                {"status": "open", "limit": 1000, "series_ticker": series_ticker},
+            )
+        except Exception as error:
+            print(f"  series {series_ticker} unavailable: {error}")
+            continue
+
+        for market in data.get("markets", []):
+            bid = _num(market.get("yes_bid_dollars"))
+            ask = _num(market.get("yes_ask_dollars"))
+            volume = _num(market.get("volume_24h_fp"))
+
+            if 0 < bid < ask < 1 and volume >= min_volume:
+                candidates.append((volume, market["ticker"]))
+
     cursor = None
 
     for _ in range(6):
@@ -98,7 +138,52 @@ def pick_liquid_tickers(count: int, *, min_volume: float) -> list[str]:
             break
 
     candidates.sort(reverse=True)
-    return [ticker for _, ticker in candidates[:count]]
+    shortlist = [ticker for _, ticker in candidates[: max(count * 6, count)]]
+
+    if not probe or len(shortlist) <= count:
+        return shortlist[:count]
+
+    print(f"  probing {len(shortlist)} candidates for actual churn...")
+    return _rank_by_churn(shortlist, count)
+
+
+def _rank_by_churn(tickers: list[str], count: int, *, gap_seconds: float = 6.0) -> list[str]:
+    """Sample each book twice and keep the ones that moved."""
+
+    first: dict[str, tuple[dict, dict]] = {}
+
+    for ticker in tickers:
+        try:
+            first[ticker] = fetch_book(ticker)
+        except Exception:
+            continue
+
+    time.sleep(gap_seconds)
+
+    scored: list[tuple[float, str]] = []
+
+    for ticker, (bids0, asks0) in first.items():
+        try:
+            bids1, asks1 = fetch_book(ticker)
+        except Exception:
+            continue
+
+        churn = 0.0
+
+        for before, after in ((bids0, bids1), (asks0, asks1)):
+            for price in set(before) | set(after):
+                churn += abs(after.get(price, 0.0) - before.get(price, 0.0))
+
+        scored.append((churn, ticker))
+
+    scored.sort(reverse=True)
+    moving = [t for c, t in scored if c > 0]
+
+    for churn, ticker in scored[:count]:
+        print(f"    {ticker[:44]:<46} churn {churn:>10,.0f}")
+
+    # Fall back to the volume order if literally nothing moved.
+    return (moving or [t for _, t in scored])[:count]
 
 
 def fetch_book(ticker: str) -> tuple[dict[str, float], dict[str, float]]:
@@ -168,7 +253,11 @@ async def _run(args: argparse.Namespace) -> None:
 
     if args.auto:
         print(f"Selecting the {args.auto} most active two-sided markets...")
-        tickers = pick_liquid_tickers(args.auto, min_volume=args.min_volume)
+        tickers = pick_liquid_tickers(
+            args.auto,
+            min_volume=args.min_volume,
+            series=tuple(args.series),
+        )
 
     if not tickers:
         raise SystemExit("no tickers to record; pass some or raise --auto / lower --min-volume")
@@ -277,6 +366,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("tickers", nargs="*", help="Explicit tickers to record.")
     parser.add_argument("--auto", type=int, default=0, help="Auto-pick the N busiest markets.")
     parser.add_argument("--min-volume", type=float, default=1000.0)
+    parser.add_argument(
+        "--series",
+        action="append",
+        default=[],
+        help="Seed candidates from a series ticker (e.g. KXBTCD). Repeatable. "
+        "Needed for the crypto ladders, which volume-ranking never reaches.",
+    )
     parser.add_argument("--interval", type=float, default=1.0, help="Seconds between polls.")
     parser.add_argument("--duration-sec", type=float, default=900.0)
     parser.add_argument("--output", help="Recording directory.")
