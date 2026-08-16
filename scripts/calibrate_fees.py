@@ -129,30 +129,38 @@ async def pick_market(rest: KalshiRestClient, args: argparse.Namespace) -> dict 
     return best[1] if best else None
 
 
+async def collect_fills(rest: KalshiRestClient) -> list[dict]:
+    data = await rest._request("GET", "/portfolio/fills", params={"limit": 200})
+    return data.get("fills") or []
+
+
 async def wait_for_fill(
     rest: KalshiRestClient,
     ticker: str,
     order_id: str,
     timeout: float,
 ) -> bool:
-    """Poll until the resting order fills, or give up."""
+    """Wait for a real execution against `order_id`.
+
+    Confirmed against the fills ledger, not by the order disappearing from the
+    resting list. The first version of this inferred a fill from absence and
+    reported two fills in the same second the orders were placed - the orders
+    had simply not appeared as resting yet. Nothing had traded. An execution is
+    only an execution when the exchange says a trade happened; anything else is
+    a guess, and guessing you are filled is how a bot ends up with a position it
+    does not know about.
+    """
 
     deadline = time.monotonic() + timeout
 
     while time.monotonic() < deadline:
-        resting = await rest.get_orders(ticker=ticker, status="resting")
-
-        if not any(str(o.get("order_id")) == order_id for o in resting):
-            return True
-
         await asyncio.sleep(2.0)
 
+        for fill in await collect_fills(rest):
+            if str(fill.get("order_id")) == order_id:
+                return True
+
     return False
-
-
-async def collect_fills(rest: KalshiRestClient) -> list[dict]:
-    data = await rest._request("GET", "/portfolio/fills", params={"limit": 200})
-    return data.get("fills") or []
 
 
 async def _run(args: argparse.Namespace) -> None:
@@ -173,7 +181,14 @@ async def _run(args: argparse.Namespace) -> None:
                 "This probe is for a small dedicated account, not a funded book."
             )
 
-        market = await pick_market(rest, args)
+        if args.ticker:
+            # An explicit target, for when the caller has already measured which
+            # book is moving. 24h volume is a poor proxy for current flow, and a
+            # resting order in a quiet market simply never fills.
+            fetched = await rest._request("GET", "/markets", params={"tickers": args.ticker})
+            market = (fetched.get("markets") or [None])[0]
+        else:
+            market = await pick_market(rest, args)
 
         if market is None:
             raise SystemExit("no suitable midpoint market found right now; try again later")
@@ -212,8 +227,15 @@ async def _run(args: argparse.Namespace) -> None:
                 log(f"loss limit hit (${start_balance - live_balance:.2f}); stopping")
                 break
 
-            fresh = await rest._request("GET", "/markets", {"tickers": ticker})
-            entry = parse_price_fp(fresh["markets"][0]["yes_bid_dollars"])
+            fresh = (await rest._request("GET", "/markets", params={"tickers": ticker}))[
+                "markets"
+            ][0]
+            live_bid = parse_price_fp(fresh["yes_bid_dollars"])
+            live_ask = parse_price_fp(fresh["yes_ask_dollars"])
+            # Step inside when the spread allows it - resting at the touch means
+            # queueing behind everyone already there, and this probe needs a
+            # fill more than it needs a good price.
+            entry = live_bid + 100 if (live_ask - live_bid) > 100 else live_bid
 
             client_id = f"{PREFIX}-{int(time.time())}-{trip}"
             log(f"trip {trip}: resting BUY 1 @ ${entry / ONE_DOLLAR:.2f} (post_only)")
@@ -249,7 +271,7 @@ async def _run(args: argparse.Namespace) -> None:
             # Exit by resting on the other side; if it does not fill we simply
             # stop and report the position rather than crossing to force it.
             exit_price = parse_price_fp(
-                (await rest._request("GET", "/markets", {"tickers": ticker}))["markets"][0][
+                (await rest._request("GET", "/markets", params={"tickers": ticker}))["markets"][0][
                     "yes_ask_dollars"
                 ]
             )
@@ -360,6 +382,7 @@ async def _run(args: argparse.Namespace) -> None:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true", help="Actually place orders.")
+    parser.add_argument("--ticker", help="Target this market instead of auto-selecting.")
     parser.add_argument("--round-trips", type=int, default=4)
     parser.add_argument("--max-loss", type=float, default=3.0, help="Abort after this loss.")
     parser.add_argument("--max-balance", type=float, default=200.0)
