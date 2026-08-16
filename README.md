@@ -6,7 +6,14 @@ backtest, screen the exchange, and run live tests.
 This is the Steps Ventures fork of
 [nathanonderko/Kalshi_MM_Bot](https://github.com/nathanonderko/Kalshi_MM_Bot).
 
-## Read this first: the fee arithmetic
+## Start here
+
+- **[LESSONS.md](LESSONS.md)** — the full write-up: what we found, why the
+  backtest could not have caught it, and what to do next.
+- **Interactive version:** https://kalshi-lessons-163098203985.us-central1.run.app
+  (live fee calculator, the exchange scan, the capacity analysis)
+
+## The fee arithmetic
 
 Kalshi's trading fee is
 
