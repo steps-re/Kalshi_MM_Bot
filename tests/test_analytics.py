@@ -10,6 +10,7 @@ from kalshi_mm_bot.analytics.performance import (
 )
 from kalshi_mm_bot.analytics.screening import (
     MarketQuote,
+    capturable_ticks,
     parse_market,
     parse_markets,
     screen_markets,
@@ -287,9 +288,26 @@ def test_screen_skips_one_sided_markets() -> None:
     assert report.scores == ()
 
 
-def test_viable_band_is_empty_for_a_two_cent_spread() -> None:
-    # Improving a tick per side leaves nothing to capture.
-    assert viable_price_band(200) is None
+def test_a_tick_wide_market_can_only_be_joined_not_improved() -> None:
+    # There is nowhere to stand inside a one-tick spread, so the whole spread
+    # is capturable. Subtracting a cent a side here would wrongly condemn most
+    # of the exchange.
+    tick_wide = MarketQuote("T", yes_bid=400, yes_ask=500, volume_24h=100)
+
+    assert capturable_ticks(tick_wide, improvement_ticks=100) == 100
+
+
+def test_improvement_leaves_at_least_one_tick_of_spread() -> None:
+    two_cent = MarketQuote("T", yes_bid=400, yes_ask=600, volume_24h=100)
+
+    # Improving one side by a cent leaves a one cent market, not a zero one.
+    assert capturable_ticks(two_cent, improvement_ticks=100) == 100
+
+
+def test_wide_markets_pay_the_full_improvement() -> None:
+    wide = MarketQuote("T", yes_bid=3000, yes_ask=7000, volume_24h=100)
+
+    assert capturable_ticks(wide, improvement_ticks=100) == 4000 - 200
 
 
 def test_viable_band_widens_with_the_spread() -> None:

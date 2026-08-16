@@ -18,22 +18,51 @@ midpoint still loses 1.5c per contract per round trip. That is not a tuning
 problem and no parameter fixes it.
 
 Because the fee is proportional to `P * (1 - P)`, it collapses in the tails.
-Improving the touch by a cent per side, here is where the arithmetic works:
+Improving the touch where the spread leaves room for it, here is where the
+arithmetic works:
 
 | quoted spread | viable YES price band          |
 | ------------- | ------------------------------ |
-| 1c            | nowhere                        |
-| 2c            | nowhere                        |
-| 3c            | below $0.08 or above $0.92     |
+| 1c-3c         | at or below $0.077, or at or above $0.923 |
 | 4c            | below $0.17 or above $0.83     |
 | 5c            | below $0.31 or above $0.69     |
 | 6c and wider  | anywhere                       |
 
-Reproduce with `python scripts/screen_markets.py --from-json <saved payload>`,
-or against the live exchange with `--prod`.
+A one-tick market cannot be improved - there is nowhere to stand between the
+bid and the ask - so the whole spread is capturable by joining. That is why 1c
+and 3c land in the same band.
 
 **The tight, liquid, midpoint markets are structurally unquotable.** The edge,
 if there is one, is in wide spreads and tail prices.
+
+### What the live exchange actually offers
+
+A full scan on 2026-08-16 (251,000 market records, of which 248,501 were
+auto-generated parlay combos, leaving ~2,500 real markets):
+
+- 250 real markets had two-sided quotes and 24h volume of 50+ contracts.
+- **78% of those were structurally unviable** - the fee exceeded the spread.
+- The 54 that cleared the fee were worth an estimated **$64/day of net edge in
+  total**, assuming we intermediate 10% of their volume.
+
+Where the viable edge is concentrated:
+
+| family                  | viable | est. $/day |
+| ----------------------- | -----: | ---------: |
+| MLB player props        |     36 |      50.36 |
+| Temperature markets     |      9 |       7.97 |
+| Soccer totals/spreads   |      6 |       5.16 |
+
+Notably **absent: crypto hourly strikes.** Those are tick-wide markets at
+midpoint prices, which is the single worst cell in the table. That is exactly
+where the earlier live testing was pointed, and it is why fees ate everything.
+
+Reproduce with `python scripts/screen_markets.py --prod --min-volume 50`, or
+score a saved payload with `--from-json`.
+
+Read the $64/day as an upper bound, not a forecast. It assumes we capture the
+quoted spread on every round trip, which adverse selection erodes - that is
+what the markout report measures. This is a low-capacity game.
 
 One caveat that changes everything and is worth one live session to settle:
 this assumes the 0.07 formula applies to **maker** fills too. If your account

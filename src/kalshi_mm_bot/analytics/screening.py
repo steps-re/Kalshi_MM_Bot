@@ -151,6 +151,28 @@ class ScreenReport:
         return "\n".join(lines)
 
 
+def capturable_ticks(market: MarketQuote, improvement_ticks: int) -> int:
+    """Spread we could actually capture after stepping inside the touch.
+
+    Improvement is capped by what the spread physically allows. A market
+    already quoted one tick wide cannot be improved at all - there is nowhere
+    to stand between the bid and the ask - so the only option is to join, and
+    the whole spread is capturable. Applying a flat "give up a cent per side"
+    to those markets subtracts liquidity that was never there and wrongly
+    condemns every tick-wide market, which on Kalshi is most of them.
+
+    At least one tick of spread must survive, or we would be crossing.
+    """
+
+    tick = max(1, market.tick_ticks)
+    # Improvement happens in whole ticks and must leave at least one tick of
+    # spread standing, so it is the total across both sides that is bounded.
+    room = max(0, market.spread_ticks - tick)
+    improvement = min(2 * improvement_ticks, room) // tick * tick
+
+    return max(tick, market.spread_ticks - improvement)
+
+
 def score_market(
     market: MarketQuote,
     *,
@@ -165,8 +187,7 @@ def score_market(
         yes_price=market.mid,
         count=assumed_size,
     )
-    improvement = improvement_ticks if improvement_ticks else market.tick_ticks
-    capturable = max(0, market.spread_ticks - 2 * improvement)
+    capturable = capturable_ticks(market, improvement_ticks)
     net_edge = capturable - fee_round_trip
 
     # Each round trip consumes two contracts of exchange volume - our buy and
@@ -244,6 +265,7 @@ def viable_price_band(
     fee_model: KalshiFeeModel = DEFAULT_FEE_MODEL,
     count: int = DEFAULT_ASSUMED_SIZE,
     improvement_ticks: int = DEFAULT_IMPROVEMENT_TICKS,
+    tick_ticks: int = 100,
 ) -> tuple[int, int] | None:
     """Prices where `spread_ticks` covers the round-trip fee.
 
@@ -251,7 +273,14 @@ def viable_price_band(
     upper tail is its mirror about $1.00. None when no price works.
     """
 
-    capturable = spread_ticks - 2 * improvement_ticks
+    probe = MarketQuote(
+        ticker="",
+        yes_bid=0,
+        yes_ask=spread_ticks,
+        volume_24h=0,
+        tick_ticks=tick_ticks,
+    )
+    capturable = capturable_ticks(probe, improvement_ticks)
 
     if capturable <= 0:
         return None
