@@ -14,16 +14,20 @@ from kalshi_mm_bot.market.price import (
 )
 from kalshi_mm_bot.sim.accounting import format_contract_count, format_money_value
 from kalshi_mm_bot.sim.backtest import BacktestResult, BacktestSummary, run_replay_backtest
+from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 from kalshi_mm_bot.sim.fills import FillModel
 from kalshi_mm_bot.strategy import format_adaptive_params, strategy_from_name
 from kalshi_mm_bot.strategy.requote import RequotePolicy
 
 OptimizationObjective = Literal[
+    "net_liquidation",
     "mark_to_market",
     "cash",
     "volume",
     "fills",
 ]
+
+DEFAULT_OPTIMIZATION_OBJECTIVE: OptimizationObjective = "net_liquidation"
 ProgressCallback = Callable[["OptimizationTrial"], None]
 StopRequested = Callable[[], bool]
 ExecutionSearchValue = int | float
@@ -94,11 +98,13 @@ async def optimize_adaptive_backtest(
     search_space: Mapping[str, Iterable[int]] | None = None,
     execution_search_space: Mapping[str, Iterable[ExecutionSearchValue]] | None = None,
     optimize_execution: bool = False,
-    objective: OptimizationObjective = "mark_to_market",
+    objective: OptimizationObjective = DEFAULT_OPTIMIZATION_OBJECTIVE,
     speed_multiplier: float = 0.0,
     latency_seconds: float = 0.0,
     requote_policy: RequotePolicy | None = None,
     starting_balance_cents: int | None = None,
+    fee_model: KalshiFeeModel = DEFAULT_FEE_MODEL,
+    strategy_name: str = "adaptive",
     max_trials: int | None = DEFAULT_MAX_OPTIMIZATION_TRIALS,
     on_progress: ProgressCallback | None = None,
     stop_requested: StopRequested | None = None,
@@ -133,7 +139,7 @@ async def optimize_adaptive_backtest(
             starting_balance_cents=starting_balance_cents,
         )
         strategy = strategy_from_name(
-            "adaptive",
+            strategy_name,
             count=settings.count,
             max_position=settings.max_position,
             adaptive_params=trial_params,
@@ -146,6 +152,7 @@ async def optimize_adaptive_backtest(
             latency_seconds=latency_seconds,
             requote_policy=settings.requote_policy,
             starting_balance_cents=settings.starting_balance_cents,
+            fee_model=fee_model,
         )
         trial = OptimizationTrial(
             index=index,
@@ -228,6 +235,23 @@ def default_execution_search_space(
             5_000,
         ),
     }
+
+
+def strategy_parameter_grid(
+    search_space: Mapping[str, Iterable[int]] | None = None,
+    fixed_params: Mapping[str, int] | None = None,
+) -> tuple[dict[str, int], ...]:
+    """Every parameter combination in the search space, as plain dicts.
+
+    Public so out-of-sample validation can iterate the same grid the in-sample
+    optimizer does, instead of maintaining a second copy that drifts.
+    """
+
+    grid = _normalized_search_space(
+        search_space or DEFAULT_ADAPTIVE_SEARCH_SPACE,
+        dict(fixed_params or ()),
+    )
+    return tuple(dict(combo) for combo in _parameter_combinations(grid))  # type: ignore[arg-type]
 
 
 def _normalized_search_space(
@@ -386,6 +410,8 @@ def _valid_execution_settings(settings: OptimizationSettings) -> bool:
 
 
 def _objective_value(summary: BacktestSummary, objective: OptimizationObjective) -> int:
+    if objective == "net_liquidation":
+        return summary.net_liquidation_value
     if objective == "mark_to_market":
         return summary.mark_to_market_value
     if objective == "cash":
@@ -399,7 +425,15 @@ def _objective_value(summary: BacktestSummary, objective: OptimizationObjective)
 
 
 def _trial_sort_key(summary: BacktestSummary, objective_value: int) -> tuple[int, int, int]:
-    return objective_value, summary.volume_count, -abs(summary.position_count)
+    """Rank trials, breaking ties toward less risk rather than more activity.
+
+    This used to tie-break on volume, which was actively harmful once fees are
+    charged: among parameter sets with equal P&L it picked the one that traded
+    most, and every extra round trip is another fee plus another chance to be
+    adversely selected. Prefer ending flat, then prefer fewer fills.
+    """
+
+    return objective_value, -abs(summary.position_count), -summary.fill_count
 
 
 def _format_objective_value(trial: OptimizationTrial) -> str:

@@ -121,6 +121,34 @@ class KalshiRestClient:
             for raw_market in data["markets"]
         }
 
+    async def get_market_close_times(
+        self,
+        tickers: list[str] | tuple[str, ...],
+    ) -> dict[str, str]:
+        """Close timestamps keyed by ticker, as ISO-8601 strings.
+
+        Markets missing a close time are omitted rather than defaulted, so a
+        caller can tell "closes at T" apart from "we do not know".
+        """
+
+        if not tickers:
+            return {}
+
+        data = await self._request(
+            "GET",
+            "/markets",
+            params={"tickers": ",".join(tickers)},
+        )
+        close_times: dict[str, str] = {}
+
+        for raw_market in data["markets"]:
+            close_time = raw_market.get("close_time") or raw_market.get("expected_expiration_time")
+
+            if close_time:
+                close_times[raw_market["ticker"]] = str(close_time)
+
+        return close_times
+
     async def get_positions(
         self,
         tickers: list[str] | tuple[str, ...],

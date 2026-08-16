@@ -4,9 +4,10 @@ from collections.abc import Mapping
 
 from kalshi_mm_bot.strategy.adaptive import AdaptivePredictionMarketMakerStrategy
 from kalshi_mm_bot.strategy.dumb import DumbMarketMakerStrategy
+from kalshi_mm_bot.strategy.horizon import HorizonAwareMarketMaker
 from kalshi_mm_bot.strategy.types import Strategy
 
-STRATEGY_NAMES: tuple[str, ...] = ("adaptive", "dumb")
+STRATEGY_NAMES: tuple[str, ...] = ("horizon", "adaptive", "dumb")
 
 
 def strategy_from_name(
@@ -17,6 +18,12 @@ def strategy_from_name(
     adaptive_params: Mapping[str, int] | None = None,
 ) -> Strategy:
     normalized = name.strip().lower()
+
+    if normalized in {"horizon", "horizon_aware", "expiry"}:
+        params = dict(adaptive_params or ())
+        params.setdefault("count", count)
+        params.setdefault("max_position", max_position)
+        return HorizonAwareMarketMaker(**params)
 
     if normalized in {"adaptive", "prediction", "adaptive_prediction_mm"}:
         params = dict(adaptive_params or ())

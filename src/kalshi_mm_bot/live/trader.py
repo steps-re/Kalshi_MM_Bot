@@ -21,6 +21,7 @@ from kalshi_mm_bot.api.parser import ParsedWsMessage
 from kalshi_mm_bot.api.rest import CancelOrderRequest, CreateOrderRequest, KalshiRestClient
 from kalshi_mm_bot.api.websocket import KalshiWebSocketClient
 from kalshi_mm_bot.config import load_settings
+from kalshi_mm_bot.market.clock import MarketClock
 from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import (
     COUNT_SCALE,
@@ -540,6 +541,7 @@ async def run_live_strategy(
     try:
         _emit(status, f"Connecting to {environment.name} ({'dry-run' if dry_run else 'LIVE'})")
         portfolio = await LivePortfolio.load(rest, tickers)
+        market_clock = await _load_market_clock(rest, tickers, status)
         await controller.connect()
 
         if not dry_run:
@@ -591,6 +593,7 @@ async def run_live_strategy(
                 event_count=stats.event_count,
                 offset_seconds=time.monotonic() - started,
                 observed_at_utc=utc_now_iso(),
+                seconds_to_close=market_clock.seconds_to_close(update.updated_ticker),
             )
             external_book = order_manager.external_orderbook(book)
             intents = strategy.on_orderbook(
@@ -618,6 +621,32 @@ async def run_live_strategy(
 
 def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+async def _load_market_clock(
+    rest: KalshiRestClient,
+    tickers: tuple[str, ...],
+    status: StatusCallback | None,
+) -> MarketClock:
+    """Fetch close times, degrading to "unknown" rather than failing the run.
+
+    Expiry awareness is an optimisation, not a prerequisite. If the metadata
+    call fails we say so loudly and keep trading with the time-based controls
+    disabled, which is exactly how the strategy behaves on older recordings.
+    """
+
+    try:
+        clock = MarketClock.from_iso_map(await rest.get_market_close_times(tickers))
+    except Exception as error:
+        _emit(status, f"Could not load market close times ({error}); expiry controls disabled")
+        return MarketClock()
+
+    unknown = [ticker for ticker in tickers if not clock.knows(ticker)]
+
+    if unknown:
+        _emit(status, f"No close time for {', '.join(unknown)}; expiry controls disabled there")
+
+    return clock
 
 
 def _emit(status: StatusCallback | None, message: str) -> None:

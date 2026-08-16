@@ -18,6 +18,13 @@ from kalshi_mm_bot.sim.orders import SimulatedOrder
 from kalshi_mm_bot.strategy.types import StrategyContext
 
 
+# Reasons where our own order crossed into resting liquidity. Everything else
+# means somebody traded against a quote we were already resting, which is a
+# maker fill. Fee schedules can differ between the two, so the simulator has to
+# know which one happened rather than assuming.
+TAKER_FILL_REASONS = frozenset({"cross_or_touch", "strict_cross"})
+
+
 @dataclass(frozen=True, slots=True)
 class SimulatedFill:
     fill_id: str
@@ -31,6 +38,7 @@ class SimulatedFill:
     observed_at_utc: str | None
     fill_model: str
     reason: str
+    is_taker: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,6 +319,7 @@ def _fill(
         observed_at_utc=context.observed_at_utc,
         fill_model=fill_model,
         reason=reason,
+        is_taker=reason in TAKER_FILL_REASONS,
     )
 
 

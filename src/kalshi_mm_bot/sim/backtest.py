@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from kalshi_mm_bot.api.feed_controller import FeedController, ORDERBOOK_CHANNEL
+from kalshi_mm_bot.market.clock import MarketClock
 from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR, PRICE_SCALE
 from kalshi_mm_bot.market.view import TopOfBookRow, top_of_book_rows
@@ -15,6 +16,7 @@ from kalshi_mm_bot.recording import (
     RecordingSessionReader,
 )
 from kalshi_mm_bot.sim.accounting import SimPortfolio
+from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 from kalshi_mm_bot.sim.fills import FillModel, SimulatedFill
 from kalshi_mm_bot.sim.orders import SimulatedOrder
 from kalshi_mm_bot.strategy.quotes import quote_intent_map
@@ -28,6 +30,17 @@ from kalshi_mm_bot.strategy.types import QuoteIntent, Strategy, StrategyContext
 
 @dataclass(frozen=True, slots=True)
 class BacktestSummary:
+    """Outcome of a replay.
+
+    `cash_value` and `mark_to_market_value` are net of fees and keep their old
+    names so existing callers keep working, but they no longer mean what they
+    used to - the pre-fee figures are `gross_cash_value` and
+    `gross_mark_to_market_value` if you need to see the difference.
+    `net_liquidation_value` is the honest bottom line: fees paid, and leftover
+    inventory valued at the touch it could actually be unwound into rather than
+    at mid.
+    """
+
     strategy_name: str
     fill_model: str
     event_count: int
@@ -43,6 +56,20 @@ class BacktestSummary:
     starting_balance_cents: int | None = None
     reserved_risk_cents: int = 0
     skipped_order_count: int = 0
+    fees_paid: int = 0
+    gross_cash_value: int = 0
+    gross_mark_to_market_value: int = 0
+    net_liquidation_value: int = 0
+    maker_fill_count: int = 0
+    taker_fill_count: int = 0
+    fee_ceiling_surcharge: int = 0
+    unwindable_at_touch: bool = True
+
+    @property
+    def inventory_mark_gap(self) -> int:
+        """Mid mark minus achievable exit. Non-zero only when ending non-flat."""
+
+        return self.mark_to_market_value - self.net_liquidation_value
 
 
 @dataclass(frozen=True, slots=True)
@@ -314,6 +341,7 @@ async def run_replay_backtest(
     latency_seconds: float = 0.0,
     requote_policy: RequotePolicy | None = None,
     starting_balance_cents: int | None = None,
+    fee_model: KalshiFeeModel = DEFAULT_FEE_MODEL,
     on_update: UpdateCallback | None = None,
     update_interval_seconds: float = 0.25,
     stop_requested: StopRequested | None = None,
@@ -326,7 +354,10 @@ async def run_replay_backtest(
     ws = RecordedWebSocketClient.from_session(reader, speed_multiplier=speed_multiplier)
     rest = RecordedRestClient(reader.manifest)
     controller = FeedController(rest=rest, ws=ws)
-    portfolio = SimPortfolio()
+    # Older recordings predate close-time capture; the clock is then empty and
+    # every strategy sees seconds_to_close=None, which is the correct answer.
+    market_clock = MarketClock.from_iso_map(reader.manifest.metadata.get("close_times_utc"))
+    portfolio = SimPortfolio(fee_model=fee_model)
     manager = SimulatedOrderManager(
         fill_model=fill_model,
         portfolio=portfolio,
@@ -359,6 +390,14 @@ async def run_replay_backtest(
                 event_count=ws.returned_count,
                 offset_seconds=event.offset_seconds,
                 observed_at_utc=event.observed_at_utc,
+                seconds_to_close=(
+                    market_clock.seconds_to_close(
+                        updated_ticker,
+                        now_utc=event.observed_at_utc,
+                    )
+                    if updated_ticker is not None
+                    else None
+                ),
             )
             recent_fills = manager.process_market_event(event.msg, controller.orderbooks, context)
 
@@ -456,6 +495,13 @@ def _build_summary(
     controller: FeedController,
 ) -> BacktestSummary:
     fills = tuple(manager.fills)
+    portfolio = manager.portfolio
+    books = controller.orderbooks
+    fee_model = portfolio.fee_model
+    gross_cash = portfolio.gross_cash()
+    mark_to_market = portfolio.mark_to_market(books)
+    fees_paid = portfolio.total_fees()
+
     return BacktestSummary(
         strategy_name=strategy.name,
         fill_model=fill_model.name,
@@ -465,13 +511,24 @@ def _build_summary(
         fill_count=len(fills),
         buy_filled_count=sum(fill.count for fill in fills if fill.action == "buy"),
         sell_filled_count=sum(fill.count for fill in fills if fill.action == "sell"),
-        position_count=manager.portfolio.total_position_count(),
-        volume_count=manager.portfolio.total_volume_count(),
-        cash_value=manager.portfolio.total_cash(),
-        mark_to_market_value=manager.portfolio.mark_to_market(controller.orderbooks),
+        position_count=portfolio.total_position_count(),
+        volume_count=portfolio.total_volume_count(),
+        cash_value=portfolio.total_cash(),
+        mark_to_market_value=mark_to_market,
         starting_balance_cents=manager.starting_balance_cents,
         reserved_risk_cents=manager.reserved_risk_cents(),
         skipped_order_count=manager.skipped_order_count,
+        fees_paid=fees_paid,
+        gross_cash_value=gross_cash,
+        gross_mark_to_market_value=mark_to_market + fees_paid,
+        net_liquidation_value=portfolio.liquidation_value(books),
+        maker_fill_count=sum(1 for fill in fills if not fill.is_taker),
+        taker_fill_count=sum(1 for fill in fills if fill.is_taker),
+        fee_ceiling_surcharge=sum(
+            fee_model.ceiling_surcharge_micros(yes_price=fill.yes_price, count=fill.count)
+            for fill in fills
+        ),
+        unwindable_at_touch=portfolio.unwindable_at_touch(books),
     )
 
 

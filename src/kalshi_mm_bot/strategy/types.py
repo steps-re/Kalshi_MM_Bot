@@ -19,9 +19,17 @@ class QuoteIntent:
 
 @dataclass(frozen=True, slots=True)
 class StrategyContext:
+    """Per-event context handed to a strategy.
+
+    `seconds_to_close` is None whenever the close time is unknown - an older
+    recording, or a market whose metadata we could not fetch. Strategies must
+    treat None as "no deadline" and keep working, never as "closing now".
+    """
+
     event_count: int
     offset_seconds: float
     observed_at_utc: str | None = None
+    seconds_to_close: float | None = None
 
 
 class PortfolioView(Protocol):

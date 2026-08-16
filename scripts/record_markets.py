@@ -39,6 +39,16 @@ def main() -> None:
         print("Recording stopped.")
 
 
+async def _close_times(rest: KalshiRestClient, tickers: tuple[str, ...]) -> dict[str, str]:
+    """Best-effort close-time lookup. A recording without them is still useful."""
+
+    try:
+        return await rest.get_market_close_times(tickers)
+    except Exception as error:
+        print(f"WARNING: could not fetch close times ({error})")
+        return {}
+
+
 async def _run(args: argparse.Namespace) -> None:
     tickers = args.tickers
     channels = cast(tuple[FeedChannel, ...], tuple(dict.fromkeys(args.channels)))
@@ -67,6 +77,15 @@ async def _run(args: argparse.Namespace) -> None:
         print(f"Subscribing to {len(tickers)} market(s): {', '.join(tickers)}")
         await controller.subscribe(tickers, channels=channels)
 
+        # Captured now so replays can reconstruct time-to-close. Without it
+        # every expiry-aware control silently no-ops on the recording.
+        close_times = await _close_times(rest, tickers)
+
+        if close_times:
+            print(f"Captured close times for {len(close_times)}/{len(tickers)} market(s)")
+        else:
+            print("WARNING: no close times captured; expiry controls will not replay")
+
         writer.write_manifest(
             RecordingManifest.create(
                 environment=environment.name,
@@ -78,6 +97,7 @@ async def _run(args: argparse.Namespace) -> None:
                 metadata={
                     "rest_base_url": environment.rest_base_url,
                     "ws_url": environment.ws_url,
+                    "close_times_utc": close_times,
                 },
             )
         )
