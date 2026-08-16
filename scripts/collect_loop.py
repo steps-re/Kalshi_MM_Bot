@@ -136,17 +136,34 @@ def run_cycle(args: argparse.Namespace, cycle: int) -> Path | None:
         return None
 
     out = Path(args.workdir) / f"rec_{now_stamp()}"
-    command = [
-        sys.executable,
-        str(ROOT / "scripts" / "poll_record.py"),
-        *tickers,
-        "--interval",
-        str(args.interval),
-        "--duration-sec",
-        str(args.cycle_min * 60),
-        "--output",
-        str(out),
-    ]
+
+    if args.websocket:
+        # The authenticated feed delivers every book event rather than net
+        # change per interval - measured at ~50x the events of polling on the
+        # same markets - so queue position and volatility are real rather than
+        # approximated. Use it whenever credentials are present.
+        command = [
+            sys.executable,
+            str(ROOT / "scripts" / "record_markets.py"),
+            "--prod",
+            *tickers,
+            "--duration-sec",
+            str(args.cycle_min * 60),
+            "--output",
+            str(out),
+        ]
+    else:
+        command = [
+            sys.executable,
+            str(ROOT / "scripts" / "poll_record.py"),
+            *tickers,
+            "--interval",
+            str(args.interval),
+            "--duration-sec",
+            str(args.cycle_min * 60),
+            "--output",
+            str(out),
+        ]
     log(f"  recording {len(tickers)} markets for {args.cycle_min}m -> {out.name}")
     subprocess.run(command, check=True, cwd=str(ROOT))
     return out
@@ -173,6 +190,12 @@ def main() -> None:
     parser.add_argument("--cycle-min", type=int, default=20)
     parser.add_argument("--probe-gap", type=float, default=8.0)
     parser.add_argument("--max-cycles", type=int, default=0, help="0 means run forever.")
+    parser.add_argument(
+        "--websocket",
+        action="store_true",
+        help="Record via the authenticated websocket feed instead of REST "
+        "polling. Needs KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY_PATH.",
+    )
     parser.add_argument("--keep-local", action="store_true")
     args = parser.parse_args()
 
