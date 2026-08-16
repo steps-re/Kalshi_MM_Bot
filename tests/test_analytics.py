@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from kalshi_mm_bot.analytics.markout import (
     MidSeries,
     compute_markout,
@@ -496,3 +498,68 @@ def test_a_fine_tick_lets_us_step_inside_a_one_cent_spread() -> None:
     # improving costs only a tenth of a cent; at the midpoint there are none.
     assert capturable_ticks(tail, improvement_ticks=100) == 10
     assert capturable_ticks(middle, improvement_ticks=100) == 100
+
+
+def test_parse_market_reads_seconds_to_close_from_close_time() -> None:
+    """Regression: this was hardcoded to None, silently disabling every
+    time-to-close screen in suitability.py."""
+
+    quote = parse_market(
+        {
+            "ticker": "KXBTC15M-TEST",
+            "yes_bid_dollars": "0.45",
+            "yes_ask_dollars": "0.47",
+            "close_time": "2026-08-16T12:15:00Z",
+        },
+        now=datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC),
+    )
+
+    assert quote is not None
+    assert quote.seconds_to_close == 900.0
+
+
+def test_parse_market_reports_closed_market_as_unknown_not_negative() -> None:
+    """A market that closed an hour ago must not look like one closing soon."""
+
+    quote = parse_market(
+        {
+            "ticker": "KXBTC15M-PAST",
+            "yes_bid_dollars": "0.45",
+            "yes_ask_dollars": "0.47",
+            "close_time": "2026-08-16T11:00:00Z",
+        },
+        now=datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC),
+    )
+
+    assert quote is not None
+    assert quote.seconds_to_close is None
+
+
+def test_parse_market_falls_back_to_expiration_time() -> None:
+    quote = parse_market(
+        {
+            "ticker": "KXTEST",
+            "yes_bid_dollars": "0.45",
+            "yes_ask_dollars": "0.47",
+            "expiration_time": "2026-08-16T13:00:00Z",
+        },
+        now=datetime(2026, 8, 16, 12, 0, 0, tzinfo=UTC),
+    )
+
+    assert quote is not None
+    assert quote.seconds_to_close == 3600.0
+
+
+def test_parse_market_survives_a_missing_or_unparseable_close_time() -> None:
+    for raw in (
+        {"ticker": "A", "yes_bid_dollars": "0.45", "yes_ask_dollars": "0.47"},
+        {
+            "ticker": "B",
+            "yes_bid_dollars": "0.45",
+            "yes_ask_dollars": "0.47",
+            "close_time": "not a timestamp",
+        },
+    ):
+        quote = parse_market(raw)
+        assert quote is not None
+        assert quote.seconds_to_close is None

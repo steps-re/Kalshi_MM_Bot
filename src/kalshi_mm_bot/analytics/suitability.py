@@ -20,6 +20,21 @@ where the fee arithmetic is live rather than hopeless. A market that scores high
 on the fee screen but expires next year is a market where we are just another
 spread quoter with no advantage.
 
+**Spread you cannot reach is not edge.** An earlier version of this score ranked
+purely on net edge and log volume, and its top families were things like
+KXWNBATEAMTOTAL: a 48c spread over a book that trades 56 contracts a day, where
+the resting queue needs 38 days to clear. The arithmetic was right and the
+conclusion was worthless, because a maker joining that queue never reaches the
+front. Wide spreads in dead markets are wide *because* they are dead.
+
+So the score now multiplies through `queue_clearance` - how many times the queue
+ahead of us can turn over before the market closes. That single term is what
+separates the 15-minute crypto window, where the whole book recycles many times
+an hour, from a wide prop market that has not traded since yesterday. Depth is
+not in the `/markets` payload and has to be probed per market, so it is optional
+here; when it is missing the market is reported UNMEASURED rather than scored,
+because an unmeasured queue is the assumption most likely to be flattering.
+
 Deliberately kept separate from `screening.py`: that module answers a question
 about the exchange, this one answers a question about *us*, and conflating them
 would hide the assumption that our machinery is worth anything.
@@ -41,6 +56,14 @@ SHORT_DATED_SECONDS = 6 * 3600
 # Above this, the market resolves so far out that time-to-close never binds.
 LONG_DATED_SECONDS = 14 * 24 * 3600
 
+# For a market with no close in sight, "before it closes" is not a useful
+# horizon, so clearance is measured against a session instead.
+SESSION_SECONDS = 6 * 3600
+
+# The queue has to turn over several times over, not just once: joining at the
+# back and being reached exactly at the bell is not a business.
+MIN_QUEUE_CLEARANCE = 3.0
+
 
 @dataclass(frozen=True, slots=True)
 class Suitability:
@@ -53,10 +76,51 @@ class Suitability:
     volume_24h: int
     seconds_to_close: float | None
     band: str
+    depth_at_touch: float | None = None
 
     @property
     def fee_viable(self) -> bool:
         return self.net_edge_ticks > 0
+
+    @property
+    def expected_wait_seconds(self) -> float | None:
+        """Seconds for the queue ahead of us at the touch to trade through.
+
+        Volume is two-sided and our order sits on one side, so only half the
+        flow can reach us. This is an optimistic floor either way: it assumes
+        every contract traded hits the touch and that nobody joins ahead of us
+        or cancels behind. A market that fails this test fails a generous one.
+        """
+
+        if self.depth_at_touch is None or self.volume_24h <= 0:
+            return None
+
+        per_side_per_second = (self.volume_24h / 86_400.0) / 2.0
+        return self.depth_at_touch / per_side_per_second
+
+    @property
+    def queue_clearance(self) -> float | None:
+        """How many times the queue can turn over before we run out of market.
+
+        None when depth was never probed - which is a missing measurement, not
+        a passing grade, and callers must treat it as such.
+        """
+
+        wait = self.expected_wait_seconds
+
+        if wait is None:
+            return None
+
+        if wait <= 0:
+            return float("inf")
+
+        horizon = self.seconds_to_close or SESSION_SECONDS
+        return min(horizon, SESSION_SECONDS) / wait
+
+    @property
+    def queue_viable(self) -> bool | None:
+        clearance = self.queue_clearance
+        return None if clearance is None else clearance >= MIN_QUEUE_CLEARANCE
 
     @property
     def expiry_fit(self) -> float:
@@ -79,10 +143,22 @@ class Suitability:
 
         Multiplicative rather than additive on purpose: a market that fails the
         fee test is not partially suitable, it is unsuitable, and no amount of
-        volume or volatility redeems it.
+        volume or volatility redeems it. The same logic applies to the queue -
+        an edge behind a queue we never reach is worth exactly nothing, so
+        clearance multiplies rather than adjusts.
+
+        An unprobed queue scores zero too. That is deliberately inconvenient:
+        the alternative is a ranking whose top entries are all markets nobody
+        bothered to measure, which is how the dead-wide-spread families topped
+        this list in the first place.
         """
 
         if not self.fee_viable or self.volume_24h <= 0:
+            return 0.0
+
+        clearance = self.queue_clearance
+
+        if clearance is None or clearance < MIN_QUEUE_CLEARANCE:
             return 0.0
 
         edge = self.net_edge_ticks / 100.0
@@ -91,7 +167,10 @@ class Suitability:
         from math import log10
 
         liquidity = log10(1.0 + self.volume_24h)
-        return edge * liquidity * (0.25 + 0.75 * self.expiry_fit)
+        # Clearance is logged for the same reason, and floored at 1.0 so a
+        # queue that merely passes the bar neither helps nor hurts.
+        turnover = log10(clearance / MIN_QUEUE_CLEARANCE * 10.0)
+        return edge * liquidity * turnover * (0.25 + 0.75 * self.expiry_fit)
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +208,12 @@ def assess(
     fee_model: KalshiFeeModel = DEFAULT_FEE_MODEL,
     improvement_ticks: int = 100,
     assumed_size: int = DEFAULT_SIZE,
+    depth_at_touch: float | None = None,
 ) -> Suitability:
+    """Assess one market. `depth_at_touch` is contracts resting at the touch,
+    averaged across the two sides; without it the queue cannot be judged and
+    the market scores zero rather than being assumed clear."""
+
     capturable = capturable_ticks(quote, improvement_ticks)
     fee = fee_model.breakeven_edge_ticks(yes_price=quote.mid, count=assumed_size)
 
@@ -141,6 +225,7 @@ def assess(
         volume_24h=quote.volume_24h,
         seconds_to_close=quote.seconds_to_close,
         band=price_band(quote.mid),
+        depth_at_touch=depth_at_touch,
     )
 
 

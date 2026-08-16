@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 from kalshi_mm_bot.market.price import COUNT_SCALE, MONEY_SCALE, ONE_DOLLAR
 from kalshi_mm_bot.market.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
@@ -387,7 +388,7 @@ def describe_series(report: ScreenReport, limit: int = 15) -> str:
     return "\n".join(lines)
 
 
-def parse_market(raw: dict) -> MarketQuote | None:
+def parse_market(raw: dict, *, now: datetime | None = None) -> MarketQuote | None:
     """Build a `MarketQuote` from a Kalshi `/markets` entry.
 
     The live API reports prices as decimal-dollar strings (`yes_bid_dollars`)
@@ -396,6 +397,10 @@ def parse_market(raw: dict) -> MarketQuote | None:
 
     Returns None when the entry lacks a two-sided market, which is not an
     error - most of the exchange is untraded at any moment.
+
+    `now` exists so a saved scan can be re-read against the time it was taken
+    rather than the time it is analysed. Without it, every close time in an
+    hour-old snapshot silently shifts an hour closer to expiry.
     """
 
     ticker = raw.get("ticker")
@@ -415,11 +420,36 @@ def parse_market(raw: dict) -> MarketQuote | None:
         yes_ask=yes_ask,
         volume_24h=_count(raw, "volume_24h_fp", "volume_24h"),
         open_interest=_count(raw, "open_interest_fp", "open_interest"),
-        seconds_to_close=None,
+        seconds_to_close=_seconds_to_close(raw, now),
         series=str(raw.get("series_ticker") or raw.get("event_ticker") or ""),
         title=str(raw.get("title") or ""),
         tick_ticks=_tick_size(raw),
     )
+
+
+def _seconds_to_close(raw: dict, now: datetime | None) -> float | None:
+    """Seconds until the market closes, or None when it cannot be determined.
+
+    Returns None rather than a negative number for a market that has already
+    closed: "closed an hour ago" and "closes in an hour" must not both look
+    like small numbers to a screen that ranks on time remaining.
+    """
+
+    stamp = raw.get("close_time") or raw.get("expiration_time")
+
+    if not isinstance(stamp, str) or not stamp:
+        return None
+
+    try:
+        close = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    if close.tzinfo is None:
+        close = close.replace(tzinfo=UTC)
+
+    remaining = (close - (now or datetime.now(UTC))).total_seconds()
+    return remaining if remaining > 0 else None
 
 
 def _price_ticks(raw: dict, dollars_key: str, cents_key: str) -> int | None:
