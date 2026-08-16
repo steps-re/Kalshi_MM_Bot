@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from kalshi_mm_bot.strategy.adaptive import AdaptivePredictionMarketMakerStrategy
+from kalshi_mm_bot.strategy.adaptive import (
+    AdaptivePredictionMarketMakerStrategy,
+    parse_adaptive_params,
+)
 from kalshi_mm_bot.strategy.dumb import DumbMarketMakerStrategy
-from kalshi_mm_bot.strategy.horizon import HorizonAwareMarketMaker
+from kalshi_mm_bot.strategy.horizon import HorizonAwareMarketMaker, parse_horizon_params
 from kalshi_mm_bot.strategy.types import Strategy
 
 STRATEGY_NAMES: tuple[str, ...] = ("horizon", "adaptive", "dumb")
@@ -40,3 +43,18 @@ def strategy_from_name(
         )
 
     raise ValueError(f"unknown strategy: {name!r}")
+
+
+def parse_params_for(name: str, raw_values: str | list[str] | None) -> dict[str, int | float]:
+    """Parse `key=value` overrides using the named strategy's own parameter set.
+
+    `horizon` and `adaptive` accept different parameters, so parsing against
+    the wrong one rejects valid overrides with a confusing "unknown parameter".
+    """
+
+    normalized = name.strip().lower()
+
+    if normalized in {"horizon", "horizon_aware", "expiry"}:
+        return parse_horizon_params(raw_values)
+
+    return dict(parse_adaptive_params(raw_values))

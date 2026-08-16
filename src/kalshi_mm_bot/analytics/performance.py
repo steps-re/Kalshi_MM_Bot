@@ -14,7 +14,7 @@ runs against a replay and against a live session.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from math import sqrt
 from statistics import fmean, pstdev
@@ -146,9 +146,10 @@ def build_performance_report(
     fills: Sequence[SimulatedFill],
     equity_curve: Sequence[tuple[float, int]],
     *,
-    final_position: int,
-    final_mid: int | None,
     fees_paid: int,
+    final_position: int | None = None,
+    final_mid: int | None = None,
+    final_marks: Mapping[str, tuple[int, int | None]] | None = None,
     fee_model: KalshiFeeModel = DEFAULT_FEE_MODEL,
 ) -> PerformanceReport:
     """Assemble the full report from a session's fills and equity curve."""
@@ -156,9 +157,10 @@ def build_performance_report(
     return PerformanceReport(
         attribution=attribute_pnl(
             fills,
+            fees_paid=fees_paid,
             final_position=final_position,
             final_mid=final_mid,
-            fees_paid=fees_paid,
+            final_marks=final_marks,
         ),
         risk=risk_metrics(equity_curve),
         fills=fill_metrics(fills),
@@ -173,9 +175,10 @@ def build_performance_report(
 def attribute_pnl(
     fills: Sequence[SimulatedFill],
     *,
-    final_position: int,
-    final_mid: int | None,
     fees_paid: int,
+    final_position: int | None = None,
+    final_mid: int | None = None,
+    final_marks: Mapping[str, tuple[int, int | None]] | None = None,
 ) -> PnlAttribution:
     """Split P&L into spread capture and inventory drift.
 
@@ -186,16 +189,22 @@ def attribute_pnl(
 
     Without a mid at fill time we fall back to attributing everything to
     inventory, which understates the strategy rather than flattering it.
+
+    Pass `final_marks` as `{ticker: (position, mid)}` for a session spanning
+    several markets. A single `final_position`/`final_mid` pair only values
+    residual inventory correctly when every fill is in one market, so it is
+    rejected when the fills say otherwise rather than quietly marking one
+    market's position at another market's price.
     """
+
+    marks = _resolve_marks(fills, final_position, final_mid, final_marks)
 
     spread_capture = 0
     signed_cash = 0
-    net_position = 0
 
     for fill in fills:
         direction = 1 if fill.action == "buy" else -1
         signed_cash -= direction * fill.yes_price * fill.count
-        net_position += direction * fill.count
 
         if fill.mid_at_fill is None:
             continue
@@ -203,11 +212,9 @@ def attribute_pnl(
         # Edge relative to fair value at the time, in ticks * contracts.
         spread_capture += direction * (fill.mid_at_fill - fill.yes_price) * fill.count
 
-    closing_value = 0
-
-    if final_mid is not None:
-        closing_value = final_position * final_mid
-
+    closing_value = sum(
+        position * mid for position, mid in marks.values() if mid is not None
+    )
     gross = signed_cash + closing_value
 
     return PnlAttribution(
@@ -215,6 +222,27 @@ def attribute_pnl(
         inventory_pnl=gross - spread_capture,
         fees_paid=fees_paid,
     )
+
+
+def _resolve_marks(
+    fills: Sequence[SimulatedFill],
+    final_position: int | None,
+    final_mid: int | None,
+    final_marks: Mapping[str, tuple[int, int | None]] | None,
+) -> dict[str, tuple[int, int | None]]:
+    if final_marks is not None:
+        return dict(final_marks)
+
+    tickers = {fill.market_ticker for fill in fills}
+
+    if len(tickers) > 1:
+        raise ValueError(
+            "fills span multiple markets; pass final_marks={ticker: (position, mid)} "
+            f"rather than a single position (saw {sorted(tickers)})"
+        )
+
+    ticker = next(iter(tickers), "")
+    return {ticker: (final_position or 0, final_mid)}
 
 
 def risk_metrics(equity_curve: Sequence[tuple[float, int]]) -> RiskMetrics:
@@ -232,14 +260,22 @@ def risk_metrics(equity_curve: Sequence[tuple[float, int]]) -> RiskMetrics:
 
     peak = equity_curve[0][1]
     max_drawdown = 0
-    underwater_samples = 0
+    underwater_seconds = 0.0
 
-    for _, value in equity_curve:
+    for index, (offset, value) in enumerate(equity_curve):
         peak = max(peak, value)
         max_drawdown = max(max_drawdown, peak - value)
 
         if value < peak:
-            underwater_samples += 1
+            # Weight by elapsed time, not sample count: equity samples are not
+            # evenly spaced, and a burst of updates during one busy minute
+            # would otherwise outvote an hour of quiet drawdown.
+            next_offset = (
+                equity_curve[index + 1][0] if index + 1 < len(equity_curve) else offset
+            )
+            underwater_seconds += max(0.0, next_offset - offset)
+
+    elapsed = equity_curve[-1][0] - equity_curve[0][0]
 
     return RiskMetrics(
         sample_count=len(equity_curve),
@@ -247,7 +283,7 @@ def risk_metrics(equity_curve: Sequence[tuple[float, int]]) -> RiskMetrics:
         max_drawdown=max_drawdown,
         peak_equity=peak,
         final_equity=equity_curve[-1][1],
-        time_in_drawdown=underwater_samples / len(equity_curve),
+        time_in_drawdown=(underwater_seconds / elapsed) if elapsed > 0 else 0.0,
     )
 
 

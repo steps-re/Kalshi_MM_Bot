@@ -59,6 +59,23 @@ class RiskLimits:
     max_consecutive_rejections: int | None = None
     max_feed_silence_seconds: float | None = 15.0
 
+    def __post_init__(self) -> None:
+        # A negative limit reads as "off" but behaves as "inverted": a
+        # max_session_loss of -$5 would only trip once the account was $5 UP.
+        # Reject it rather than fail open on a sign slip.
+        for name in (
+            "max_abs_position",
+            "max_session_loss_micros",
+            "max_drawdown_micros",
+            "max_orders_per_minute",
+            "max_consecutive_rejections",
+            "max_feed_silence_seconds",
+        ):
+            value = getattr(self, name)
+
+            if value is not None and value < 0:
+                raise ValueError(f"{name} must be non-negative or None, got {value!r}")
+
     @classmethod
     def conservative(cls, *, contracts: int = 10, loss_dollars: float = 5.0) -> "RiskLimits":
         """Sane starting limits for a first live run."""

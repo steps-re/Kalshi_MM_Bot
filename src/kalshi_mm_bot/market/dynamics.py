@@ -62,9 +62,18 @@ class MarketSnapshot:
     price_levels: tuple[int, ...] = ()
     seconds_to_close: float | None = None
 
+    min_samples_required: int = DEFAULT_MIN_VOL_SAMPLES
+
     @property
     def has_volatility_estimate(self) -> bool:
-        return self.sample_count >= DEFAULT_MIN_VOL_SAMPLES
+        """False when too few recent observations to trust sigma.
+
+        A caller must widen, not tighten, when this is False. Zero samples
+        produce a sigma of zero, and treating that as "calm" is exactly wrong
+        after a feed gap or at the start of a session.
+        """
+
+        return self.sample_count >= self.min_samples_required
 
     def expected_move_ticks(self, horizon_seconds: float) -> float:
         """One standard deviation of mid movement over `horizon_seconds`."""
@@ -161,6 +170,7 @@ class MarketDynamicsTracker:
             sigma_ticks_per_sqrt_sec=_realized_sigma(history),
             update_rate_hz=_update_rate_hz(history),
             sample_count=len(history),
+            min_samples_required=self.min_samples,
             price_levels=orderbook.price_levels,
             seconds_to_close=seconds_to_close,
         )
@@ -172,9 +182,19 @@ class MarketDynamicsTracker:
             self._history.pop(market_ticker, None)
 
     def _trim(self, history: deque[tuple[float, int]], now: float) -> None:
+        """Drop observations older than the window, strictly.
+
+        Keeping `min_samples` regardless of age looks like a kindness to the
+        estimator and is the opposite. After a feed gap the retained samples
+        span the whole outage, so the realized-variance denominator becomes
+        huge and sigma collapses toward zero - telling the strategy the market
+        is calm at the exact moment it has no idea what the market is doing.
+        Better to have too few samples and say so via `has_volatility_estimate`.
+        """
+
         cutoff = now - self.vol_window_seconds
 
-        while len(history) > self.min_samples and history[0][0] < cutoff:
+        while history and history[0][0] < cutoff:
             history.popleft()
 
 

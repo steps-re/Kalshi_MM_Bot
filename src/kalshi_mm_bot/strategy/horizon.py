@@ -61,6 +61,7 @@ HORIZON_PARAM_SPEC = ParamSpec(
             "inventory_skew",
             "vol_reference_ticks",
             "edge_ramp_ticks",
+            "unknown_volatility_ticks",
             "max_fee_round_trip_ticks",
         }
     ),
@@ -96,6 +97,9 @@ class HorizonAwareMarketMaker:
     min_profit_edge: int = 25
     adverse_selection_bps: int = 10_000
     quote_lifetime_seconds: float = 2.0
+    # Expected move assumed while sigma is unmeasurable. Widens quotes at
+    # session start and after feed gaps instead of tightening them.
+    unknown_volatility_ticks: int = 100
 
     # Inventory.
     inventory_skew: int = 300
@@ -190,6 +194,7 @@ class HorizonAwareMarketMaker:
                 reservation=reservation,
                 required_edge=required_edge,
                 position=position,
+                reduce_only=reduce_only,
             )
 
             if intent is not None:
@@ -205,10 +210,24 @@ class HorizonAwareMarketMaker:
         fee_edge = self.fee_model.edge_ticks_per_contract(snapshot.mid)
         adverse = (
             self.adverse_selection_bps
-            * snapshot.expected_move_ticks(self.quote_lifetime_seconds)
+            * self._expected_move(snapshot, self.quote_lifetime_seconds)
             / BPS_SCALE
         )
         return self.min_profit_edge + fee_edge + int(adverse)
+
+    def _expected_move(self, snapshot: MarketSnapshot, horizon_seconds: float) -> float:
+        """Expected move, falling back to a pessimistic default when unknown.
+
+        With too few recent samples the measured sigma is zero, and using it
+        would quote the tightest spread of the session at the moment we know
+        least - session start, or just after a feed gap. Assume the fallback
+        instead until real observations accumulate.
+        """
+
+        if snapshot.has_volatility_estimate:
+            return snapshot.expected_move_ticks(horizon_seconds)
+
+        return float(self.unknown_volatility_ticks)
 
     def _reservation_price(self, snapshot: MarketSnapshot, position: int) -> int:
         fair = snapshot.microprice if self.use_microprice else snapshot.mid
@@ -254,6 +273,7 @@ class HorizonAwareMarketMaker:
         reservation: int,
         required_edge: int,
         position: int,
+        reduce_only: bool = False,
     ) -> QuoteIntent | None:
         price = self._quote_price(
             snapshot,
@@ -286,6 +306,7 @@ class HorizonAwareMarketMaker:
             available_edge=available_edge,
             required_edge=required_edge,
             price=price,
+            reduce_only=reduce_only,
         )
 
         if count <= 0:
@@ -371,6 +392,7 @@ class HorizonAwareMarketMaker:
         available_edge: int,
         required_edge: int,
         price: int,
+        reduce_only: bool = False,
     ) -> int:
         top_size = snapshot.bid_size if action == "buy" else snapshot.ask_size
 
@@ -397,6 +419,13 @@ class HorizonAwareMarketMaker:
         capacity = (
             self.max_position - position if action == "buy" else self.max_position + position
         )
+
+        # Reduce-only means reduce, not reverse. Position capacity alone would
+        # let a long of 1 sell all the way to the short limit near expiry -
+        # turning a risk control into the largest position of the session.
+        if reduce_only:
+            capacity = min(capacity, abs(position))
+
         count = min(desired, capacity, ceiling)
 
         if count < self.min_count:
@@ -431,7 +460,7 @@ class HorizonAwareMarketMaker:
         if self.vol_reference_ticks <= 0:
             return 1.0
 
-        move = snapshot.expected_move_ticks(self.quote_lifetime_seconds)
+        move = self._expected_move(snapshot, self.quote_lifetime_seconds)
         return self.vol_reference_ticks / (self.vol_reference_ticks + move)
 
     def _time_taper(self, snapshot: MarketSnapshot) -> float:
