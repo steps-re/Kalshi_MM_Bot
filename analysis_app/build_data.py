@@ -22,7 +22,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from kalshi_mm_bot.analytics.screening import (  # noqa: E402
+    DEFAULT_IMPROVEMENT_TICKS,
     PRICE_BANDS,
+    capturable_ticks,
     by_price_band,
     parse_markets,
     price_band,
@@ -155,6 +157,17 @@ def build(raw_markets: list[dict], *, scanned_at_utc: str, records: int) -> dict
             }
             for s in viable[:25]
         ],
+        # One compact row per liquid market: [mid_ticks, capturable_ticks,
+        # contracts_24h]. Small enough to ship, and it lets the opportunity
+        # model recompute viability live for any fee schedule or capture
+        # assumption instead of baking one scenario in.
+        "markets_compact": [
+            [q.mid, capturable_ticks(q, DEFAULT_IMPROVEMENT_TICKS), q.volume_24h]
+            for q in liquid
+        ],
+        "notional_per_day": round(
+            sum(q.volume_24h * q.mid / ONE_DOLLAR for q in liquid), 2
+        ),
         "spread_histogram": dict(
             sorted(collections.Counter(round(q.spread_ticks / 100) for q in liquid).items())
         ),

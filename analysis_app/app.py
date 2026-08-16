@@ -25,7 +25,8 @@ st.set_page_config(
 )
 
 pages = [
-    st.Page("views/fee_wall.py", title="The fee wall", icon="🧱", default=True),
+    st.Page("views/opportunity.py", title="The opportunity", icon="📈", default=True),
+    st.Page("views/fee_wall.py", title="Why fees decide it", icon="🧱"),
     st.Page("views/exchange.py", title="What the exchange offers", icon="🔎"),
     st.Page("views/venues.py", title="Kalshi vs the universe", icon="🌐"),
     st.Page("views/backtest_lies.py", title="Why the backtest lied", icon="📉"),
@@ -35,7 +36,7 @@ pages = [
 
 with st.sidebar:
     st.markdown("### Kalshi market making")
-    st.caption("Findings from hardening the bot for live trading.")
+    st.caption("Market size, what is addressable, and what it could pay.")
 
 st.navigation(pages).run()
 
