@@ -95,6 +95,9 @@ class BacktestResult:
     # can run without replaying the recording a second time.
     mid_series: dict[str, MidSeries] = field(default_factory=dict)
     equity_curve: tuple[tuple[float, int], ...] = ()
+    # Per-ticker closing inventory. A session spanning several markets
+    # cannot be marked with one position and one price.
+    positions_by_ticker: dict[str, int] = field(default_factory=dict)
 
 
 UpdateCallback = Callable[[BacktestUpdate], None]
@@ -550,6 +553,7 @@ def _build_result(
         final_rows=top_of_book_rows(controller.orderbooks, reader.manifest.tickers),
         mid_series=series.mid_series(),
         equity_curve=series.equity_curve(),
+        positions_by_ticker=dict(manager.portfolio.positions),
     )
 
 

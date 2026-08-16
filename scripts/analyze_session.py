@@ -63,8 +63,7 @@ def print_report(result: BacktestResult, fee_model: KalshiFeeModel) -> None:
     report = build_performance_report(
         result.fills,
         result.equity_curve,
-        final_position=summary.position_count,
-        final_mid=final_mid,
+        final_marks=_final_marks(result),
         fees_paid=summary.fees_paid,
         fee_model=fee_model,
     )
@@ -137,11 +136,27 @@ async def _run(args: argparse.Namespace) -> None:
         await _single(args, fee_model)
 
 
-def _final_mid(result: BacktestResult) -> int | None:
-    """Last mid we actually observed, from the recorded series.
+def _final_marks(result: BacktestResult) -> dict[str, tuple[int, int | None]]:
+    """Closing position and last observed mid, per market.
 
-    `final_rows` is pre-formatted display text, not numbers.
+    A recording usually spans several markets, and each one has to be marked at
+    its own price - attribute_pnl refuses a single mark for exactly that reason.
     """
+
+    marks: dict[str, tuple[int, int | None]] = {}
+
+    for ticker, position in result.positions_by_ticker.items():
+        series = result.mid_series.get(ticker)
+        marks[ticker] = (position, series.mids[-1] if series and series.mids else None)
+
+    for fill in result.fills:
+        marks.setdefault(fill.market_ticker, (0, None))
+
+    return marks
+
+
+def _final_mid(result: BacktestResult) -> int | None:
+    """Last mid observed on any market, for the headline line only."""
 
     for series in result.mid_series.values():
         if series.mids:
