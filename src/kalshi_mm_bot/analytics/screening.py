@@ -47,6 +47,9 @@ class MarketQuote:
     seconds_to_close: float | None = None
     series: str = ""
     title: str = ""
+    # Minimum price increment. Whole cents on most markets, a tenth of a cent
+    # on deci-cent markets, which can therefore hold a tighter spread.
+    tick_ticks: int = 100
 
     @property
     def mid(self) -> int:
@@ -162,7 +165,8 @@ def score_market(
         yes_price=market.mid,
         count=assumed_size,
     )
-    capturable = max(0, market.spread_ticks - 2 * improvement_ticks)
+    improvement = improvement_ticks if improvement_ticks else market.tick_ticks
+    capturable = max(0, market.spread_ticks - 2 * improvement)
     net_edge = capturable - fee_round_trip
 
     # Each round trip consumes two contracts of exchange volume - our buy and
@@ -284,29 +288,117 @@ def describe_series(report: ScreenReport, limit: int = 15) -> str:
 def parse_market(raw: dict) -> MarketQuote | None:
     """Build a `MarketQuote` from a Kalshi `/markets` entry.
 
-    Kalshi reports `yes_bid` and `yes_ask` in whole cents. Returns None when
-    the entry lacks a two-sided market, which is not an error - most of the
-    exchange is untraded at any moment.
+    The live API reports prices as decimal-dollar strings (`yes_bid_dollars`)
+    and sizes as fixed-point strings (`volume_24h_fp`). Older integer-cent
+    fields are accepted too so saved payloads keep working.
+
+    Returns None when the entry lacks a two-sided market, which is not an
+    error - most of the exchange is untraded at any moment.
     """
 
     ticker = raw.get("ticker")
-    yes_bid = raw.get("yes_bid")
-    yes_ask = raw.get("yes_ask")
 
-    if not ticker or yes_bid is None or yes_ask is None:
+    if not ticker:
+        return None
+
+    yes_bid = _price_ticks(raw, "yes_bid_dollars", "yes_bid")
+    yes_ask = _price_ticks(raw, "yes_ask_dollars", "yes_ask")
+
+    if yes_bid is None or yes_ask is None:
         return None
 
     return MarketQuote(
         ticker=str(ticker),
-        yes_bid=int(yes_bid) * 100,
-        yes_ask=int(yes_ask) * 100,
-        volume_24h=int(raw.get("volume_24h") or 0),
-        open_interest=int(raw.get("open_interest") or 0),
+        yes_bid=yes_bid,
+        yes_ask=yes_ask,
+        volume_24h=_count(raw, "volume_24h_fp", "volume_24h"),
+        open_interest=_count(raw, "open_interest_fp", "open_interest"),
+        seconds_to_close=None,
         series=str(raw.get("series_ticker") or raw.get("event_ticker") or ""),
         title=str(raw.get("title") or ""),
+        tick_ticks=_tick_size(raw),
     )
 
 
-def parse_markets(raw_markets: Sequence[dict]) -> tuple[MarketQuote, ...]:
-    parsed = (parse_market(raw) for raw in raw_markets)
+def _price_ticks(raw: dict, dollars_key: str, cents_key: str) -> int | None:
+    """Price in ticks, from either the decimal-dollar or integer-cent field."""
+
+    dollars = raw.get(dollars_key)
+
+    if dollars not in (None, ""):
+        try:
+            return int(round(float(dollars) * ONE_DOLLAR))
+        except (TypeError, ValueError):
+            return None
+
+    cents = raw.get(cents_key)
+
+    if cents in (None, ""):
+        return None
+
+    try:
+        return int(cents) * 100
+    except (TypeError, ValueError):
+        return None
+
+
+def _count(raw: dict, fp_key: str, plain_key: str) -> int:
+    """Contract count, rounded down to whole contracts."""
+
+    value = raw.get(fp_key)
+
+    if value not in (None, ""):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return 0
+
+    try:
+        return int(raw.get(plain_key) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _tick_size(raw: dict) -> int:
+    """Minimum price increment in ticks.
+
+    Most markets step a whole cent, but some are `deci_cent` (a tenth of a
+    cent). It matters: a market that can be quoted in tenths can hold a
+    genuinely tighter spread, which changes what is capturable.
+    """
+
+    for price_range in raw.get("price_ranges") or ():
+        step = price_range.get("step")
+
+        if step not in (None, ""):
+            try:
+                return max(1, int(round(float(step) * ONE_DOLLAR)))
+            except (TypeError, ValueError):
+                continue
+
+    return 100
+
+
+def is_combo_market(raw: dict) -> bool:
+    """True for auto-generated multivariate parlay markets.
+
+    Kalshi generates enormous numbers of these - tens of thousands, versus a
+    few thousand real markets - and essentially none of them are quoted. They
+    dominate a naive `/markets` scan and crowd out everything worth looking at,
+    so the screen drops them by default.
+    """
+
+    return bool(raw.get("mve_collection_ticker") or raw.get("mve_selected_legs"))
+
+
+def parse_markets(
+    raw_markets: Sequence[dict],
+    *,
+    skip_combos: bool = True,
+) -> tuple[MarketQuote, ...]:
+    parsed = (
+        parse_market(raw)
+        for raw in raw_markets
+        if not (skip_combos and is_combo_market(raw))
+    )
     return tuple(market for market in parsed if market is not None)

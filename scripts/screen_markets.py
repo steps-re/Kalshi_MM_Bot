@@ -108,7 +108,10 @@ async def _run(args: argparse.Namespace) -> None:
         Path(args.save_json).write_text(json.dumps(raw_markets), encoding="utf-8")
         print(f"Saved {len(raw_markets)} raw market(s) to {args.save_json}")
 
-    quotes: tuple[MarketQuote, ...] = parse_markets(raw_markets)
+    quotes: tuple[MarketQuote, ...] = parse_markets(
+        raw_markets,
+        skip_combos=not args.include_combos,
+    )
     report = screen_markets(
         quotes,
         fee_model=fee_model,
@@ -153,6 +156,12 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--fee-bps", type=int, default=700, help="Trading fee rate in bps.")
     parser.add_argument("--max-pages", type=int, default=20, help="Market pages to fetch.")
+    parser.add_argument(
+        "--include-combos",
+        action="store_true",
+        help="Include multivariate parlay markets. There are tens of thousands "
+        "and essentially none are quoted; excluded by default.",
+    )
     parser.add_argument("--save-json", help="Write the raw market payload here.")
     parser.add_argument("--from-json", help="Score a saved payload instead of calling the API.")
     return parser.parse_args()

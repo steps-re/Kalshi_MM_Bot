@@ -11,6 +11,7 @@ from kalshi_mm_bot.analytics.performance import (
 from kalshi_mm_bot.analytics.screening import (
     MarketQuote,
     parse_market,
+    parse_markets,
     screen_markets,
     score_market,
     viable_price_band,
@@ -325,3 +326,67 @@ def test_series_breakdown_counts_viable_markets() -> None:
     )
 
     assert report.by_series() == {"TAILS": (1, 1), "MIDS": (0, 1)}
+
+
+# --- live API payload parsing ---------------------------------------------
+
+
+def test_parse_market_reads_decimal_dollar_fields() -> None:
+    # The live API sends decimal-dollar strings, not integer cents. Reading the
+    # wrong field silently produced a zero bid and skipped every market.
+    quote = parse_market(
+        {
+            "ticker": "T",
+            "yes_bid_dollars": "0.4200",
+            "yes_ask_dollars": "0.4500",
+            "volume_24h_fp": "1234.00",
+            "open_interest_fp": "500.00",
+            "event_ticker": "E",
+        }
+    )
+
+    assert quote is not None
+    assert quote.yes_bid == 4200
+    assert quote.yes_ask == 4500
+    assert quote.volume_24h == 1234
+    assert quote.open_interest == 500
+
+
+def test_parse_market_reads_deci_cent_tick_size() -> None:
+    quote = parse_market(
+        {
+            "ticker": "T",
+            "yes_bid_dollars": "0.4200",
+            "yes_ask_dollars": "0.4500",
+            "price_ranges": [{"start": "0.0000", "end": "1.0000", "step": "0.0010"}],
+        }
+    )
+
+    assert quote is not None
+    assert quote.tick_ticks == 10
+
+
+def test_parse_market_defaults_to_a_cent_tick() -> None:
+    quote = parse_market({"ticker": "T", "yes_bid_dollars": "0.42", "yes_ask_dollars": "0.45"})
+
+    assert quote is not None
+    assert quote.tick_ticks == 100
+
+
+def test_parse_markets_drops_parlay_combos_by_default() -> None:
+    raw = [
+        {"ticker": "REAL", "yes_bid_dollars": "0.40", "yes_ask_dollars": "0.60"},
+        {
+            "ticker": "COMBO",
+            "yes_bid_dollars": "0.40",
+            "yes_ask_dollars": "0.60",
+            "mve_collection_ticker": "KXMVE-R",
+        },
+    ]
+
+    assert [q.ticker for q in parse_markets(raw)] == ["REAL"]
+    assert len(parse_markets(raw, skip_combos=False)) == 2
+
+
+def test_parse_market_survives_malformed_numbers() -> None:
+    assert parse_market({"ticker": "T", "yes_bid_dollars": "abc", "yes_ask_dollars": "0.5"}) is None
