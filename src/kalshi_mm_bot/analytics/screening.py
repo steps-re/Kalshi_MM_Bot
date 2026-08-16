@@ -25,7 +25,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
 from kalshi_mm_bot.market.price import COUNT_SCALE, MONEY_SCALE, ONE_DOLLAR
-from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
+from kalshi_mm_bot.market.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 
 # A quote that joins the touch captures the whole spread but rarely fills. One
 # tick of improvement per side is the realistic assumption for a maker who

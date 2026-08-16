@@ -17,7 +17,7 @@ from kalshi_mm_bot.recording import (
     RecordingSessionReader,
 )
 from kalshi_mm_bot.sim.accounting import SimPortfolio
-from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
+from kalshi_mm_bot.market.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 from kalshi_mm_bot.sim.fills import FillModel, SimulatedFill
 from kalshi_mm_bot.sim.orders import SimulatedOrder
 from kalshi_mm_bot.strategy.quotes import quote_intent_map

@@ -20,7 +20,7 @@ from math import sqrt
 from statistics import fmean, pstdev
 
 from kalshi_mm_bot.market.price import COUNT_SCALE, MONEY_SCALE
-from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
+from kalshi_mm_bot.market.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 from kalshi_mm_bot.sim.fills import SimulatedFill
 
 SECONDS_PER_YEAR = 365.0 * 24.0 * 3600.0

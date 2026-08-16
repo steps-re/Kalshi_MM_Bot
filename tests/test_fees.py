@@ -1,5 +1,5 @@
 from kalshi_mm_bot.market.price import COUNT_SCALE, MONEY_SCALE
-from kalshi_mm_bot.sim.fees import (
+from kalshi_mm_bot.market.fees import (
     KalshiFeeModel,
     ZERO_FEE_MODEL,
     calibrate_from_fills,

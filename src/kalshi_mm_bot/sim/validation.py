@@ -20,7 +20,7 @@ from pathlib import Path
 from statistics import fmean
 
 from kalshi_mm_bot.sim.backtest import BacktestSummary, run_replay_backtest
-from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
+from kalshi_mm_bot.market.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 from kalshi_mm_bot.sim.fills import FillModel
 from kalshi_mm_bot.sim.optimization import (
     DEFAULT_OPTIMIZATION_OBJECTIVE,

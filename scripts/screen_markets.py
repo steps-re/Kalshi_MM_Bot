@@ -36,7 +36,7 @@ from kalshi_mm_bot.api.auth import KalshiAuth  # noqa: E402
 from kalshi_mm_bot.api.rest import KalshiRestClient  # noqa: E402
 from kalshi_mm_bot.config import load_settings  # noqa: E402
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR  # noqa: E402
-from kalshi_mm_bot.sim.fees import KalshiFeeModel  # noqa: E402
+from kalshi_mm_bot.market.fees import KalshiFeeModel  # noqa: E402
 
 
 async def fetch_open_markets(rest: KalshiRestClient, *, max_pages: int) -> list[dict]:

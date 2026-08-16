@@ -12,7 +12,7 @@ from kalshi_mm_bot.market.price import (
     format_count_fp,
 )
 from kalshi_mm_bot.market.types import MarketTicker
-from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
+from kalshi_mm_bot.market.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 from kalshi_mm_bot.sim.fills import SimulatedFill
 
 

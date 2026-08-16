@@ -41,7 +41,7 @@ from kalshi_mm_bot.market.dynamics import (
 from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR
 from kalshi_mm_bot.market.types import MarketTicker, OrderAction
-from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
+from kalshi_mm_bot.market.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 from kalshi_mm_bot.strategy.params import ParamSpec
 from kalshi_mm_bot.strategy.types import (
     PortfolioView,

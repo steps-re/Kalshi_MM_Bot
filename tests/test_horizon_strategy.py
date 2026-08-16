@@ -2,7 +2,7 @@ from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import COUNT_SCALE, parse_price_fp
 from kalshi_mm_bot.market.types import PriceRange
 from kalshi_mm_bot.sim import SimPortfolio
-from kalshi_mm_bot.sim.fees import ZERO_FEE_MODEL
+from kalshi_mm_bot.market.fees import ZERO_FEE_MODEL
 from kalshi_mm_bot.strategy import strategy_from_name
 from kalshi_mm_bot.strategy.horizon import HorizonAwareMarketMaker, parse_horizon_params
 from kalshi_mm_bot.strategy.types import StrategyContext

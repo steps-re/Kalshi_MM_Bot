@@ -12,7 +12,7 @@ from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR
 from kalshi_mm_bot.market.types import PriceRange
 from kalshi_mm_bot.sim.accounting import SimPortfolio
-from kalshi_mm_bot.sim.fees import KalshiFeeModel, ZERO_FEE_MODEL
+from kalshi_mm_bot.market.fees import KalshiFeeModel, ZERO_FEE_MODEL
 from kalshi_mm_bot.sim.fills import SimulatedFill
 from kalshi_mm_bot.live.risk import RiskLimits
 from kalshi_mm_bot.strategy.horizon import HorizonAwareMarketMaker

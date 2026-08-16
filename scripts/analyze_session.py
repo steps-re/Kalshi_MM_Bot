@@ -31,7 +31,7 @@ from kalshi_mm_bot.analytics.markout import (  # noqa: E402
 from kalshi_mm_bot.analytics.performance import build_performance_report  # noqa: E402
 from kalshi_mm_bot.market.price import COUNT_SCALE, MONEY_SCALE  # noqa: E402
 from kalshi_mm_bot.sim.backtest import BacktestResult, run_replay_backtest  # noqa: E402
-from kalshi_mm_bot.sim.fees import KalshiFeeModel  # noqa: E402
+from kalshi_mm_bot.market.fees import KalshiFeeModel  # noqa: E402
 from kalshi_mm_bot.sim.fills import fill_model_from_name  # noqa: E402
 from kalshi_mm_bot.sim.validation import walk_forward  # noqa: E402
 from kalshi_mm_bot.strategy.factory import parse_params_for, strategy_from_name  # noqa: E402

@@ -14,7 +14,7 @@ from kalshi_mm_bot.market.price import (
 )
 from kalshi_mm_bot.sim.accounting import format_contract_count, format_money_value
 from kalshi_mm_bot.sim.backtest import BacktestResult, BacktestSummary, run_replay_backtest
-from kalshi_mm_bot.sim.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
+from kalshi_mm_bot.market.fees import DEFAULT_FEE_MODEL, KalshiFeeModel
 from kalshi_mm_bot.sim.fills import FillModel
 from kalshi_mm_bot.strategy import format_adaptive_params, strategy_from_name
 from kalshi_mm_bot.strategy.requote import RequotePolicy
