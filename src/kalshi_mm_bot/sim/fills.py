@@ -39,6 +39,13 @@ class SimulatedFill:
     fill_model: str
     reason: str
     is_taker: bool = True
+    # Carried on the fill so post-hoc analysis can bucket by time remaining
+    # without re-deriving it from the recording.
+    seconds_to_close: float | None = None
+    # Mid at the moment of the fill, the reference for spread-capture
+    # attribution. This is the mid *after* the triggering event is applied,
+    # which slightly understates captured edge - the conservative direction.
+    mid_at_fill: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,14 +101,22 @@ class OptimisticFillModel:
                 continue
 
             if _is_marketable(order, book, strict=False):
-                fills.append(_fill(order, order.remaining_count, context, self.name, "cross_or_touch"))
+                fills.append(
+                    _fill(
+                        order, order.remaining_count, context, self.name, "cross_or_touch", book
+                    )
+                )
                 continue
 
             if delta is None or delta.market_ticker != order.market_ticker:
                 continue
 
             if _went_through(order, book, delta):
-                fills.append(_fill(order, order.remaining_count, context, self.name, "through"))
+                fills.append(
+                    _fill(
+                        order, order.remaining_count, context, self.name, "through", book
+                    )
+                )
                 continue
 
             if _same_level_reduction(order, delta):
@@ -112,6 +127,7 @@ class OptimisticFillModel:
                         context,
                         self.name,
                         "same_level_reduction",
+                        book,
                     )
                 )
 
@@ -144,11 +160,19 @@ class PessimisticFillModel:
                 continue
 
             if _is_marketable(order, book, strict=True):
-                fills.append(_fill(order, order.remaining_count, context, self.name, "strict_cross"))
+                fills.append(
+                    _fill(
+                        order, order.remaining_count, context, self.name, "strict_cross", book
+                    )
+                )
                 continue
 
             if delta is not None and _went_through(order, book, delta):
-                fills.append(_fill(order, order.remaining_count, context, self.name, "through"))
+                fills.append(
+                    _fill(
+                        order, order.remaining_count, context, self.name, "through", book
+                    )
+                )
 
         return tuple(fills)
 
@@ -198,7 +222,11 @@ class QueueAwareFillModel:
                 continue
 
             if _is_marketable(order, book, strict=False):
-                fills.append(_fill(order, order.remaining_count, context, self.name, "cross_or_touch"))
+                fills.append(
+                    _fill(
+                        order, order.remaining_count, context, self.name, "cross_or_touch", book
+                    )
+                )
                 continue
 
             if delta is None or delta.market_ticker != order.market_ticker:
@@ -208,7 +236,11 @@ class QueueAwareFillModel:
                 if self.fill_on_through and _went_through(order, book, delta):
                     state = self._states.setdefault(order.order_id, _QueueState(queue_ahead=0))
                     if state.queue_ahead <= 0:
-                        fills.append(_fill(order, order.remaining_count, context, self.name, "through"))
+                        fills.append(
+                            _fill(
+                                order, order.remaining_count, context, self.name, "through", book
+                            )
+                        )
                 continue
 
             state = self._states.setdefault(order.order_id, _QueueState(queue_ahead=0))
@@ -227,10 +259,15 @@ class QueueAwareFillModel:
                         context,
                         self.name,
                         "queue_exhausted",
+                        book,
                     )
                 )
             elif self.fill_on_through and state.queue_ahead <= 0 and _went_through(order, book, delta):
-                fills.append(_fill(order, order.remaining_count, context, self.name, "queue_through"))
+                fills.append(
+                    _fill(
+                        order, order.remaining_count, context, self.name, "queue_through", book
+                    )
+                )
 
         return tuple(fills)
 
@@ -306,6 +343,7 @@ def _fill(
     context: StrategyContext,
     fill_model: str,
     reason: str,
+    book: Orderbook | None = None,
 ) -> SimulatedFill:
     return SimulatedFill(
         fill_id=f"{context.event_count}:{order.order_id}",
@@ -320,7 +358,16 @@ def _fill(
         fill_model=fill_model,
         reason=reason,
         is_taker=reason in TAKER_FILL_REASONS,
+        seconds_to_close=context.seconds_to_close,
+        mid_at_fill=_book_mid(book),
     )
+
+
+def _book_mid(book: Orderbook | None) -> int | None:
+    if book is None or book.best_bid is None or book.best_ask is None:
+        return None
+
+    return (book.best_bid + book.best_ask) // 2
 
 
 def _fractional_count(count: int, fraction: float) -> int:

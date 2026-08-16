@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from kalshi_mm_bot.api.feed_controller import FeedController, ORDERBOOK_CHANNEL
 from kalshi_mm_bot.market.clock import MarketClock
 from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR, PRICE_SCALE
+from kalshi_mm_bot.market.series import MidSeries
 from kalshi_mm_bot.market.view import TopOfBookRow, top_of_book_rows
 from kalshi_mm_bot.recording import (
     RecordedRestClient,
@@ -90,10 +91,68 @@ class BacktestResult:
     fills: tuple[SimulatedFill, ...]
     orders: tuple[SimulatedOrder, ...]
     final_rows: tuple[TopOfBookRow, ...]
+    # Mid over time per ticker, retained so markout and equity-curve analysis
+    # can run without replaying the recording a second time.
+    mid_series: dict[str, MidSeries] = field(default_factory=dict)
+    equity_curve: tuple[tuple[float, int], ...] = ()
 
 
 UpdateCallback = Callable[[BacktestUpdate], None]
 StopRequested = Callable[[], bool]
+
+
+class _SeriesRecorder:
+    """Collects the time series post-hoc analytics need.
+
+    Sampling the equity curve on every book event would make the series mostly
+    duplicate points and dominate memory on a long recording, so it is thinned
+    to a fixed interval. Mid prices are kept at full resolution because markout
+    reads them at arbitrary offsets.
+    """
+
+    def __init__(self, *, equity_interval_seconds: float = 1.0) -> None:
+        self.equity_interval_seconds = equity_interval_seconds
+        self._offsets: dict[str, list[float]] = {}
+        self._mids: dict[str, list[int]] = {}
+        self._equity: list[tuple[float, int]] = []
+        self._last_equity_offset: float | None = None
+
+    def observe_book(self, ticker: str, book: Orderbook, offset_seconds: float) -> None:
+        if book.best_bid is None or book.best_ask is None:
+            return
+
+        self._offsets.setdefault(ticker, []).append(offset_seconds)
+        self._mids.setdefault(ticker, []).append((book.best_bid + book.best_ask) // 2)
+
+    def observe_equity(
+        self,
+        portfolio: SimPortfolio,
+        orderbooks: dict[str, Orderbook],
+        offset_seconds: float,
+    ) -> None:
+        due = (
+            self._last_equity_offset is None
+            or offset_seconds - self._last_equity_offset >= self.equity_interval_seconds
+        )
+
+        if not due:
+            return
+
+        self._last_equity_offset = offset_seconds
+        self._equity.append((offset_seconds, portfolio.mark_to_market(orderbooks)))
+
+    def mid_series(self) -> dict[str, MidSeries]:
+        return {
+            ticker: MidSeries(
+                market_ticker=ticker,
+                offsets=tuple(offsets),
+                mids=tuple(self._mids[ticker]),
+            )
+            for ticker, offsets in self._offsets.items()
+        }
+
+    def equity_curve(self) -> tuple[tuple[float, int], ...]:
+        return tuple(self._equity)
 
 
 class SimulatedOrderManager:
@@ -358,6 +417,7 @@ async def run_replay_backtest(
     # every strategy sees seconds_to_close=None, which is the correct answer.
     market_clock = MarketClock.from_iso_map(reader.manifest.metadata.get("close_times_utc"))
     portfolio = SimPortfolio(fee_model=fee_model)
+    series = _SeriesRecorder()
     manager = SimulatedOrderManager(
         fill_model=fill_model,
         portfolio=portfolio,
@@ -400,11 +460,13 @@ async def run_replay_backtest(
                 ),
             )
             recent_fills = manager.process_market_event(event.msg, controller.orderbooks, context)
+            series.observe_equity(portfolio, controller.orderbooks, event.offset_seconds)
 
             if updated_ticker is not None:
                 book = controller.orderbooks.get(updated_ticker)
 
                 if book is not None:
+                    series.observe_book(updated_ticker, book, event.offset_seconds)
                     intents = strategy.on_orderbook(context, updated_ticker, book, portfolio)
                     manager.sync_market_quotes(
                         updated_ticker,
@@ -430,7 +492,7 @@ async def run_replay_backtest(
                         )
                     )
 
-        result = _build_result(reader, strategy, fill_model, manager, controller)
+        result = _build_result(reader, strategy, fill_model, manager, controller, series)
     finally:
         await controller.close()
 
@@ -477,6 +539,7 @@ def _build_result(
     fill_model: FillModel,
     manager: SimulatedOrderManager,
     controller: FeedController,
+    series: _SeriesRecorder,
 ) -> BacktestResult:
     return BacktestResult(
         recording=reader.directory,
@@ -485,6 +548,8 @@ def _build_result(
         fills=tuple(manager.fills),
         orders=tuple(manager.orders.values()),
         final_rows=top_of_book_rows(controller.orderbooks, reader.manifest.tickers),
+        mid_series=series.mid_series(),
+        equity_curve=series.equity_curve(),
     )
 
 

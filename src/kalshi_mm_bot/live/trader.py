@@ -22,6 +22,7 @@ from kalshi_mm_bot.api.rest import CancelOrderRequest, CreateOrderRequest, Kalsh
 from kalshi_mm_bot.api.websocket import KalshiWebSocketClient
 from kalshi_mm_bot.config import load_settings
 from kalshi_mm_bot.market.clock import MarketClock
+from kalshi_mm_bot.live.risk import RiskBreach, RiskLimits, RiskMonitor
 from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import (
     COUNT_SCALE,
@@ -510,6 +511,7 @@ async def run_live_strategy(
     requote_size_threshold_bps: int = 0,
     order_expiration_seconds: float | None = None,
     cancel_on_stop: bool = True,
+    risk_limits: RiskLimits | None = None,
     status: StatusCallback | None = None,
     stop_requested: StopRequested | None = None,
 ) -> LiveRunStats:
@@ -536,6 +538,7 @@ async def run_live_strategy(
         status=status,
     )
     stats = LiveRunStats(dry_run=dry_run)
+    risk = RiskMonitor(limits=risk_limits or RiskLimits())
     started = time.monotonic()
 
     try:
@@ -569,8 +572,17 @@ async def run_live_strategy(
             try:
                 update = await controller.recv_update(timeout=0.5)
             except TimeoutError:
+                # A quiet feed is checked, not ignored: resting quotes priced
+                # off a stale book are the worst position to be in.
+                breach = _check_risk(risk, portfolio, tickers)
+
+                if breach is not None:
+                    _emit(status, breach.describe())
+                    break
+
                 continue
 
+            risk.record_event()
             stats.event_count += 1
             portfolio.apply_message(update.parsed)
 
@@ -602,9 +614,18 @@ async def run_live_strategy(
                 external_book,
                 portfolio,
             )
+            breach = _check_risk(risk, portfolio, tickers)
+
+            if breach is not None:
+                _emit(status, breach.describe())
+                break
+
             created, canceled = await order_manager.sync_quotes(update.updated_ticker, intents)
             stats.create_count += created
             stats.cancel_count += canceled
+
+            for _ in range(created):
+                risk.record_order()
     finally:
         try:
             if cancel_on_stop:
@@ -621,6 +642,27 @@ async def run_live_strategy(
 
 def utc_now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def _check_risk(
+    risk: RiskMonitor,
+    portfolio: LivePortfolio,
+    tickers: tuple[str, ...],
+) -> RiskBreach | None:
+    """Evaluate risk against current inventory.
+
+    Equity is not tracked live here, so the P&L-based limits stay dormant
+    unless a caller feeds them; position, order rate, rejection and feed
+    silence limits all work from state we do have. Passing zero equity would
+    quietly disable exactly the limits an operator most expects to work, so
+    those are simply left unset rather than fed a fake number.
+    """
+
+    worst_position = max(
+        (abs(portfolio.position(ticker)) for ticker in tickers),
+        default=0,
+    )
+    return risk.check(position=worst_position, equity_micros=risk.peak_equity_micros)
 
 
 async def _load_market_clock(

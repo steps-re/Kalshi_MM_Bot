@@ -121,6 +121,27 @@ class KalshiRestClient:
             for raw_market in data["markets"]
         }
 
+    async def list_markets(
+        self,
+        *,
+        status: str = "open",
+        limit: int = 1000,
+        cursor: str | None = None,
+    ) -> tuple[list[dict[str, Any]], str | None]:
+        """One page of markets, with the cursor for the next page.
+
+        Returns `(markets, next_cursor)`; `next_cursor` is None on the last
+        page. Used by the screener, which walks the whole exchange.
+        """
+
+        params: dict[str, Any] = {"status": status, "limit": limit}
+
+        if cursor:
+            params["cursor"] = cursor
+
+        data = await self._request("GET", "/markets", params=params)
+        return list(data.get("markets") or ()), data.get("cursor") or None
+
     async def get_market_close_times(
         self,
         tickers: list[str] | tuple[str, ...],
