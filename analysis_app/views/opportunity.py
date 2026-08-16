@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from kalshi_mm_bot.market.fees import KalshiFeeModel
+from kalshi_mm_bot.research.assumptions import default_ledger
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR
 
 from theme import GRIDLINE, INK_MUTED, SERIES_BLUE, SERIES_ORANGE, annotate, style
@@ -282,6 +283,34 @@ repo. Until then, treat every number on this page as a **bracket, not a
 forecast** — which is exactly why the assumptions are sliders instead of prose.
 """
 )
+
+st.divider()
+st.subheader("Has anything been measured yet?")
+
+ledger = default_ledger()
+rows = [
+    {
+        "Assumption": f.assumption.key,
+        "Status": f.verdict.value.upper(),
+        "Assumed": f"{f.assumption.assumed:g}{f.assumption.unit}",
+        "Blocking": "yes" if f.assumption.blocking else "",
+    }
+    for f in ledger.findings()
+]
+st.dataframe(rows, hide_index=True)
+
+blocking = ledger.blocking_unresolved
+
+if blocking:
+    st.error(
+        f"**{len(blocking)} blocking assumption(s) unresolved: "
+        + ", ".join(f.assumption.key for f in blocking)
+        + ".** Until these are measured the number above is a bracket, not a "
+        "claim. `python scripts/test_assumptions.py <recording>` measures what "
+        "a replay can; the maker fee needs one live session."
+    )
+else:
+    st.success("Every blocking assumption has been measured and holds.")
 
 st.info(
     "**The honest summary for a review.** The fee arithmetic says a real "
