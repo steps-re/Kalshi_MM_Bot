@@ -10,7 +10,10 @@ from kalshi_mm_bot.analytics.performance import (
 )
 from kalshi_mm_bot.analytics.screening import (
     MarketQuote,
+    by_price_band,
     capturable_ticks,
+    distance_from_end,
+    price_band,
     parse_market,
     parse_markets,
     screen_markets,
@@ -408,3 +411,35 @@ def test_parse_markets_drops_parlay_combos_by_default() -> None:
 
 def test_parse_market_survives_malformed_numbers() -> None:
     assert parse_market({"ticker": "T", "yes_bid_dollars": "abc", "yes_ask_dollars": "0.5"}) is None
+
+
+# --- price bands: the actionable screening rule -----------------------------
+
+
+def test_distance_from_end_is_symmetric() -> None:
+    assert distance_from_end(300) == 300
+    assert distance_from_end(9700) == 300
+    assert distance_from_end(5000) == 5000
+
+
+def test_price_band_classifies_by_distance_not_side() -> None:
+    # A 3c market and a 97c market are the same problem to a market maker.
+    assert price_band(300) == price_band(9700)
+    assert price_band(300) == "deep tail (<=5c from an end)"
+    assert price_band(5000) == "near the money (30-50c)"
+
+
+def test_by_price_band_separates_viable_tails_from_dead_middles() -> None:
+    report = screen_markets(
+        [
+            MarketQuote("TAIL", yes_bid=250, yes_ask=350, volume_24h=1_000),
+            MarketQuote("MID", yes_bid=4900, yes_ask=5100, volume_24h=100_000),
+        ],
+        min_volume_24h=0,
+    )
+    bands = by_price_band(report)
+
+    # The tail is quotable on a 1c spread; the midpoint is not, at any volume.
+    assert bands["deep tail (<=5c from an end)"]["viable"] == 1
+    assert bands["near the money (30-50c)"]["viable"] == 0
+    assert bands["near the money (30-50c)"]["volume"] == 100_000

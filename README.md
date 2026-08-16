@@ -44,39 +44,38 @@ if there is one, is in wide spreads and tail prices.
 
 ### What the live exchange actually offers
 
-A full scan on 2026-08-16 (251,000 market records, of which 248,501 were
-auto-generated parlay combos, leaving ~2,500 real markets):
+A complete scan of every open Kalshi market (2026-08-16), via `/events`:
 
-- 250 real markets had two-sided quotes and 24h volume of 50+ contracts.
-- **78% of those were structurally unviable** - the fee exceeded the spread.
-- The 54 that cleared the fee were worth an estimated **$64/day of net edge in
-  total**, assuming we intermediate 10% of their volume.
+- **84,181 open markets**; 8,061 with two-sided quotes and 24h volume of 50+
+  contracts, carrying **66.0M contracts a day**.
+- Under the *pessimistic* fee assumption (taker rate charged on both sides),
+  **44% of liquid markets clear their own fee**, carrying 26% of the volume.
+- The hit rate is 88% in the deep tails and 27% near the money — the tails
+  dominate, but the rule is spread versus fee at that price, not "tails only".
 
-Where the viable edge is concentrated:
+At 10% participation the fee-permitted edge is roughly $30k/day. **That is a
+ceiling on what the fee structure allows, not a forecast** — it assumes
+capturing the quoted spread on every round trip with no adverse selection, and
+concentrates in thinly traded wide-spread markets. Markout is what separates the
+ceiling from reality.
 
-| family                  | viable | est. $/day |
-| ----------------------- | -----: | ---------: |
-| MLB player props        |     36 |      50.36 |
-| Temperature markets     |      9 |       7.97 |
-| Soccer totals/spreads   |      6 |       5.16 |
+> An earlier version of this README reported 2,504 markets and $64/day. That
+> scan stopped paging early and covered ~3% of the exchange. See LESSONS.md §6.
 
-Notably **absent: crypto hourly strikes.** Those are tick-wide markets at
-midpoint prices, which is the single worst cell in the table. That is exactly
-where the earlier live testing was pointed, and it is why fees ate everything.
+### The other venue
 
-Reproduce with `python scripts/screen_markets.py --prod --min-volume 50`, or
-score a saved payload with `--from-json`.
+Polymarket is the only other venue with open enough data to screen. **Every one
+of its fee schedules sets `takerOnly: true`** — makers pay nothing and earn a
+15-25% rebate — and its tick is 0.1c on most active markets. Run the same screen
+there and every liquid market passes, which means the screen has stopped being
+the binding analysis: the constraints there are adverse selection and
+competition, not fees.
 
-Read the $64/day as an upper bound, not a forecast. It assumes we capture the
-quoted spread on every round trip, which adverse selection erodes - that is
-what the markout report measures. This is a low-capacity game.
-
-One caveat that changes everything and is worth one live session to settle:
-this assumes the 0.07 formula applies to **maker** fills too. If your account
-is billed a flat per-contract maker fee on a given market instead, the picture
-is completely different. `calibrate_from_fills` in `sim/fees.py` reconciles the
-model against the `fees_paid` Kalshi reports on real executions. Run it before
-trusting any backtest.
+So the fee wall is a property of *one fee schedule*, not of prediction markets.
+Which makes the Kalshi maker-fee question decisive: Kalshi's published schedule
+charges takers, and public summaries say most standard markets carry **no maker
+fee**. If that applies to the account, most of the exchange opens up.
+`calibrate_from_fills` settles it with one session of real fills.
 
 ## Setup
 

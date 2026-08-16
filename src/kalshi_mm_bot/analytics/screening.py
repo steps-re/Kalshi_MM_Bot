@@ -294,6 +294,79 @@ def viable_price_band(
     return (viable[0], viable[-1]) if viable else None
 
 
+PRICE_BANDS: tuple[tuple[str, int], ...] = (
+    ("deep tail (<=5c from an end)", 500),
+    ("tail (5-15c)", 1_500),
+    ("shoulder (15-30c)", 3_000),
+    ("near the money (30-50c)", 5_000),
+)
+
+
+def distance_from_end(yes_price: int) -> int:
+    """How far a price sits from the nearest end of the range, in ticks.
+
+    The fee depends on `P * (1 - P)`, which is symmetric, so this single number
+    - not the price itself - determines whether a market is quotable.
+    """
+
+    return min(yes_price, ONE_DOLLAR - yes_price)
+
+
+def price_band(yes_price: int) -> str:
+    distance = distance_from_end(yes_price)
+
+    for label, upper in PRICE_BANDS:
+        if distance <= upper:
+            return label
+
+    return PRICE_BANDS[-1][0]
+
+
+def by_price_band(report: ScreenReport) -> dict[str, dict[str, int]]:
+    """Viability grouped by distance from the end of the range.
+
+    This is the screen's most actionable cut. On a strike ladder the same
+    underlying produces markets across the whole probability range, and only
+    the ends of the ladder clear the fee - so the rule is about *which strikes*
+    to quote, not which product.
+    """
+
+    bands: dict[str, dict[str, int]] = {
+        label: {"markets": 0, "viable": 0, "volume": 0, "viable_volume": 0, "daily_micros": 0}
+        for label, _ in PRICE_BANDS
+    }
+
+    for score in report.scores:
+        entry = bands[price_band(score.market.mid)]
+        entry["markets"] += 1
+        entry["volume"] += score.market.volume_24h
+
+        if not score.structurally_unviable:
+            entry["viable"] += 1
+            entry["viable_volume"] += score.market.volume_24h
+            entry["daily_micros"] += score.expected_daily_micros
+
+    return bands
+
+
+def describe_price_bands(report: ScreenReport) -> str:
+    lines = ["viability by distance from the end of the range:"]
+
+    for label, _ in PRICE_BANDS:
+        entry = by_price_band(report)[label]
+
+        if not entry["markets"]:
+            continue
+
+        lines.append(
+            f"  {label:<30} {entry['viable']:>4}/{entry['markets']:<4} viable  "
+            f"{entry['volume']:>9,} contracts  "
+            f"${entry['daily_micros'] / MONEY_SCALE:>8.2f}/day"
+        )
+
+    return "\n".join(lines)
+
+
 def describe_series(report: ScreenReport, limit: int = 15) -> str:
     """Which product families are worth quoting at all."""
 

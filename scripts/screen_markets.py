@@ -40,18 +40,29 @@ from kalshi_mm_bot.market.fees import KalshiFeeModel  # noqa: E402
 
 
 async def fetch_open_markets(rest: KalshiRestClient, *, max_pages: int) -> list[dict]:
-    """Page through open markets. Kalshi caps a page at 1000 entries."""
+    """Page through every open market. Kalshi caps a page at 1000 entries.
+
+    Page to exhaustion. Kalshi returns tens of thousands of auto-generated
+    parlay combos before it gets to anything tradable, so a low page cap
+    silently returns a biased slice - an earlier scan stopped at 251 pages,
+    never reached a single crypto market, and then reported their absence as a
+    finding. `max_pages` is a runaway guard, not a budget.
+    """
 
     markets: list[dict] = []
     cursor: str | None = None
 
-    for _ in range(max_pages):
-        page, cursor = await rest.list_markets(status="open", cursor=cursor)
-        markets.extend(page)
+    for page in range(max_pages):
+        entries, cursor = await rest.list_markets(status="open", cursor=cursor)
+        markets.extend(entries)
 
-        if not cursor or not page:
-            break
+        if not cursor or not entries:
+            return markets
 
+    print(
+        f"WARNING: stopped at the {max_pages}-page cap with more pages left. "
+        "Results are a partial slice of the exchange - raise --max-pages."
+    )
     return markets
 
 
@@ -155,7 +166,13 @@ def _parse_args() -> argparse.Namespace:
         help="Share of 24h volume we assume we could intermediate.",
     )
     parser.add_argument("--fee-bps", type=int, default=700, help="Trading fee rate in bps.")
-    parser.add_argument("--max-pages", type=int, default=20, help="Market pages to fetch.")
+    parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=2000,
+        help="Runaway guard on pagination. The scan normally ends on its own; "
+        "if this cap is hit the results are a partial slice and say so.",
+    )
     parser.add_argument(
         "--include-combos",
         action="store_true",

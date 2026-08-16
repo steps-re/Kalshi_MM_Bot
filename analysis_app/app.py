@@ -27,6 +27,7 @@ st.set_page_config(
 pages = [
     st.Page("views/fee_wall.py", title="The fee wall", icon="🧱", default=True),
     st.Page("views/exchange.py", title="What the exchange offers", icon="🔎"),
+    st.Page("views/venues.py", title="Kalshi vs the universe", icon="🌐"),
     st.Page("views/backtest_lies.py", title="Why the backtest lied", icon="📉"),
     st.Page("views/adverse_selection.py", title="Adverse selection & expiry", icon="⏱"),
     st.Page("views/what_changed.py", title="What changed, what's next", icon="🛠"),

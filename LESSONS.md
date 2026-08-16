@@ -232,88 +232,103 @@ one lucky replay is precisely what we are trying not to ship.
 
 ## 6. What the exchange actually offers
 
-I scanned every open market (2026-08-16). Two things worth knowing before you
-scan it yourself:
+**This section was wrong twice before it was right, and both errors had the same
+cause: I reported an incomplete scan as if it were the whole exchange.** Worth
+reading for that alone.
 
-- Kalshi floods `/markets` with auto-generated multivariate parlay combos.
-  **248,501 of 251,000 records** were combos, essentially none quoted. Filter on
-  `mve_collection_ticker` or they crowd out every real market.
-- The public market-data endpoint needs **no auth**, and its fields are
-  `yes_bid_dollars` (decimal string) and `volume_24h_fp` (fixed point) — not the
-  integer cents the older docs imply. I got this wrong first and every market
-  parsed to a zero bid, which looked like a finding rather than a bug.
+### The corrections
 
-Results, of ~2,500 real markets:
+My first scan paged the `/markets` endpoint and stopped early. It returned 2,504
+markets, contained **zero crypto markets**, and I wrote that "crypto hourly
+strikes do not appear at any volume threshold" — presenting an artefact of my own
+truncation as a finding about the world. The right conclusion from that data was
+"my scan is incomplete", and I did not reach for it because the wrong conclusion
+was more interesting.
 
-- 250 had two-sided quotes and 24h volume of 50+ contracts
-- **78% of those were structurally unviable** — fee exceeds spread
-- 54 cleared the fee, worth an estimated **$64/day of net edge in total** at 10%
-  participation
+The complete scan goes through `/events` (which returns markets nested under
+events and skips the parlay combos entirely) rather than `/markets`:
 
-| family              | viable | est. $/day |
-| ------------------- | -----: | ---------: |
-| MLB player props    |     36 |      50.36 |
-| Temperature markets |      9 |       7.97 |
-| Soccer totals       |      6 |       5.16 |
+| | first scan | complete scan |
+| --- | ---: | ---: |
+| real markets | 2,504 | **84,181** |
+| liquid & two-sided | 250 | **8,061** |
+| daily volume | 453,545 | **66,020,772 contracts** |
+| clearing the fee | 54 | **3,519** |
 
-**Crypto hourly strikes do not appear at any volume threshold.** Tick-wide
-spreads at midpoint prices is the single worst cell in the table, and it is
-where the testing was pointed.
+The first scan covered about **3% of the exchange**. The fee arithmetic in the
+sections above was never wrong; the population I applied it to was.
 
-Treat $64/day as an upper bound, not a forecast — it assumes capturing the
-quoted spread on every round trip, which is exactly what adverse selection
-erodes.
+### The real picture
 
-### That number is not a size limit
+Of 8,061 liquid markets carrying 66.0M contracts a day, under the *pessimistic*
+assumption that the taker rate is charged on both sides:
 
-Order size does not enter the estimate at all:
+- **3,519 markets (44%) clear their own fee**
+- those carry **17.4M contracts a day (26% of volume)**
 
-```
-daily = net edge per contract × (market volume × our share) / 2
-```
+By distance from the end of the price range:
 
-Both terms are set by the market:
+| band | viable | hit rate | 24h volume | volume clearing |
+| --- | ---: | ---: | ---: | ---: |
+| deep tail (<=5c from an end) | 1,196 / 1,352 | 88% | 18.9M | 12.9M |
+| tail (5-15c) | 986 / 2,085 | 47% | 13.6M | 2.2M |
+| shoulder (15-30c) | 622 / 1,960 | 32% | 13.7M | 0.9M |
+| near the money (30-50c) | 715 / 2,664 | 27% | 19.7M | 1.4M |
 
-- **Volume in fee-viable markets: 81,717 contracts/day**, out of 453,545 across
-  all liquid markets. That is the entire pool.
-- **Volume-weighted net edge: 1.56c per contract** — what survives the fee.
+The tails dominate, exactly as the fee curve predicts. But note the hit rate is
+not zero anywhere: a market near the money clears the fee whenever its spread is
+wide enough. **The rule is spread versus fee at that price, not "only trade the
+tails".**
 
-Trading bigger only helps insofar as it wins a larger *share* of a fixed pool,
-and the share cannot exceed 100%:
+By category, Sports carries most of Kalshi's volume (54.9M of 66.0M contracts)
+and therefore most of the opportunity. Crypto is present and partly viable — 93
+of 187 liquid crypto markets clear the fee — and within each BTC or ETH strike
+ladder it is the **wings** that clear and the at-the-money strikes that do not.
+So the original instinct to trade BTC was not wrong. The strike selection was.
 
-| share of volume intermediated | net edge |
-| ----------------------------: | -------: |
-|                            5% |   $32/day |
-|                           10% |   $64/day |
-|                           25% |  $159/day |
-|                           50% |  $318/day |
-|                          100% |  $637/day |
+### On the dollar figures
 
-100% means being the counterparty to every single trade in every fee-viable
-market on the exchange. It is a ceiling, not a plan.
+At 10% participation the fee-permitted edge across those markets is roughly
+$30k/day. **Do not treat that as an opportunity estimate.** It assumes capturing
+the quoted spread on every round trip with no adverse selection, and it
+concentrates in wide-spread, thinly traded markets where the participation
+assumption is weakest. It is a ceiling on what the fee structure permits, not a
+forecast of what a strategy earns. What separates the two is markout.
 
-Nor is there a hidden pool further down. Dropping the volume threshold from 50
-contracts to zero adds 579 more viable markets and about **$3.50/day** — the
-long tail is viable but empty.
+### The other venue
 
-### The lever that actually moves it
+Polymarket is the only other venue with open enough data to screen. Its fee
+schedules are worth reading carefully, because **every one of them sets
+`takerOnly: true`** — makers pay nothing and receive a rebate of 15-25% of the
+taker fee. Its minimum tick is 0.1c on more than half of active markets, ten
+times finer than Kalshi's.
 
-| fee schedule | viable markets | addressable volume | net edge @10% |
-| --- | ---: | ---: | ---: |
-| Taker 7% both sides (what we assume) | 54 | 81,717 | $63.66/day |
-| Maker $0.0025/contract, taker exit | 121 | 235,852 | $82.68/day |
-| Zero fees (theoretical ceiling) | 250 | 453,545 | $291.46/day |
+Run the same screen there and *every* liquid market passes. That is not a
+$50k/day opportunity; it is the screen reporting that it has stopped being the
+binding analysis. Where there is no fee wall, the constraints are adverse
+selection and competing with market makers who are already good at this —
+neither of which this screen models.
 
-Under the taker schedule we can address **18%** of the liquid volume on the
-exchange. Under a flat maker fee that rises to **52%**, because the midpoint
-markets — where nearly all the volume is — come back into play.
+Which reframes the whole exercise: **the fee wall is a property of one fee
+schedule, not a law of prediction markets.** And it makes the Kalshi maker-fee
+question decisive rather than a footnote. Kalshi's published schedule charges
+takers, and public summaries of it say most standard markets carry **no maker
+fee at all**. If that is what this account is billed, Kalshi looks far more like
+Polymarket than like the pessimistic table above, and most of the exchange opens
+up.
 
-**Capital is not the constraint. The fee schedule is.** Which is why calibrating
-it against real fills belongs first, not last.
+One session of real fills, run through `calibrate_from_fills`, settles it.
 
-Run it yourself: `python scripts/screen_markets.py --prod --min-volume 50`.
+### Two API traps worth knowing
 
----
+- The public market-data endpoint needs **no auth**, but its fields are
+  `yes_bid_dollars` (decimal string) and `volume_24h_fp` (fixed point), not the
+  integer cents older docs imply. Reading the wrong field silently produced a
+  zero bid for every market and looked like a finding rather than a bug.
+- `/markets` is flooded with auto-generated multivariate parlay combos —
+  248,501 of the first 251,000 records — none of them quoted. `/events` with
+  `with_nested_markets=true` avoids them entirely and is roughly 50x faster to
+  page. Use `/events`.
 
 ## 7. Habits worth stealing
 
