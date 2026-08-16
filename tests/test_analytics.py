@@ -18,6 +18,7 @@ from kalshi_mm_bot.analytics.screening import (
     parse_markets,
     screen_markets,
     score_market,
+    tick_at_price,
     viable_price_band,
 )
 from kalshi_mm_bot.market.price import COUNT_SCALE
@@ -443,3 +444,55 @@ def test_by_price_band_separates_viable_tails_from_dead_middles() -> None:
     assert bands["deep tail (<=5c from an end)"]["viable"] == 1
     assert bands["near the money (30-50c)"]["viable"] == 0
     assert bands["near the money (30-50c)"]["volume"] == 100_000
+
+
+# --- tapered tick size ------------------------------------------------------
+
+TAPERED = [
+    {"start": "0.0000", "end": "0.1000", "step": "0.0010"},
+    {"start": "0.1000", "end": "0.9000", "step": "0.0100"},
+    {"start": "0.9000", "end": "1.0000", "step": "0.0010"},
+]
+
+
+def test_tick_is_finer_in_the_tails_than_the_middle() -> None:
+    # Kalshi's tapered_deci_cent: 0.1c in the tails, 1c in between. Treating
+    # tick as a per-market constant is wrong in both directions.
+    assert tick_at_price(TAPERED, 300) == 10
+    assert tick_at_price(TAPERED, 5000) == 100
+    assert tick_at_price(TAPERED, 9500) == 10
+
+
+def test_parse_market_reads_the_tick_at_the_current_mid() -> None:
+    tail = parse_market(
+        {
+            "ticker": "TAIL",
+            "yes_bid_dollars": "0.0300",
+            "yes_ask_dollars": "0.0400",
+            "price_ranges": TAPERED,
+        }
+    )
+    middle = parse_market(
+        {
+            "ticker": "MID",
+            "yes_bid_dollars": "0.4900",
+            "yes_ask_dollars": "0.5100",
+            "price_ranges": TAPERED,
+        }
+    )
+
+    assert tail is not None and middle is not None
+    # An earlier version returned the first range's step for both, modelling
+    # every midpoint market as ten times finer than it really is.
+    assert tail.tick_ticks == 10
+    assert middle.tick_ticks == 100
+
+
+def test_a_fine_tick_lets_us_step_inside_a_one_cent_spread() -> None:
+    tail = MarketQuote("T", yes_bid=300, yes_ask=400, volume_24h=100, tick_ticks=10)
+    middle = MarketQuote("M", yes_bid=4900, yes_ask=5000, volume_24h=100, tick_ticks=100)
+
+    # Same 1c spread. In the tail there are nine places to stand inside it, so
+    # improving costs only a tenth of a cent; at the midpoint there are none.
+    assert capturable_ticks(tail, improvement_ticks=100) == 10
+    assert capturable_ticks(middle, improvement_ticks=100) == 100

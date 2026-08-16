@@ -461,24 +461,50 @@ def _count(raw: dict, fp_key: str, plain_key: str) -> int:
         return 0
 
 
-def _tick_size(raw: dict) -> int:
-    """Minimum price increment in ticks.
+def tick_at_price(price_ranges: Sequence[dict], yes_price: int) -> int:
+    """Minimum price increment **at this price**, in ticks.
 
-    Most markets step a whole cent, but some are `deci_cent` (a tenth of a
-    cent). It matters: a market that can be quoted in tenths can hold a
-    genuinely tighter spread, which changes what is capturable.
+    Kalshi's common structure is `tapered_deci_cent`: 0.1c steps below $0.10
+    and above $0.90, 1c steps in between. Treating tick size as a per-market
+    constant is therefore wrong in both directions - it claims you can improve
+    a midpoint quote by a tenth of a cent (you cannot) and that a tail quote is
+    stuck on whole cents (it is not).
+
+    This matters more than it sounds. The fee analysis already showed the tails
+    are the only place the fee arithmetic works; the taper means the tails are
+    also the only place you can step inside a one-cent spread to jump the
+    queue. Cheap fees and a fine tick land in the same place.
     """
 
-    for price_range in raw.get("price_ranges") or ():
-        step = price_range.get("step")
+    for price_range in price_ranges or ():
+        try:
+            low = int(round(float(price_range["start"]) * ONE_DOLLAR))
+            high = int(round(float(price_range["end"]) * ONE_DOLLAR))
+            step = int(round(float(price_range["step"]) * ONE_DOLLAR))
+        except (KeyError, TypeError, ValueError):
+            continue
 
-        if step not in (None, ""):
-            try:
-                return max(1, int(round(float(step) * ONE_DOLLAR)))
-            except (TypeError, ValueError):
-                continue
+        if low <= yes_price <= high and step > 0:
+            return step
 
     return 100
+
+
+def _tick_size(raw: dict) -> int:
+    """Tick at this market's current mid, not at the bottom of its range.
+
+    An earlier version returned the first range's step, which on a tapered
+    market is the 0.1c tail step - so every midpoint market was modelled as
+    ten times finer than it is.
+    """
+
+    bid = _price_ticks(raw, "yes_bid_dollars", "yes_bid")
+    ask = _price_ticks(raw, "yes_ask_dollars", "yes_ask")
+
+    if bid is None or ask is None:
+        return 100
+
+    return tick_at_price(raw.get("price_ranges") or (), (bid + ask) // 2)
 
 
 def is_combo_market(raw: dict) -> bool:
