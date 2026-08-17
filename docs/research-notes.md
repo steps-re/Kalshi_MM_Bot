@@ -139,3 +139,69 @@ constraint, which is that Kalshi has exactly two books whose queues we can reach
 
 Unevaluated. It is the only idea here that raises the ceiling rather than the
 rate.
+
+---
+
+# External data sources, 2026-08-17
+
+## What is reachable
+
+| source | status | use |
+|---|---|---|
+| Coinbase BTC-USD | 200 | spot, USD |
+| Kraken BTC-USD | 200 | spot, USD |
+| Deribit `btc_usd` index | 200 | index + options chain for implied vol |
+| OKX BTC-USDT | 200 | spot, USDT |
+| Polymarket gamma + CLOB | 200 | competing venue, same events |
+| Binance spot/futures | **451** | geo-blocked from this location |
+
+Binance being blocked matters more than it looks - see below.
+
+## Spot feeds do not lead Kalshi
+
+186 paired samples at 1s against a live KXBTC15M book: contemporaneous
+correlation 0.226, and spot moves predict Kalshi moves 5/10/20/30s later at
+−0.08 / −0.10 / +0.03 / +0.07. **There is no lag to trade.** A faster spot feed
+buys nothing on its own.
+
+## The finding: Kalshi and Polymarket settle different underlyings
+
+Both venues run BTC strike markets expiring at the same instant (16:00 UTC),
+with matching strikes. They are not the same contract.
+
+- **Kalshi** `KXBTCD-...-T63999.99` settles on the 60-second average of **CF
+  Benchmarks BRTI**, a BTC/**USD** index, above 63999.99.
+- **Polymarket** "above $64,000 on August 17" settles on the **Binance 1-minute
+  candle for BTC/USDT** close.
+
+Observed at 15:35 UTC, 25 minutes to expiry, on the $64,000 strike:
+
+    Kalshi mid   0.325   (bid 0.32 / ask 0.33, tight and liquid)
+    Polymarket   0.590   (bid 0.58 / ask 0.599)
+    gap          26.5 cents
+
+Measured basis at that moment: BTC/USD 63,970.82 across three sources,
+BTC/USDT 64,029.55 — a **+$58.74 (9 bps)** spread. The strike sat $29 *above*
+USD spot and $30 *below* USDT spot, so the two contracts genuinely had opposite
+moneyness at the same instant.
+
+At a crude 23-minute sigma of ~$200 that basis explains roughly 12 points of
+the 26.5-point gap. **The remainder is unexplained and worth pursuing.**
+
+### Why this matters more than a faster feed
+
+This is not an arbitrage - the payoffs differ - and it must not be traded as
+one. It is a basis position: long Kalshi / short Polymarket on the same strike
+is a bet on where BTC/USD sits relative to BTC/USDT at a known instant.
+
+It is also the first thing found here that is *not* queue-constrained and does
+not depend on a lead-lag edge, which is what killed the spot idea and caps the
+market maker at two books.
+
+### The instrument gap
+
+Kalshi settles on BRTI, which we do not currently read. Polymarket settles on a
+Binance candle, and **Binance is geo-blocked from this location**. So today we
+can price neither venue's settlement source directly - we are approximating both
+from Coinbase, Kraken, Deribit and OKX. Closing that gap (a BRTI feed, and a
+Binance-equivalent price) is a prerequisite before any size goes near this.
