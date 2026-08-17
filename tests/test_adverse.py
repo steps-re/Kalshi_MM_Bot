@@ -155,3 +155,27 @@ def test_an_unknown_market_does_not_crash_the_run() -> None:
     )
 
     assert len(run(model)) == 1
+
+
+def test_fills_are_judged_at_the_horizon_the_metric_uses() -> None:
+    """Thinning on one quantity cannot calibrate another.
+
+    The first version judged fills on a 30s forward drift while calibrating
+    against immediate markout. Dropping half the favourable fills moved measured
+    markout from +1.093c to +1.131c - no effect at all.
+    """
+
+    favourable = SimulatedFill(
+        fill_id="f", order_id="o", market_ticker="M1", action="buy", side="yes",
+        yes_price=parse_price_fp("0.5000"), count=ONE, offset_seconds=0.0,
+        observed_at_utc=None, fill_model="queue", reason="r", is_taker=False,
+        mid_at_fill=parse_price_fp("0.5200"),
+    )
+    # Forward series says the opposite of the fill's own mark; the fill's mark wins.
+    model = AdverseSelectionFillModel(
+        inner=Inner([favourable]),
+        mid_series=series((0.0, 5000), (30.0, 4000)),
+        favourable_keep_rate=0.0,
+    )
+
+    assert run(model) == (), "judged favourable by its own mark, so thinned"

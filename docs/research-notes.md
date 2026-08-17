@@ -349,3 +349,45 @@ artifact of the session. The simulator remains useful for mechanics - does a
 strategy quote, does it manage inventory, does it stay flat - and for relative
 fill rates. It should not be used to choose between strategies on edge, and no
 parameter that trades off fill quality against fill quantity can be tuned on it.
+
+---
+
+# Adverse selection in the fill model: attempted, failed, informative
+
+The simulator overstates markout 2.5x early and 8.7x late and shows none of the
+decay live data shows. Two hypotheses, tested in order.
+
+**H1: it is a marking artifact** - we measure at too short a horizon. Rejected.
+Simulated markout against the forward mid series is flat at every horizon:
+1s 0.558c, 5s 0.557c, 15s 0.487c, 30s 0.592c, 60s 0.499c, 120s 0.521c. Waiting
+longer never reveals a loss.
+
+**H2: it is a selection artifact** - the simulator gives us too many good fills
+relative to bad ones. Built `sim/adverse.py` to keep adverse fills and thin
+favourable ones, then calibrated the thinning rate against live:
+
+    keep   fills    early     late      (target: early +0.268c, late +0.058c)
+    1.00    1561   +1.093c  +0.579c
+    0.50    1264   +1.143c  +0.562c
+    0.30    1205   +1.049c  +0.537c
+    0.15     956   +1.002c  +0.451c
+    0.05     602   +1.006c  +0.222c
+
+**Also rejected.** Discarding 95% of favourable fills leaves early markout at
++1.006c against a +0.268c target. The mix is not the problem.
+
+**What is left: fill eligibility.** If removing fills does not lower the average
+quality of what remains, the remaining fills are themselves too good - the
+simulator is filling us at prices reality would not give us. The queue model
+puts us at the touch whenever a level shrinks past our position; in a book with
+1,690 contracts resting ahead, we would not be there at all. That is a question
+of whether a fill happens, not which fills we keep.
+
+The model is committed, defaulted off, because ruling out the obvious
+explanation is worth keeping. The next attempt should condition fills on
+modelled queue position.
+
+One methodological note: the first version of this model judged fills on a
+30-second forward drift while calibrating against immediate markout. Thinning
+half the "favourable" fills moved measured markout from +1.093c to +1.131c -
+no effect - because thinning on one quantity cannot calibrate another.
