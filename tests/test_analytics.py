@@ -563,3 +563,40 @@ def test_parse_market_survives_a_missing_or_unparseable_close_time() -> None:
         quote = parse_market(raw)
         assert quote is not None
         assert quote.seconds_to_close is None
+
+
+def test_attribution_separates_a_directional_run_from_a_market_making_one() -> None:
+    """The case that inverted a backtest ranking.
+
+    A strategy that ends at its position limit can show a large mark to market
+    while capturing almost no spread - the number is what the inventory did, not
+    what the strategy earned. Attribution has to make that visible.
+    """
+
+    # Bought 10 contracts a full cent under the mid, then the mid ran up 10c.
+    fills = [
+        make_fill(action="buy", price=5000, count=10 * ONE, mid=5100),
+    ]
+
+    attribution = attribute_pnl(
+        fills,
+        fees_paid=0,
+        final_marks={"M1": (10 * ONE, 6000)},
+    )
+
+    # One cent of edge on ten contracts.
+    assert attribution.spread_capture == 100 * 10 * ONE
+    # Everything above that is the market moving, not the quote being good.
+    assert attribution.inventory_pnl > attribution.spread_capture
+    assert attribution.net == attribution.spread_capture + attribution.inventory_pnl
+
+
+def test_unscored_fills_fall_to_inventory_rather_than_inflating_capture() -> None:
+    """No mid at fill time means we cannot claim the edge, so we do not."""
+
+    fills = [make_fill(action="buy", price=5000, count=ONE, mid=None)]
+
+    attribution = attribute_pnl(fills, fees_paid=0, final_marks={"M1": (ONE, 5100)})
+
+    assert attribution.spread_capture == 0
+    assert attribution.inventory_pnl > 0

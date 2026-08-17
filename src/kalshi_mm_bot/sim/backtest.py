@@ -98,6 +98,12 @@ class BacktestResult:
     # Per-ticker closing inventory. A session spanning several markets
     # cannot be marked with one position and one price.
     positions_by_ticker: dict[str, int] = field(default_factory=dict)
+    # Closing mid per ticker, as a number rather than the formatted string in
+    # final_rows. P&L attribution needs to value residual inventory, and
+    # re-parsing a display row to do it invites exactly the unit confusion this
+    # codebase keeps finding. None where the book had no two-sided market at
+    # the end, which is normal for a market that has settled.
+    final_mids_by_ticker: dict[str, int | None] = field(default_factory=dict)
 
 
 UpdateCallback = Callable[[BacktestUpdate], None]
@@ -554,7 +560,25 @@ def _build_result(
         mid_series=series.mid_series(),
         equity_curve=series.equity_curve(),
         positions_by_ticker=dict(manager.portfolio.positions),
+        final_mids_by_ticker={
+            ticker: _book_mid(controller.orderbooks.get(ticker))
+            for ticker in reader.manifest.tickers
+        },
     )
+
+
+def _book_mid(book) -> int | None:
+    """Mid of a book, or None when it is not two-sided."""
+
+    if book is None:
+        return None
+
+    best_bid, best_ask = book.best_bid, book.best_ask
+
+    if best_bid is None or best_ask is None or best_bid >= best_ask:
+        return None
+
+    return (best_bid + best_ask) // 2
 
 
 def _build_summary(

@@ -13,7 +13,14 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from kalshi_mm_bot.api.feed_controller import FeedController, ORDERBOOK_CHANNEL
-from kalshi_mm_bot.market.price import format_price_fp, parse_count_fp, parse_price_fp
+from kalshi_mm_bot.analytics.performance import attribute_pnl
+from kalshi_mm_bot.market.price import (
+    COUNT_SCALE,
+    MONEY_SCALE,
+    format_price_fp,
+    parse_count_fp,
+    parse_price_fp,
+)
 from kalshi_mm_bot.market.view import TopOfBookRow, top_of_book_rows
 from kalshi_mm_bot.recording import (
     RecordedRestClient,
@@ -120,6 +127,71 @@ async def _run(args: argparse.Namespace) -> None:
         print(",".join(row))
 
 
+def _attribution_report(result) -> str:
+    """Split the headline P&L into the part the strategy earned and the rest.
+
+    Mark to market on its own is not a verdict. A run that ends holding 41
+    contracts short has a number dominated by what that inventory did while the
+    market moved, and a market maker finishing at its position limit has taken a
+    position rather than made a market - which looks like skill whenever the
+    price happened to keep going its way.
+
+    Spread capture is the part a maker controls: buying under the mid or selling
+    over it, scored against the mid at the instant of each fill. Inventory P&L is
+    everything else. Both are real money; only the first is evidence.
+    """
+
+    fills = result.fills
+
+    if not fills:
+        return "P&L attribution: no fills."
+
+    marks = {
+        ticker: (position, result.final_mids_by_ticker.get(ticker))
+        for ticker, position in result.positions_by_ticker.items()
+    }
+    attribution = attribute_pnl(
+        fills,
+        fees_paid=result.summary.fees_paid,
+        final_marks=marks,
+    )
+
+    scored = sum(1 for f in fills if f.mid_at_fill is not None)
+    lines = [
+        "P&L attribution",
+        f"  spread capture  {_money(attribution.spread_capture):>14}",
+        f"  inventory       {_money(attribution.inventory_pnl):>14}",
+        f"  fees            {_money(-attribution.fees_paid):>14}",
+        f"  net             {_money(attribution.net):>14}",
+    ]
+
+    if scored < len(fills):
+        # Unscored fills fall entirely into inventory, which understates the
+        # strategy rather than flattering it - but say so, because a reader
+        # would otherwise take a small spread-capture figure as a verdict.
+        lines.append(
+            f"  ({len(fills) - scored} of {len(fills)} fills had no mid at fill "
+            "time and are counted as inventory)"
+        )
+
+    residual = sum(abs(p) for p in result.positions_by_ticker.values())
+
+    if residual and attribution.spread_capture:
+        share = attribution.inventory_pnl / attribution.net if attribution.net else 0.0
+        lines.append(
+            f"  ends holding {residual / COUNT_SCALE:,.2f} contract(s); "
+            f"inventory is {share:.0%} of net"
+        )
+
+    return "\n".join(lines)
+
+
+def _money(micros: int) -> str:
+    sign = "-" if micros < 0 else ""
+    micros = abs(micros)
+    return f"{sign}${micros // MONEY_SCALE}.{micros % MONEY_SCALE:06d}"
+
+
 async def _run_simulation(args: argparse.Namespace) -> None:
     adaptive_params = parse_adaptive_params(args.adaptive_param)
 
@@ -153,6 +225,8 @@ async def _run_simulation(args: argparse.Namespace) -> None:
     print(f"Simulated {result.summary.event_count} event(s) from {result.recording}")
     print("")
     print(format_backtest_summary(result.summary))
+    print("")
+    print(_attribution_report(result))
 
     if result.final_rows:
         print("")
