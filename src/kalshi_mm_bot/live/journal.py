@@ -167,6 +167,15 @@ class OrderJournal:
     ) -> None:
         """Record a fill. `fee_micros` of None means the payload did not say.
 
+        The websocket fill message does not carry a fee at all, so a live run
+        journals None for every fill and the campaign monitor will correctly
+        refuse to confirm the maker-fee premise from it. That is the right
+        behaviour and not a substitute for the fee: reconcile against
+        /portfolio/fills, which does carry `fee_cost`, before drawing any
+        conclusion about what a session cost. Measured on a 28-fill live run:
+        the journal read 0 of 28 fees while the ledger showed all 28 as maker
+        fills charged $0.000000.
+
         None is not zero and must survive as None all the way to analysis: a fee
         we could not read once made 48 taker fills that really cost $0.5879 look
         free, and confirmed the conclusion the project most wanted to be true.
