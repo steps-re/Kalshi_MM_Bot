@@ -167,3 +167,15 @@ def test_flow_window_never_exceeds_a_day() -> None:
     )
 
     assert old.flow_window_seconds == 86_400.0
+
+
+def test_an_empty_touch_is_unmeasured_not_infinitely_good() -> None:
+    """Zero depth used to return infinite clearance and an infinite score,
+    ranking an empty book as the best market on the exchange."""
+
+    empty = assess(quote(), depth_at_touch=0.0)
+
+    assert empty.expected_wait_seconds == 0.0
+    assert empty.queue_clearance is None
+    assert empty.queue_viable is None
+    assert empty.score() == 0.0

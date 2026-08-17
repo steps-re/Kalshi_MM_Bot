@@ -117,20 +117,27 @@ class Fill:
     fee_micros: int | None
     # Mid at fill time; None when the book was not captured.
     mid_at_fill: int | None = None
+    # "buy" or "sell". Required for markout to have the right sign; defaulting
+    # it would silently report every sell backwards.
+    action: str = "buy"
 
     @property
     def markout_cents(self) -> float | None:
         """Signed edge in cents. Positive is in our favour.
 
-        Sign convention follows the trade direction: a buy wants the mid to rise
-        afterwards, a sell wants it to fall. Callers pass the price we paid, so
-        this measures against that.
+        Direction matters and is not optional. A buy wants the mid to rise
+        after the fill and a sell wants it to fall, so the same price move is
+        good for one and bad for the other. An earlier version hardcoded the buy
+        convention because every trial happened to be a buy; the first sell to
+        reach it would have been scored exactly backwards, and a strategy
+        quoting both sides produces those constantly.
         """
 
         if self.mid_at_fill is None:
             return None
 
-        return (self.mid_at_fill - self.yes_price) / TICKS_PER_CENT
+        drift = (self.mid_at_fill - self.yes_price) / TICKS_PER_CENT
+        return drift if self.action == "buy" else -drift
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,10 +381,19 @@ class CampaignMonitor:
         charged = sum(f.fee_micros for f in takers)
 
         if not takers:
+            # A strategy that never crosses generates no taker fills, so this
+            # control can never satisfy itself from its own flow - it would
+            # halt every pure-maker campaign after the grace period for a
+            # reason the campaign cannot fix by trading better. The answer is a
+            # deliberate probe, not a weaker rule: cross one contract
+            # occasionally and read what it costs.
             return Reading(
                 "fee_reader_control",
                 self._pending_or_unknown(sample, "no taker fills"),
-                "no taker fill to validate the fee reader against",
+                "no taker fill to validate the fee reader against - a pure maker "
+                "run must cross one contract deliberately (see "
+                "scripts/queue_experiments.py --modes cross) or this can never "
+                "pass",
             )
 
         if charged <= 0:
@@ -530,6 +546,7 @@ def fills_from_ledger(raw_fills: Iterable[dict], *, mids: dict[str, int] | None 
                 is_taker=bool(raw.get("is_taker")),
                 fee_micros=parse_fill_fee_micros(raw),
                 mid_at_fill=(mids or {}).get(str(raw.get("fill_id") or "")),
+                action=str(raw.get("action") or "buy"),
             )
         )
 

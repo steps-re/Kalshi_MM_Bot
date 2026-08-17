@@ -86,7 +86,11 @@ def markout_cents(trial: dict) -> float | None:
     if mid_at_fill is None or not trial.get("filled"):
         return None
 
-    return (mid_at_fill - trial["our_price"]) / TICKS_PER_CENT
+    drift = (mid_at_fill - trial["our_price"]) / TICKS_PER_CENT
+    # Trials buy unless they say otherwise. A sell scored with the buy
+    # convention reads exactly backwards, so the direction is explicit rather
+    # than assumed from the fact that today's trials all happened to be buys.
+    return drift if trial.get("action", "buy") == "buy" else -drift
 
 
 def fill_summary(trials: list[dict]) -> str:
@@ -99,10 +103,15 @@ def fill_summary(trials: list[dict]) -> str:
             continue
 
         filled = [t for t in subset if t.get("filled")]
-        times = [t["seconds_to_fill"] for t in filled if t.get("seconds_to_fill")]
+        # `is not None`, not truthiness: a fill that landed in 0.0s is the
+        # fastest observation in the sample, and dropping it biases the median
+        # upward exactly where speed matters most.
+        times = [
+            t["seconds_to_fill"] for t in filled if t.get("seconds_to_fill") is not None
+        ]
         lines.append(
             f"{mode:<9}{len(subset):>7}{len(filled):>8}{len(filled) / len(subset):>7.0%}"
-            f"{st.median([t['depth_ahead'] for t in subset]):>11,.0f}"
+            f"{st.median([t.get('depth_ahead', 0.0) or 0.0 for t in subset]):>11,.0f}"
             f"{(st.median(times) if times else float('nan')):>12.1f}"
         )
 
@@ -175,7 +184,11 @@ def markout_summary(trials: list[dict], *, by_close: bool) -> str:
     )
     lines = [header]
 
-    for mode in ("touch", "cross"):
+    # Every mode actually present, not a hardcoded list. "inside" was missing
+    # from this loop, so inside-the-spread fills were collected, scored and then
+    # silently dropped from the summary - a quiet survivorship filter over
+    # exactly the mode most likely to behave differently.
+    for mode in sorted({t.get("mode", "?") for t, _ in usable}):
         subset = [(t, m) for t, m in usable if t.get("mode") == mode]
 
         if subset:

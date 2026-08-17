@@ -146,7 +146,13 @@ class Suitability:
             return None
 
         if wait <= 0:
-            return float("inf")
+            # Zero depth means nothing is resting at the touch, which used to
+            # return infinite clearance and therefore an infinite score - an
+            # empty book rated as the best market on the exchange. An empty
+            # touch is not a fast queue; it usually means the market is dead, or
+            # that we read the book at the instant it was crossed. Treat it as
+            # unmeasured and let the caller find out why.
+            return None
 
         horizon = self.seconds_to_close or SESSION_SECONDS
         return min(horizon, SESSION_SECONDS) / wait

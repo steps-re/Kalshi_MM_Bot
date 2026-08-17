@@ -38,10 +38,19 @@ Three things this shows that the cross-sectional screen cannot:
   (130k -> 234k contracts/min). Queue position gets easier all the way down. The
   queue is not what stops this market being profitable.
 
-Which leaves the whole question resting on one binary: the last column. Every
-row is negative if a resting maker order pays the taker fee, and every row is
-positive if it does not. No amount of further screening moves that needle -
-only a live maker fill does, which is what scripts/calibrate_fees.py is for.
+Which left the whole question resting on one binary: the last column. Every row
+is negative if a resting maker order pays the taker fee, and positive if it does
+not.
+
+**That binary is now settled.** Measured on the live ledger: 25 maker fills
+charged $0.0000 against 48 taker fills charged $0.5879, confirmed at midpoint
+prices in two independent series. Makers pay nothing, so the maker-free column
+is the real one and this market pays about a cent a round trip - provided we
+never cross. One cross at the midpoint costs 1.75c and undoes nearly two round
+trips of edge.
+
+What that leaves is not fees but adverse selection and queue position, which
+this tool cannot see. See scripts/analyze_trials.py.
 """
 
 from __future__ import annotations
@@ -75,12 +84,17 @@ BUCKETS = (
 def fee_cents(price: float, contracts: int = 100) -> float:
     """Kalshi's per-order fee in cents per contract.
 
-    The ceiling is applied to the whole order, so it is amortised over the
-    order rather than charged per contract; quoting it per contract at a
-    realistic order size is the honest way to compare it to a spread.
+    Rounds up to $0.0001, which is what the ledger does - not to the next cent,
+    which is what the documentation says. Measured across 48 taker fills: the
+    raw formula predicts $0.5860, we were charged $0.5879, and a cent ceiling
+    would have charged $0.8700. Using the cent ceiling here overstated the fee
+    by up to 14% at these sizes, in the direction that makes the market look
+    less tradable than it is.
     """
 
-    return math.ceil(0.07 * contracts * price * (1.0 - price) * 100) / contracts
+    raw_cents = 0.07 * contracts * price * (1.0 - price) * 100
+    # $0.0001 == 0.01 cents, so round up to the nearest hundredth of a cent.
+    return math.ceil(raw_cents * 100) / 100 / contracts
 
 
 def record(series: str, minutes: float, out: Path, interval: float) -> Path:
@@ -196,9 +210,10 @@ def report(rows: list[dict]) -> str:
 
     lines += [
         "",
-        "Fee is ceil(0.07 x N x P x (1-P)) per order, charged to takers. Whether a",
-        "resting maker order pays it decides the sign of every row above, and it is",
-        "still unmeasured - see scripts/calibrate_fees.py.",
+        "Fee is 0.07 x N x P x (1-P) per order, rounded up to $0.0001, charged to",
+        "TAKERS only - measured, 25 maker fills at $0.0000 against 48 taker fills",
+        "at $0.5879. So the maker-free column is the live one, and the taker column",
+        "is what one cross costs you out of it.",
     ]
     return "\n".join(lines)
 

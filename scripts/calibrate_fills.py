@@ -145,6 +145,7 @@ def calibrate(path: Path) -> dict:
             "ask_shrink": 0.0,
             "bid_traded": 0.0,
             "ask_traded": 0.0,
+            "unattributed_traded": 0.0,
             "snapshots": 0,
         }
     )
@@ -185,11 +186,20 @@ def calibrate(path: Path) -> dict:
             except (TypeError, ValueError):
                 continue
 
-            # taker_book_side names the resting side that was consumed.
-            if trade.get("taker_book_side") == "ask":
+            # taker_book_side names the resting side that was consumed. An
+            # absent or unexpected value used to fall through to the bid, which
+            # silently attributed every unparseable trade to one side and
+            # skewed the per-side split. Count it toward neither.
+            side = trade.get("taker_book_side")
+
+            if side == "ask":
                 stats["ask_traded"] += count
-            else:
+            elif side == "bid":
                 stats["bid_traded"] += count
+            else:
+                stats["unattributed_traded"] = (
+                    stats.get("unattributed_traded", 0.0) + count
+                )
 
     return dict(per_ticker)
 
@@ -224,6 +234,14 @@ def report(stats: dict) -> str:
         lines.append(
             f"{ticker[-27:]:<28}{s['snapshots']:>7}{shrink:>11,.0f}{traded:>10,.0f}"
             f"{fraction:>12.3f}{1 - fraction:>9.1%}"
+        )
+
+    unattributed = sum(s.get("unattributed_traded", 0.0) for s in stats.values())
+
+    if unattributed:
+        lines.append(
+            f"\n!! {unattributed:,.0f} contracts had no readable taker side and "
+            "were excluded from both sides rather than guessed."
         )
 
     if not fractions:

@@ -226,3 +226,53 @@ def test_ledger_fills_carry_unreadable_fees_through_as_none() -> None:
 def test_limits_reject_a_nonsensical_opportunity_threshold() -> None:
     with pytest.raises(ValueError):
         CampaignLimits(min_mean_markout_cents=1.0, good_mean_markout_cents=0.5)
+
+
+def test_markout_respects_trade_direction() -> None:
+    """A sell scored with the buy convention reads exactly backwards."""
+
+    rise_after_buy = Fill(
+        yes_price=5000, count=ONE, is_taker=False, fee_micros=0,
+        mid_at_fill=5100, action="buy",
+    )
+    rise_after_sell = Fill(
+        yes_price=5000, count=ONE, is_taker=False, fee_micros=0,
+        mid_at_fill=5100, action="sell",
+    )
+
+    assert rise_after_buy.markout_cents == 1.0
+    assert rise_after_sell.markout_cents == -1.0
+
+
+def test_a_losing_two_sided_book_is_not_reported_as_flat() -> None:
+    """Buys and sells both picked off must not cancel into a healthy average."""
+
+    fills = []
+    for _ in range(13):
+        fills.append(Fill(5000, ONE, False, 0, mid_at_fill=4900, action="buy"))
+        fills.append(Fill(5000, ONE, False, 0, mid_at_fill=5100, action="sell"))
+    fills.append(taker())
+
+    verdict = CampaignMonitor().assess(sample(fills))
+
+    assert reading(verdict, "markout").verdict is Verdict.TRIPPED
+    assert verdict.should_halt
+
+
+def test_ledger_fills_carry_the_action_through() -> None:
+    built = fills_from_ledger(
+        [{"yes_price_dollars": "0.50", "count_fp": "1.00", "is_taker": False,
+          "fee_cost": "0.000000", "action": "sell"}]
+    )
+
+    assert built[0].action == "sell"
+
+
+def test_a_pure_maker_run_is_told_how_to_satisfy_the_control() -> None:
+    """It cannot pass from its own flow, so the message must say what to do."""
+
+    fills = [maker(mid_at_fill=5020) for _ in range(25)]
+    verdict = CampaignMonitor().assess(sample(fills, elapsed=600.0))
+
+    detail = reading(verdict, "fee_reader_control").detail
+    assert "cross" in detail
