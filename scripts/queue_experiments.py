@@ -132,7 +132,23 @@ async def book_state(rest: KalshiRestClient, ticker: str) -> dict | None:
 
 
 async def candidates(rest: KalshiRestClient, args: argparse.Namespace) -> list[dict]:
-    """Quotable markets, annotated with the depth we would be queueing behind."""
+    """Quotable markets, annotated with the depth we would be queueing behind.
+
+    `--series` matters more than it looks. Ranking the whole exchange by volume
+    picks whatever is busiest right now, which in the afternoon is baseball; a
+    run aimed at understanding 15-minute crypto windows then spends its budget
+    measuring queues in markets that behave nothing like them. Volume is not the
+    variable under study.
+
+    A series filter also skips the paged /events sweep entirely, which is worth
+    doing on its own: rolling short-dated series keep exactly one market open,
+    and it is routinely missing from a volume-ranked sweep because its 24h
+    volume field reads zero until the window has been alive for a day - which
+    for a 15-minute market is never.
+    """
+
+    if args.series:
+        return await _series_candidates(rest, args)
 
     found: list[dict] = []
     cursor = None
@@ -172,6 +188,52 @@ async def candidates(rest: KalshiRestClient, args: argparse.Namespace) -> list[d
 
         annotated.append({**market, **state})
 
+    return annotated
+
+
+async def _series_candidates(
+    rest: KalshiRestClient, args: argparse.Namespace
+) -> list[dict]:
+    """Open markets of the named series, annotated with queue depth.
+
+    Deliberately does not apply the volume floor or the 0.10-0.90 price band
+    used for the exchange-wide sweep: the caller named this series on purpose,
+    and a 15-minute window spends its final minutes in exactly the tail those
+    filters exclude.
+    """
+
+    annotated: list[dict] = []
+
+    for series in args.series:
+        data = await rest._request(
+            "GET",
+            "/markets",
+            params={"status": "open", "limit": 200, "series_ticker": series},
+        )
+
+        for market in data.get("markets", []) or []:
+            bid = _num(market.get("yes_bid_dollars"))
+            ask = _num(market.get("yes_ask_dollars"))
+
+            if not 0 < bid < ask < 1:
+                continue
+
+            state = await book_state(rest, market["ticker"])
+
+            if state is None:
+                continue
+
+            annotated.append(
+                {
+                    "ticker": market["ticker"],
+                    # volume_fp is the market's own lifetime volume; volume_24h_fp
+                    # is zero for anything younger than a day.
+                    "volume": _num(market.get("volume_fp")),
+                    **state,
+                }
+            )
+
+    annotated.sort(key=lambda m: -m["volume"])
     return annotated
 
 
@@ -458,6 +520,13 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--per-mode", type=int, default=2)
     parser.add_argument("--rests", type=float, nargs="+", default=[30, 180])
     parser.add_argument("--probe", type=int, default=40, help="Markets to read depth for.")
+    parser.add_argument(
+        "--series",
+        action="append",
+        help="Restrict to these series (e.g. KXBTC15M). Repeatable. Skips the "
+        "exchange-wide volume ranking, which otherwise picks whatever is busiest "
+        "rather than what is under study.",
+    )
     parser.add_argument("--thin-depth", type=float, default=100.0)
     parser.add_argument("--min-volume", type=float, default=2000.0)
     parser.add_argument("--max-loss", type=float, default=5.0)
