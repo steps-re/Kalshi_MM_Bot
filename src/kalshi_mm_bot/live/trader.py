@@ -22,6 +22,7 @@ from kalshi_mm_bot.api.rest import CancelOrderRequest, CreateOrderRequest, Kalsh
 from kalshi_mm_bot.api.websocket import KalshiWebSocketClient
 from kalshi_mm_bot.config import load_settings
 from kalshi_mm_bot.market.clock import MarketClock
+from kalshi_mm_bot.live.journal import OrderJournal
 from kalshi_mm_bot.live.risk import RiskBreach, RiskLimits, RiskMonitor
 from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import (
@@ -152,6 +153,7 @@ class LiveOrderManager:
         order_expiration_seconds: float | None = None,
         rejection_cooldown_seconds: float = 1.0,
         status: StatusCallback | None = None,
+        journal: OrderJournal | None = None,
     ) -> None:
         if rejection_cooldown_seconds < 0:
             raise ValueError("rejection_cooldown_seconds must be non-negative")
@@ -178,6 +180,13 @@ class LiveOrderManager:
         self.rejection_cooldown_seconds = rejection_cooldown_seconds
         self.order_expiration_seconds = order_expiration_seconds
         self.status = status
+        self.journal = journal
+        # Latest book per ticker, kept only so a fill can be journalled against
+        # the market it happened in. The manager is handed books rather than
+        # holding them, so without this the book is gone by the time the fill
+        # arrives - and the mid at fill time is exactly what the campaign
+        # monitor halts for lacking.
+        self._last_book: dict[str, Orderbook] = {}
         self.orders: dict[str, LiveOrder] = {}
 
         self._run_id = uuid4().hex[:8]
@@ -354,12 +363,52 @@ class LiveOrderManager:
             order.fill_message_count += fill.count
             _sync_remaining_from_fill_counts(order)
 
+            if self.journal is not None:
+                self.journal.record_filled(
+                    order_id=order.order_id,
+                    trade_id=str(fill.trade_id),
+                    market_ticker=str(order.market_ticker),
+                    action=str(order.action),
+                    yes_price=fill.yes_price,
+                    count=fill.count,
+                    is_taker=bool(getattr(fill, "is_taker", False)),
+                    fee_micros=getattr(fill, "fees_paid", None),
+                    book=self._last_book.get(str(order.market_ticker)),
+                )
+
             if order.remaining_count <= 0:
                 self.orders.pop(client_order_id, None)
 
             return
 
+    def _journal_placed(self, order_id: str, intent: QuoteIntent) -> None:
+        """Record the book we joined, including the depth ahead of us.
+
+        Queue position at placement is the best single predictor of whether a
+        resting order ever fills, and it is unrecoverable afterwards - by the
+        time the order fills or is cancelled, the level has churned.
+        """
+
+        if self.journal is None:
+            return
+
+        self.journal.record_placed(
+            order_id=order_id,
+            market_ticker=str(intent.market_ticker),
+            action=str(intent.action),
+            yes_price=intent.yes_price,
+            count=intent.count,
+            book=self._last_book.get(str(intent.market_ticker)),
+        )
+
+    def observe_orderbook(self, orderbook: Orderbook) -> None:
+        """Remember the latest book for a market, for journalling."""
+
+        self._last_book[str(orderbook.market_ticker)] = orderbook
+
     def external_orderbook(self, orderbook: Orderbook) -> Orderbook:
+        self.observe_orderbook(orderbook)
+
         own_orders = tuple(
             order
             for order in self.orders.values()
@@ -394,6 +443,7 @@ class LiveOrderManager:
                     intent=intent,
                     created_monotonic=now,
                 )
+                self._journal_placed(f"dry-{client_order_id}", intent)
                 self._emit(
                     f"DRY create {intent.market_ticker} {intent.action} "
                     f"{format_count_fp(intent.count)} @ {format_price_fp(intent.yes_price)}"
@@ -462,6 +512,7 @@ class LiveOrderManager:
                 created_monotonic=now,
                 remaining_count=remaining_count,
             )
+            self._journal_placed(order_id, intent)
             created += 1
 
         self._emit(f"Created {created}/{len(requests)} live order(s)")
@@ -469,6 +520,16 @@ class LiveOrderManager:
 
     async def _cancel(self, order: LiveOrder) -> None:
         await self._cancel_order_id(order.order_id, reason="quote replaced")
+
+        if self.journal is not None:
+            # Cancellations are the denominator of a fill rate. Counting fills
+            # without counting the orders that never filled measures nothing.
+            self.journal.record_cancelled(
+                order_id=order.order_id,
+                market_ticker=str(order.market_ticker),
+                reason="quote replaced",
+            )
+
         self.orders.pop(order.client_order_id, None)
 
     async def _cancel_order_id(self, order_id: str, *, reason: str) -> None:
