@@ -198,6 +198,32 @@ def markout_summary(trials: list[dict], *, by_close: bool) -> str:
             if subset:
                 lines.append(row(label, subset))
 
+    resting = [m for t, m in usable if t.get("mode") == "touch"]
+
+    if len(resting) >= 5:
+        mean, median = st.mean(resting), st.median(resting)
+
+        if (mean < 0) != (median < 0):
+            # The signature of market making: win small, often; lose big,
+            # rarely. Quoting the median here would describe a profitable
+            # strategy that loses money, and quoting the mean would describe a
+            # broken one that fills favourably most of the time. Both are true
+            # and neither is the summary.
+            worst = min(resting)
+            lines.append(
+                f"\n!! mean ({mean:+.2f}c) and median ({median:+.2f}c) disagree in "
+                "sign on resting fills."
+            )
+            lines.append(
+                f"   Most fills go our way and the tail takes it back - the worst "
+                f"single fill was {worst:+.2f}c, against a median of {median:+.2f}c."
+            )
+            lines.append(
+                "   Neither number alone describes this. What decides it is whether "
+                "the tail can be cut without losing the wins, which is an inventory "
+                "and risk question, not a quoting one."
+            )
+
     if missing:
         lines.append(
             f"\n{missing} filled trial(s) predate mid_at_fill and are excluded "
