@@ -324,3 +324,30 @@ def test_optimizer_searches_execution_settings_with_balance(tmp_path) -> None:
         }
 
     asyncio.run(run())
+
+
+def test_queue_model_default_trade_fraction_is_the_measured_one() -> None:
+    """0.5 was a guess; 0.327 was measured over 291 book snapshots.
+
+    The guess made the model consume the queue ahead of a resting order about
+    half again too fast, which is how a 31% simulated fill rate coexisted with
+    a live 0%.
+    """
+
+    from kalshi_mm_bot.sim.fills import QueueAwareFillModel
+
+    model = QueueAwareFillModel()
+
+    assert model.trade_fraction == QueueAwareFillModel.MEASURED_TRADE_FRACTION
+    assert model.trade_fraction < 0.5, "the measurement must not drift back to the guess"
+
+
+def test_a_slower_trade_fraction_leaves_more_queue_ahead() -> None:
+    """The whole point of the parameter: it controls queue decay speed."""
+
+    from kalshi_mm_bot.sim.fills import QueueAwareFillModel
+
+    optimistic = QueueAwareFillModel(trade_fraction=1.0)
+    measured = QueueAwareFillModel(trade_fraction=0.327)
+
+    assert measured.trade_fraction < optimistic.trade_fraction

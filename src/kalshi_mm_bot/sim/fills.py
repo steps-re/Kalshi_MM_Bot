@@ -185,10 +185,24 @@ class _QueueState:
 class QueueAwareFillModel:
     name = "queue"
 
+    # Measured, not guessed. Over 291 book snapshots of a KXBTC15M window,
+    # 3,154,806 contracts of level shrinkage came with 1,030,892 contracts of
+    # published trades: 67% of the book's shrinkage is people cancelling, not
+    # trading. The old 0.5 default was a guess, and it made the model eat the
+    # queue ahead of a resting order about half again too fast - which is the
+    # mechanism behind a simulated 31% fill rate against a live 0%.
+    #
+    # Treat it as an *upper* bound. Polling sees net change per interval, so a
+    # level that traded and refilled within one second reads as unchanged, which
+    # understates shrinkage and inflates this ratio. The true figure is at most
+    # this, so erring here errs toward optimism and should be revisited from a
+    # websocket recording. See scripts/calibrate_fills.py.
+    MEASURED_TRADE_FRACTION = 0.327
+
     def __init__(
         self,
         *,
-        trade_fraction: float = 0.5,
+        trade_fraction: float = MEASURED_TRADE_FRACTION,
         fill_on_through: bool = True,
     ) -> None:
         if not 0 <= trade_fraction <= 1:

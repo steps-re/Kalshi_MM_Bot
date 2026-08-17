@@ -43,15 +43,39 @@ from kalshi_mm_bot.analytics.screening import parse_market, score_market  # noqa
 from kalshi_mm_bot.market.fees import KalshiFeeModel  # noqa: E402
 from kalshi_mm_bot.market.price import COUNT_SCALE  # noqa: E402
 
-# Families worth sampling. Crypto ladders churn hardest; the others are here so
-# the dataset is not a single regime, and because the fee screen likes wide
-# spreads which crypto rarely has.
+# Families worth sampling, ordered by what we have actually measured rather than
+# by what looked promising on a fee screen.
+#
+# The rolling 15-minute crypto windows come first because they are the only
+# markets measured to support this strategy end to end: 91% fill rate, fills in
+# about two seconds, and a queue that recycles many times inside one window.
+# They are also the only markets on the exchange that are reliably short-dated -
+# at any instant the whole exchange has roughly two of them open.
+#
+# The rest are here because a dataset of one regime teaches nothing about which
+# regime matters. In-play sports and esports are episodic: their books are
+# tradable while a game is live and effectively frozen the rest of the time
+# (KXCS2GAME measured a queue needing 3.8 days to clear between matches, and
+# KXLOLGAME 18 days), so recording them is only useful when something is
+# happening. The collector re-picks targets every cycle precisely so it catches
+# those windows instead of assuming them.
 DEFAULT_SERIES = (
+    # Measured viable.
+    "KXBTC15M",
+    "KXETH15M",
+    # Same underlying, longer horizon - the control for "is it crypto, or is it
+    # the 15-minute structure?"
     "KXBTCD",
     "KXETHD",
+    # Episodic: worth recording only while in play.
     "KXNBAGAME",
     "KXNFLGAME",
     "KXMLBGAME",
+    "KXVALORANTGAME",
+    "KXCS2GAME",
+    # News-driven rather than price-driven. Different mechanism, useful contrast.
+    "KXTRUMPSAY",
+    # Daily settles with real flow near the close.
     "KXHIGHNY",
     "KXHIGHCHI",
 )
@@ -86,7 +110,17 @@ def candidate_markets(series: tuple[str, ...], min_volume: float) -> list[dict]:
             bid = pr._num(market.get("yes_bid_dollars"))
             ask = pr._num(market.get("yes_ask_dollars"))
 
-            if 0 < bid < ask < 1 and pr._num(market.get("volume_24h_fp")) >= min_volume:
+            # volume_24h_fp reads 0.00 for any market younger than a day, which
+            # is every 15-minute window, always. Screening on it silently
+            # excluded exactly the markets this collector exists to record.
+            # volume_fp is the market's own lifetime volume and is the right
+            # measure for a short-dated market.
+            volume = max(
+                pr._num(market.get("volume_fp")),
+                pr._num(market.get("volume_24h_fp")),
+            )
+
+            if 0 < bid < ask < 1 and volume >= min_volume:
                 seen[market["ticker"]] = market
 
     return list(seen.values())
