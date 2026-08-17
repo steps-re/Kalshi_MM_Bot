@@ -117,3 +117,46 @@ def test_zero_fill_strategies_do_not_crash_the_report() -> None:
     text = report([run(strategy="silent", fills=0, capture_dollars=0.0)])
 
     assert "silent" in text
+
+
+def _resolution(deltas=100_000, seconds=900.0, tickers=1):
+    from sweep_backtests import Resolution
+
+    return Resolution(
+        recording="rec", deltas=deltas, seconds=seconds, tickers=tickers
+    )
+
+
+def test_a_polled_book_is_flagged_as_too_thin_to_prove_fill_rates() -> None:
+    """Measured: polling carried 11.8% of the real shrinkage, and the same
+    strategy filled 13 times instead of 942."""
+
+    from sweep_backtests import resolution_report
+
+    polled = _resolution(deltas=31_013, seconds=898.0, tickers=10)
+
+    assert polled.deltas_per_second_per_ticker < 5
+    assert polled.is_thin
+
+    text = resolution_report([polled])
+    assert "!!" in text
+    assert "floors, not estimates" in text
+
+
+def test_a_websocket_book_is_not_flagged() -> None:
+    from sweep_backtests import resolution_report
+
+    feed = _resolution(deltas=300_562, seconds=854.0, tickers=1)
+
+    assert feed.deltas_per_second_per_ticker > 300
+    assert not feed.is_thin
+    assert resolution_report([feed]) == ""
+
+
+def test_resolution_is_per_ticker_so_breadth_does_not_pass_as_depth() -> None:
+    """The same delta count spread over ten markets is a tenth the resolution."""
+
+    one = _resolution(deltas=100_000, tickers=1)
+    ten = _resolution(deltas=100_000, tickers=10)
+
+    assert ten.deltas_per_second_per_ticker == one.deltas_per_second_per_ticker / 10

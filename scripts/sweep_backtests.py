@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import statistics as st
 import sys
 from dataclasses import dataclass
@@ -57,6 +58,39 @@ STRATEGIES = ("adaptive", "horizon", "dumb")
 # Below this many fills across the whole book, a per-fill figure says more about
 # luck than about the quote.
 MIN_FILLS_FOR_CONFIDENCE = 200
+
+# Book deltas per second per ticker, below which a recording cannot support a
+# conclusion about fill rates. Measured on one KXBTC15M window captured both
+# ways at once: the websocket feed carried 300,562 deltas and 152.9M contracts
+# of level shrinkage, while REST polling of the same market over the same window
+# carried 14,122 deltas and 18.0M of shrinkage - **11.8% of the real thing**.
+# The same strategy filled 942 times on the feed and 13 times on the polled copy.
+#
+# Polling reports the NET change per interval, so a level that trades and
+# refills between two samples is invisible. The fill model consumes queue from
+# observed reductions, so hiding 88% of them means a resting order essentially
+# never reaches the front, and every strategy looks like it cannot trade.
+# Polling faster helps a little; it does not fix the netting.
+MIN_DELTAS_PER_SECOND = 50.0
+
+
+@dataclass(frozen=True, slots=True)
+class Resolution:
+    """How finely a recording saw the book, which bounds what it can prove."""
+
+    recording: str
+    deltas: int
+    seconds: float
+    tickers: int
+
+    @property
+    def deltas_per_second_per_ticker(self) -> float:
+        span = max(1.0, self.seconds) * max(1, self.tickers)
+        return self.deltas / span
+
+    @property
+    def is_thin(self) -> bool:
+        return self.deltas_per_second_per_ticker < MIN_DELTAS_PER_SECOND
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +118,49 @@ class Run:
         """
 
         return self.residual_contracts / max(1, self.markets_held)
+
+
+def measure_resolution(recording: Path) -> Resolution | None:
+    """Count book deltas and the span they cover, without replaying."""
+
+    events = recording / "events.jsonl"
+
+    if not events.exists():
+        return None
+
+    deltas = 0
+    tickers: set[str] = set()
+    first = last = None
+
+    for line in events.open():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+
+        message = row.get("msg") or {}
+        inner = message.get("msg") or {}
+        ticker = inner.get("market_ticker")
+
+        if ticker:
+            tickers.add(str(ticker))
+
+        if message.get("type") != "orderbook_delta":
+            continue
+
+        deltas += 1
+        offset = row.get("offset_seconds")
+
+        if isinstance(offset, (int, float)):
+            first = offset if first is None else min(first, offset)
+            last = offset if last is None else max(last, offset)
+
+    return Resolution(
+        recording=recording.name,
+        deltas=deltas,
+        seconds=(last - first) if (first is not None and last is not None) else 0.0,
+        tickers=len(tickers),
+    )
 
 
 async def one_run(
@@ -124,6 +201,31 @@ async def one_run(
         / COUNT_SCALE,
         markets_held=sum(1 for p in result.positions_by_ticker.values() if p),
     )
+
+
+def resolution_report(resolutions: list[Resolution]) -> str:
+    thin = [r for r in resolutions if r.is_thin]
+
+    if not thin:
+        return ""
+
+    worst = min(thin, key=lambda r: r.deltas_per_second_per_ticker)
+    lines = [
+        f"!! {len(thin)} of {len(resolutions)} recording(s) are below "
+        f"{MIN_DELTAS_PER_SECOND:.0f} book deltas/sec/ticker - the thinnest is "
+        f"{worst.recording} at {worst.deltas_per_second_per_ticker:.1f}.",
+        "   These are REST-polled books. Polling reports the net change per",
+        "   interval, so a level that trades and refills between samples is",
+        "   invisible: measured against a websocket capture of the same window,",
+        "   polling carried 11.8% of the real shrinkage and the same strategy",
+        "   filled 13 times instead of 942.",
+        "   Fill counts and totals below are therefore floors, not estimates.",
+        "   The RANKING may survive, since every strategy is starved equally, but",
+        "   any parameter that controls how often we trade is being fitted to the",
+        "   artifact rather than to the market.",
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def report(runs: list[Run]) -> str:
@@ -220,7 +322,14 @@ async def _main(args: argparse.Namespace) -> None:
     if not runs:
         raise SystemExit("every run failed")
 
+    resolutions = [r for r in (measure_resolution(d) for d in recordings) if r]
+
     print("")
+    warning = resolution_report(resolutions)
+
+    if warning:
+        print(warning)
+
     print(report(runs))
 
 

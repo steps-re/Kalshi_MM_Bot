@@ -1,5 +1,26 @@
 """Continuously record the markets most likely to be worth quoting, to GCS.
 
+**Read this before backtesting anything recorded here.** This collector polls
+REST, and polling reports the NET change to a price level between two samples.
+A level that trades and is refilled in between is invisible. Measured against a
+websocket capture of the same KXBTC15M window taken at the same time:
+
+    websocket   300,562 deltas   152.9M contracts of shrinkage   942 fills
+    polled       14,122 deltas    18.0M contracts of shrinkage    13 fills
+
+Polling carried **11.8% of the real shrinkage**, and because the simulator
+consumes queue from observed reductions, a resting order almost never reaches
+the front. The same strategy filled 72x less often.
+
+So this data is good for what it was first built for - spreads, depth, price
+paths, which markets are alive and when - and it cannot support a conclusion
+about fill rates, queue position, or any parameter that governs how often we
+trade. Polling more often helps at the margin and does not fix the netting; the
+websocket feed does, and needs credentials on the host.
+
+scripts/sweep_backtests.py measures each recording's delta rate and refuses to
+present its numbers as anything but floors when they are this thin.
+
     python scripts/collect_loop.py --bucket steps-nate-backtest-data --cycle-min 20
 
 Designed to run unattended on a VM for days. Each cycle re-picks its targets by
