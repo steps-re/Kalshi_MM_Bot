@@ -281,3 +281,32 @@ def test_window_alignment_targets_the_quarter_hour() -> None:
     assert collect_loop.seconds_to_next_window(899) == 1
     # Exactly on a boundary means a full window is available, not zero.
     assert collect_loop.seconds_to_next_window(900) == 900
+
+
+def test_a_window_expiring_right_now_is_not_pinned() -> None:
+    """The bug the alignment fix created.
+
+    Waiting for the quarter hour and then selecting grabs the window that just
+    expired at that boundary - Kalshi lists it for a few seconds more. One
+    aligned cycle recorded two dead markets for fourteen minutes: 2,389 events
+    where a live window produces ~100,000.
+    """
+
+    from datetime import UTC, datetime, timedelta
+
+    import collect_loop
+
+    now = datetime(2026, 8, 17, 16, 45, 24, tzinfo=UTC)
+    just_closed = {
+        "ticker": "KXBTC15M-26AUG171245-45",
+        "close_time": "2026-08-17T16:45:00Z",
+    }
+    fresh = {
+        "ticker": "KXBTC15M-26AUG171300-00",
+        "close_time": (now + timedelta(minutes=14)).isoformat().replace("+00:00", "Z"),
+    }
+
+    assert not collect_loop._pinnable(just_closed, now)
+    assert collect_loop._pinnable(fresh, now)
+    # Still a short window by name - the name was never the problem.
+    assert collect_loop._is_short_window(just_closed["ticker"])

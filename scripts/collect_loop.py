@@ -212,8 +212,37 @@ def rank_candidates(markets: list[dict], shortlist: int) -> list[str]:
 PINNED_SERIES = ("KXBTC15M", "KXETH15M")
 
 
+# A pinned window must have enough life left to be worth recording. Without
+# this the alignment fix backfired precisely: waiting for the quarter-hour and
+# then selecting grabbed the window that had just EXPIRED at that boundary,
+# because Kalshi still lists it for a few seconds. One aligned cycle recorded
+# two dead 15-minute markets for fourteen minutes - 2,389 events against the
+# ~100,000 a live window produces.
+MIN_PINNED_SECONDS = 300.0
+
+
 def _is_short_window(ticker: str) -> bool:
     return any(ticker.startswith(series) for series in PINNED_SERIES)
+
+
+def _pinnable(market: dict, now: datetime | None = None) -> bool:
+    """A short window with real life left, not one expiring as we look at it."""
+
+    if not _is_short_window(str(market.get("ticker", ""))):
+        return False
+
+    stamp = market.get("close_time")
+
+    if not isinstance(stamp, str) or not stamp:
+        return False
+
+    try:
+        close = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+
+    remaining = (close - (now or datetime.now(UTC))).total_seconds()
+    return remaining >= MIN_PINNED_SECONDS
 
 
 def run_cycle(args: argparse.Namespace, cycle: int) -> Path | None:
@@ -239,7 +268,7 @@ def run_cycle(args: argparse.Namespace, cycle: int) -> Path | None:
     # A 15-minute window is also the market this project is actually about, and
     # it is systematically penalised by a churn probe - it can be seconds from
     # settling, or freshly opened with an empty book, at the instant we look.
-    pinned = [t for t in (m["ticker"] for m in markets) if _is_short_window(t)]
+    pinned = [m["ticker"] for m in markets if _pinnable(m)]
     remaining = max(0, args.markets - len(pinned))
     ranked = pr._rank_by_churn(
         [t for t in shortlisted if t not in pinned],
