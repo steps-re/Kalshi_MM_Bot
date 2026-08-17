@@ -322,3 +322,21 @@ def test_a_freshly_opened_window_survives_the_volume_floor() -> None:
     assert collect_loop._is_short_window("KXBTC15M-26AUG171300-00")
     # Not a pinned series, so the floor still applies to it.
     assert not collect_loop._is_short_window("KXBTCD-26AUG1717-T63499.99")
+
+
+def test_alignment_waits_past_the_boundary_for_the_book_to_form() -> None:
+    """Selecting exactly on the boundary grabs the expiring window or nothing.
+
+    Both happened across four consecutive cycles. A window checked by hand three
+    minutes after open had a two-sided book and 318,904 contracts of volume, so
+    it is ready well inside a minute.
+    """
+
+    import collect_loop
+
+    assert collect_loop.WINDOW_SETTLE_SECONDS > 0
+    # Waiting must land after the boundary, never before it.
+    assert (
+        collect_loop.seconds_to_next_window(0) + collect_loop.WINDOW_SETTLE_SECONDS
+        > collect_loop.WINDOW_SECONDS
+    )

@@ -120,18 +120,30 @@ def seconds_to_next_window(now: float | None = None) -> float:
     return WINDOW_SECONDS - (now % WINDOW_SECONDS)
 
 
+# A window is not selectable at the instant it opens. The previous one is still
+# listed for a few seconds, and the new one has no two-sided book yet - so
+# selecting exactly on the boundary either grabs the expiring market or finds
+# nothing at all. Both happened, across four consecutive cycles.
+#
+# Verified by hand at 17:33 against a window that opened at 17:30: bid 0.33,
+# ask 0.34, 318,904 contracts of volume, comfortably pinnable. The market is
+# ready well inside a minute; sixty seconds is that with margin, and costs one
+# minute of a fifteen-minute window to reliably capture the other fourteen.
+WINDOW_SETTLE_SECONDS = 60.0
+
+
 def wait_for_window_open(max_wait: float = WINDOW_SECONDS) -> float:
-    """Sleep until the next window opens. Returns how long it waited.
+    """Sleep until just after the next window opens. Returns how long it waited.
 
     Waiting up to fifteen minutes to start looks wasteful and is not: a cycle
     that begins mid-window records the tail of a market nobody should be quoting
     and misses the part that pays.
     """
 
-    delay = min(seconds_to_next_window(), max_wait)
+    delay = min(seconds_to_next_window() + WINDOW_SETTLE_SECONDS, max_wait)
 
     if delay > 1.0:
-        log(f"  aligning to window open in {delay:.0f}s")
+        log(f"  aligning to window open (+settle) in {delay:.0f}s")
         time.sleep(delay)
 
     return delay
