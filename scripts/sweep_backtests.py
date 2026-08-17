@@ -76,21 +76,45 @@ MIN_DELTAS_PER_SECOND = 50.0
 
 @dataclass(frozen=True, slots=True)
 class Resolution:
-    """How finely a recording saw the book, which bounds what it can prove."""
+    """How finely a recording saw the book, which bounds what it can prove.
+
+    Measured **per ticker and then taken as a median**, not as an aggregate.
+    A recording that pins two busy 15-minute windows alongside a quiet daily
+    strike ladder averages to something thin-looking while the markets under
+    study are recorded at 250-360 deltas/sec. Judging that recording on its
+    average would discard exactly the data it was collected for.
+    """
 
     recording: str
     deltas: int
     seconds: float
     tickers: int
+    # Per-ticker rates, best first. Empty when nothing was measured.
+    ticker_rates: tuple[float, ...] = ()
 
     @property
     def deltas_per_second_per_ticker(self) -> float:
+        """Median per-ticker rate, falling back to the aggregate."""
+
+        if self.ticker_rates:
+            return st.median(self.ticker_rates)
+
         span = max(1.0, self.seconds) * max(1, self.tickers)
         return self.deltas / span
 
     @property
+    def best_ticker_rate(self) -> float:
+        return max(self.ticker_rates) if self.ticker_rates else 0.0
+
+    @property
     def is_thin(self) -> bool:
-        return self.deltas_per_second_per_ticker < MIN_DELTAS_PER_SECOND
+        """Thin when even the best-recorded market in it is thin.
+
+        A single well-recorded market is enough to support a conclusion about
+        that market, which is what this project actually studies.
+        """
+
+        return self.best_ticker_rate < MIN_DELTAS_PER_SECOND
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,8 +153,10 @@ def measure_resolution(recording: Path) -> Resolution | None:
         return None
 
     deltas = 0
-    tickers: set[str] = set()
     first = last = None
+    # Per ticker, because a recording mixes markets of wildly different
+    # activity and the average of those is not a property of any of them.
+    per_ticker: dict[str, list] = {}
 
     for line in events.open():
         try:
@@ -142,24 +168,39 @@ def measure_resolution(recording: Path) -> Resolution | None:
         inner = message.get("msg") or {}
         ticker = inner.get("market_ticker")
 
-        if ticker:
-            tickers.add(str(ticker))
+        if not ticker:
+            continue
+
+        entry = per_ticker.setdefault(str(ticker), [0, None, None])
 
         if message.get("type") != "orderbook_delta":
             continue
 
         deltas += 1
+        entry[0] += 1
         offset = row.get("offset_seconds")
 
         if isinstance(offset, (int, float)):
             first = offset if first is None else min(first, offset)
             last = offset if last is None else max(last, offset)
+            entry[1] = offset if entry[1] is None else min(entry[1], offset)
+            entry[2] = offset if entry[2] is None else max(entry[2], offset)
+
+    rates = []
+
+    for count, low, high in per_ticker.values():
+        if not count:
+            continue
+
+        span = max(1.0, (high - low) if low is not None else 1.0)
+        rates.append(count / span)
 
     return Resolution(
         recording=recording.name,
         deltas=deltas,
         seconds=(last - first) if (first is not None and last is not None) else 0.0,
-        tickers=len(tickers),
+        tickers=len(per_ticker),
+        ticker_rates=tuple(sorted(rates, reverse=True)),
     )
 
 
@@ -209,11 +250,11 @@ def resolution_report(resolutions: list[Resolution]) -> str:
     if not thin:
         return ""
 
-    worst = min(thin, key=lambda r: r.deltas_per_second_per_ticker)
+    worst = min(thin, key=lambda r: r.best_ticker_rate)
     lines = [
-        f"!! {len(thin)} of {len(resolutions)} recording(s) are below "
-        f"{MIN_DELTAS_PER_SECOND:.0f} book deltas/sec/ticker - the thinnest is "
-        f"{worst.recording} at {worst.deltas_per_second_per_ticker:.1f}.",
+        f"!! {len(thin)} of {len(resolutions)} recording(s) have no market "
+        f"recorded above {MIN_DELTAS_PER_SECOND:.0f} book deltas/sec - the "
+        f"thinnest peaks at {worst.best_ticker_rate:.1f} ({worst.recording}).",
         "   These are REST-polled books. Polling reports the net change per",
         "   interval, so a level that trades and refills between samples is",
         "   invisible: measured against a websocket capture of the same window,",

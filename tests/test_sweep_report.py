@@ -119,12 +119,37 @@ def test_zero_fill_strategies_do_not_crash_the_report() -> None:
     assert "silent" in text
 
 
-def _resolution(deltas=100_000, seconds=900.0, tickers=1):
+def _resolution(deltas=100_000, seconds=900.0, tickers=1, rates=None):
     from sweep_backtests import Resolution
 
+    # Per-ticker rates are what the verdict keys off. Default to spreading the
+    # deltas evenly, which is what a single-market recording really looks like.
+    if rates is None:
+        rates = tuple([deltas / max(1.0, seconds) / max(1, tickers)] * max(1, tickers))
+
     return Resolution(
-        recording="rec", deltas=deltas, seconds=seconds, tickers=tickers
+        recording="rec",
+        deltas=deltas,
+        seconds=seconds,
+        tickers=tickers,
+        ticker_rates=tuple(sorted(rates, reverse=True)),
     )
+
+
+def test_a_mixed_recording_is_judged_on_its_best_market_not_its_average() -> None:
+    """Two busy 15-minute windows beside a quiet strike ladder.
+
+    Judging that on the average discards exactly the data it was collected for:
+    measured, the windows recorded at 250-360 deltas/sec while the ladder sat
+    near 5, and the aggregate read as thin.
+    """
+
+    mixed = _resolution(rates=(336.5, 124.3, 5.5), tickers=3)
+
+    assert not mixed.is_thin
+    assert mixed.best_ticker_rate == 336.5
+    # The median still describes the recording as a whole.
+    assert mixed.deltas_per_second_per_ticker == 124.3
 
 
 def test_a_polled_book_is_flagged_as_too_thin_to_prove_fill_rates() -> None:
