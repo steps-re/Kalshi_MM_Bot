@@ -81,6 +81,7 @@ def record(series: str, minutes: float, out: Path, interval: float) -> Path:
     deadline = time.time() + minutes * 60
     written = 0
     seen_trades: set[str] = set()
+    warmed: set[str] = set()
 
     with out.open("w") as handle:
         while time.time() < deadline:
@@ -100,6 +101,18 @@ def record(series: str, minutes: float, out: Path, interval: float) -> Path:
 
                     fresh = [t for t in raw_trades if t.get("trade_id") not in seen_trades]
                     seen_trades.update(str(t.get("trade_id")) for t in fresh)
+
+                    # The first poll of a ticker returns its recent trade
+                    # HISTORY, not trades since we started watching. Counting
+                    # that backlog against shrinkage we never observed inflates
+                    # the ratio without limit: a slow market measured 28,003
+                    # contracts traded against 127 of observed shrinkage, which
+                    # a min(1.0, ...) clamp then quietly reported as a perfect
+                    # 1.000. Seed the dedup set on the first poll and count
+                    # nothing from it.
+                    if ticker not in warmed:
+                        warmed.add(ticker)
+                        fresh = []
 
                     handle.write(
                         json.dumps(
@@ -195,7 +208,18 @@ def report(stats: dict) -> str:
         if shrink <= 0:
             continue
 
-        fraction = min(1.0, traded / shrink)
+        fraction = traded / shrink
+
+        if fraction > 1.0:
+            # Physically impossible: more traded than the book gave up. Report
+            # it and exclude it rather than clamping, which is what hid the
+            # trade-backlog bug in the first place.
+            lines.append(
+                f"{ticker[-27:]:<28}{s['snapshots']:>7}{shrink:>11,.0f}{traded:>10,.0f}"
+                f"{'IMPOSSIBLE':>12}{'excluded':>9}"
+            )
+            continue
+
         fractions.append(fraction)
         lines.append(
             f"{ticker[-27:]:<28}{s['snapshots']:>7}{shrink:>11,.0f}{traded:>10,.0f}"
