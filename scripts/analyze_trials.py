@@ -224,6 +224,25 @@ def markout_summary(trials: list[dict], *, by_close: bool) -> str:
                 "and risk question, not a quoting one."
             )
 
+    lags = [t.get("mid_lag_seconds") for t, _ in usable if t.get("mid_lag_seconds")]
+
+    if lags:
+        lines.append(
+            f"\nmarkout horizon: {st.median(lags):.1f}s median "
+            f"({min(lags):.1f}-{max(lags):.1f}s). This is the delay between the "
+            "exchange executing the fill and us sampling the book, and it is not "
+            "controlled - the numbers above are markout at that horizon, not at "
+            "the moment of execution."
+        )
+    else:
+        lines.append(
+            "\n!! markout horizon UNKNOWN for these trials. The book was sampled "
+            "some time after the fill - detection lag plus a round trip, roughly "
+            "0-4s - and that delay was never recorded. Treat the markout above as "
+            "indicative only: a markout with no horizon is not comparable to any "
+            "other markout, including a later run of this same tool."
+        )
+
     if missing:
         lines.append(
             f"\n{missing} filled trial(s) predate mid_at_fill and are excluded "

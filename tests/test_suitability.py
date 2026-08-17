@@ -133,3 +133,37 @@ def test_family_rollup_does_not_credit_unscorable_markets() -> None:
     assert families["KXB"].total_score > 0.0
     # Ranked ahead of the unmeasured family.
     assert by_family(assessments)[0].family == "KXB"
+
+
+def test_flow_is_measured_over_the_market_s_own_life_not_a_day() -> None:
+    """A 15-minute window has no 24-hour history; assuming one understates its
+    flow by a factor of ninety-six and makes every short-dated market look
+    untradeable."""
+
+    fast = assess(
+        quote(volume_24h=12_000, seconds_to_close=900.0),
+        depth_at_touch=200.0,
+        age_seconds=900.0,
+    )
+    assumed_day = assess(
+        quote(volume_24h=12_000, seconds_to_close=900.0),
+        depth_at_touch=200.0,
+    )
+
+    assert fast.flow_window_seconds == 900.0
+    assert assumed_day.flow_window_seconds == 86_400.0
+    assert fast.expected_wait_seconds < assumed_day.expected_wait_seconds
+    assert fast.queue_viable is True
+    assert assumed_day.queue_viable is False, "the old assumption rejected it"
+
+
+def test_flow_window_never_exceeds_a_day() -> None:
+    """A month-old market did not accumulate today's volume over a month."""
+
+    old = assess(
+        quote(volume_24h=86_400, seconds_to_close=3600.0),
+        depth_at_touch=100.0,
+        age_seconds=30 * 86_400.0,
+    )
+
+    assert old.flow_window_seconds == 86_400.0

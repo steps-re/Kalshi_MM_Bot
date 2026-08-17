@@ -77,6 +77,9 @@ class Suitability:
     seconds_to_close: float | None
     band: str
     depth_at_touch: float | None = None
+    # How long this market has been open. Volume divided by this is a far better
+    # flow estimate than volume divided by a day - see flow_window_seconds.
+    age_seconds: float | None = None
 
     @property
     def fee_viable(self) -> bool:
@@ -90,13 +93,44 @@ class Suitability:
         flow can reach us. This is an optimistic floor either way: it assumes
         every contract traded hits the touch and that nobody joins ahead of us
         or cancels behind. A market that fails this test fails a generous one.
+
+        **Flow is averaged over the market's own life, not over 24 hours.**
+        Spreading a day's volume evenly is wrong in both directions and wrong
+        worst exactly where it matters: a 15-minute window has no 24-hour
+        history at all (the API reports its 24h volume as literally zero), while
+        an in-play sports market concentrates a day's volume into the two hours
+        a game is on and looks tradable at 3am. Dividing by the market's real
+        elapsed life at least measures flow over a period the market existed
+        for.
+
+        It remains an average, so a market whose flow arrives in bursts is still
+        flattered between bursts. Clearance is a screen, not a promise.
         """
 
         if self.depth_at_touch is None or self.volume_24h <= 0:
             return None
 
-        per_side_per_second = (self.volume_24h / 86_400.0) / 2.0
+        window = self.flow_window_seconds
+        per_side_per_second = (self.volume_24h / window) / 2.0
+
+        if per_side_per_second <= 0:
+            return None
+
         return self.depth_at_touch / per_side_per_second
+
+    @property
+    def flow_window_seconds(self) -> float:
+        """The period the observed volume was actually accumulated over.
+
+        Falls back to a day only when the market's age is unknown, and never
+        exceeds it: claiming a market traded its volume over 24 hours when it
+        has existed for 15 minutes understates flow by a factor of ninety-six.
+        """
+
+        if self.age_seconds is not None and self.age_seconds > 0:
+            return min(self.age_seconds, 86_400.0)
+
+        return 86_400.0
 
     @property
     def queue_clearance(self) -> float | None:
@@ -209,6 +243,7 @@ def assess(
     improvement_ticks: int = 100,
     assumed_size: int = DEFAULT_SIZE,
     depth_at_touch: float | None = None,
+    age_seconds: float | None = None,
 ) -> Suitability:
     """Assess one market. `depth_at_touch` is contracts resting at the touch,
     averaged across the two sides; without it the queue cannot be judged and
@@ -226,6 +261,7 @@ def assess(
         seconds_to_close=quote.seconds_to_close,
         band=price_band(quote.mid),
         depth_at_touch=depth_at_touch,
+        age_seconds=age_seconds,
     )
 
 

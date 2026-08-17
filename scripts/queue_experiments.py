@@ -97,6 +97,8 @@ class Trial:
     our_price: int
     mid: int
     filled: bool
+    # True execution latency, from the exchange's own timestamp. None when the
+    # payload carries no usable time.
     seconds_to_fill: float | None
     is_taker: bool | None
     fee_micros: int | None
@@ -113,6 +115,12 @@ class Trial:
     # Book at the moment we filled, for markout. Without it there is no way to
     # tell a good fill from one that was immediately run over.
     mid_at_fill: int | None = None
+    # How long after the execution the book above was sampled. This is the
+    # markout horizon, and it is not controlled - report it, never assume it.
+    mid_lag_seconds: float | None = None
+    # How long our polling took to notice. A property of the harness, kept so a
+    # later reader can tell it apart from seconds_to_fill.
+    seconds_to_detect: float | None = None
     note: str = ""
 
 
@@ -135,6 +143,37 @@ def _seconds_to_close(market: dict) -> float | None:
 
     remaining = (close - datetime.now(UTC)).total_seconds()
     return remaining if remaining > 0 else None
+
+
+def _fill_time(fill: dict) -> float | None:
+    """Exchange-stamped execution time as a unix timestamp."""
+
+    stamp = fill.get("created_time")
+
+    if isinstance(stamp, str) and stamp:
+        try:
+            return datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            pass
+
+    try:
+        return float(fill["ts"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _fill_latency_seconds(fill: dict, placed_at_wall: float) -> float | None:
+    """Seconds from placing the order to the exchange executing it."""
+
+    executed = _fill_time(fill)
+    return None if executed is None else max(0.0, executed - placed_at_wall)
+
+
+def _fill_age_seconds(fill: dict) -> float | None:
+    """How long ago the execution happened, as of now."""
+
+    executed = _fill_time(fill)
+    return None if executed is None else max(0.0, time.time() - executed)
 
 
 async def book_state(rest: KalshiRestClient, ticker: str) -> dict | None:
@@ -349,6 +388,7 @@ async def run_trial(
 
     client_id = f"{PREFIX}-{int(time.time() * 1000)}"
     started = time.monotonic()
+    placed_at_wall = time.time()
 
     response = await rest.batch_create_orders(
         [
@@ -411,15 +451,26 @@ async def run_trial(
 
             seen_trades.add(trade_id)
             trial.filled = True
-            trial.seconds_to_fill = time.monotonic() - started
+            # Detection time is a property of THIS LOOP, not of the market. It
+            # can only ever be a multiple of the poll interval, which is why an
+            # earlier version reported that every fill landed in "2 seconds" -
+            # that was the sleep above, reported back as a measurement. The
+            # exchange stamps the real execution time, so use it.
+            trial.seconds_to_fill = _fill_latency_seconds(fill, placed_at_wall)
+            trial.seconds_to_detect = time.monotonic() - started
             trial.is_taker = bool(fill.get("is_taker"))
             # None means the payload did not report a fee. Never coerce that to
             # zero: it is the difference between "free" and "we cannot read it".
             trial.fee_micros = parse_fill_fee_micros(fill)
-            # Where the book sat when we traded, so adverse selection is
-            # measurable later rather than assumed away.
+            # The book AFTER the fill, not at it. We learn of the fill up to one
+            # poll interval late and then spend a round trip fetching the book,
+            # so this is a markout at an uncontrolled horizon of roughly 0-4
+            # seconds. Record how stale it is so the horizon is a known quantity
+            # rather than a hidden one; a markout whose horizon is unknown is
+            # not comparable to anything.
             at_fill = await book_state(rest, ticker)
             trial.mid_at_fill = at_fill["mid"] if at_fill else None
+            trial.mid_lag_seconds = _fill_age_seconds(fill)
             break
 
         if trial.filled:
