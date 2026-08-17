@@ -15,6 +15,7 @@ STRATEGY_NAMES: tuple[str, ...] = ("horizon", "adaptive", "dumb")
 
 from kalshi_mm_bot.strategy.defended import MomentumDefendedStrategy
 from kalshi_mm_bot.strategy.momentum_taker import MomentumTakerStrategy
+from kalshi_mm_bot.strategy.phase import WindowPhaseStrategy
 
 
 def strategy_from_name(
@@ -45,6 +46,16 @@ def strategy_from_name(
 
     # "defended:<name>" wraps any strategy in the momentum defence, so the two
     # can be compared by running the same inner strategy either way.
+    if normalized.startswith("phased:"):
+        return WindowPhaseStrategy(
+            inner=strategy_from_name(
+                normalized.split(":", 1)[1],
+                count=count,
+                max_position=max_position,
+                adaptive_params=adaptive_params,
+            )
+        )
+
     if normalized.startswith(("defended:", "symmetric:")):
         prefix, inner_name = normalized.split(":", 1)
         return MomentumDefendedStrategy(

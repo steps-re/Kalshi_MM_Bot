@@ -258,3 +258,75 @@ def test_one_move_emits_one_signal() -> None:
     # Once the cooldown lapses a genuinely new move can fire again.
     tracker.observe("M1", 5110, offset_seconds=95.0)
     assert tracker.observe("M1", 5220, offset_seconds=125.0) is not None
+
+
+# --- window phase gate -------------------------------------------------------
+
+
+def _phased(position=0):
+    from kalshi_mm_bot.strategy.phase import WindowPhaseStrategy
+
+    class BothSides:
+        name = "both"
+
+        def on_orderbook(self, context, market_ticker, orderbook, portfolio):
+            return (
+                QuoteIntent("b", market_ticker, "buy", "yes", parse_price_fp("0.4900"), ONE),
+                QuoteIntent("s", market_ticker, "sell", "yes", parse_price_fp("0.5000"), ONE),
+            )
+
+    class Held:
+        def position(self, market_ticker):
+            return position
+
+    return WindowPhaseStrategy(inner=BothSides()), Held()
+
+
+def _run(strategy, portfolio, seconds_left):
+    return strategy.on_orderbook(
+        context=StrategyContext(
+            event_count=1, offset_seconds=1.0, seconds_to_close=seconds_left
+        ),
+        market_ticker="M1",
+        orderbook=book(),
+        portfolio=portfolio,
+    )
+
+
+def test_phase_gate_is_transparent_early_in_the_window() -> None:
+    strategy, portfolio = _phased()
+
+    assert len(_run(strategy, portfolio, 700.0)) == 2
+    assert strategy.blocked_count == 0
+
+
+def test_phase_gate_keeps_only_the_flattening_side_when_long() -> None:
+    """Reduce-only, not stop: a withheld quote leaves inventory with no exit."""
+
+    strategy, portfolio = _phased(position=ONE)
+    kept = _run(strategy, portfolio, 120.0)
+
+    assert [i.action for i in kept] == ["sell"]
+
+
+def test_phase_gate_keeps_only_the_flattening_side_when_short() -> None:
+    strategy, portfolio = _phased(position=-ONE)
+    kept = _run(strategy, portfolio, 120.0)
+
+    assert [i.action for i in kept] == ["buy"]
+
+
+def test_phase_gate_stops_entirely_when_flat() -> None:
+    """No position to unwind and no edge left to earn."""
+
+    strategy, portfolio = _phased(position=0)
+
+    assert _run(strategy, portfolio, 120.0) == ()
+
+
+def test_unknown_time_to_close_does_not_gate() -> None:
+    """Otherwise a market whose close time failed to parse is silently muted."""
+
+    strategy, portfolio = _phased(position=0)
+
+    assert len(_run(strategy, portfolio, None)) == 2

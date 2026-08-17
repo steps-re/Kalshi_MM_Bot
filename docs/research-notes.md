@@ -230,3 +230,55 @@ is no cross-venue edge here, only a basis that is exactly what it should be.
 `scripts/cross_venue.py` reads live CLOB midpoints and refuses to fall back to
 cached quotes - returning None instead - because a stale price that looks live
 is how this nearly became a trade.
+
+---
+
+# Window phase: where the edge actually is (539 live fills)
+
+Markout by time remaining, pooled across all live runs:
+
+| time left | n | mean | in favour |
+|---|---|---|---|
+| 12-15m | 29 | **+0.414c** | 75% |
+| 9-12m | 79 | **+0.416c** | 75% |
+| 6-8m | 39 | +0.232c | 56% |
+| 4-6m | 92 | +0.078c | 63% |
+| 2-4m | 82 | +0.002c | 49% |
+| 1-2m | 33 | −0.068c | 36% |
+| <1m | 3 | −0.050c | 0% |
+
+Monotonic decay. The edge is concentrated in the **first half** of a window and
+is gone by roughly six minutes out - consistent with the mechanics: as expiry
+approaches the remaining traders increasingly know where it settles, and depth
+collapses about elevenfold, so a resting quote sits in a thinner, better
+informed book.
+
+I had this backwards. The closing minutes were on the list as unexplored
+*opportunity* - low fees, thin queue. They are unexplored *risk*.
+
+## The gate, and why the backtest cannot judge it
+
+`strategy/phase.py` goes **reduce-only** past a threshold rather than stopping:
+withholding quotes leaves inventory with no exit except crossing, which is how
+the momentum defence turned +$1.33 of inventory into -$14.78.
+
+Backtested it collapses: 3,582 fills -> 177, net $15.06 -> $1.57. That number
+means nothing, because of where the recordings sit in the window:
+
+    fills by time to close, across the 7 feed recordings
+      12m+     177
+      9-12m      0
+      6-9m       0
+      3-6m     539
+      0-3m   2,866
+
+**95% of backtest fills are inside six minutes of close, and the 6-12m band -
+where the live edge lives - is empty.** The collector records fifteen-minute
+cycles that land wherever they land, and they have landed late. So the backtest
+is not a fair test of a rule about window phase; it is mostly measuring the
+regime the rule exists to avoid.
+
+Fixing this needs recordings aligned to window open, which is a collector change
+(start a cycle when a window opens rather than on a fixed clock), not a strategy
+change. Until then the gate should be judged live, where the 539-fill decay
+curve came from.
