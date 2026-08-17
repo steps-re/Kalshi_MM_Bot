@@ -6,6 +6,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from math import ceil
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -573,15 +574,21 @@ async def run_live_strategy(
     dry_run: bool = True,
     duration_seconds: float | None = None,
     client_prefix: str = "kmm",
-    min_requote_seconds: float = 0.0,
-    min_order_rest_seconds: float = 0.0,
-    requote_price_threshold: int = 0,
-    requote_size_threshold_bps: int = 0,
+    # None means "use RequotePolicy's own defaults", which are deliberately
+    # sticky. Spelling zeros out here re-created the exact bug fixed in
+    # LiveOrderManager: a dry run churned 176 creates and 176 cancels in 70
+    # seconds, throwing away queue position on every book tick, in a market
+    # where the queue is the whole game.
+    min_requote_seconds: float | None = None,
+    min_order_rest_seconds: float | None = None,
+    requote_price_threshold: int | None = None,
+    requote_size_threshold_bps: int | None = None,
     order_expiration_seconds: float | None = None,
     cancel_on_stop: bool = True,
     risk_limits: RiskLimits | None = None,
     status: StatusCallback | None = None,
     stop_requested: StopRequested | None = None,
+    journal_path: "Path | None" = None,
 ) -> LiveRunStats:
     if not tickers:
         raise ValueError("at least one ticker is required")
@@ -604,6 +611,10 @@ async def run_live_strategy(
         requote_size_threshold_bps=requote_size_threshold_bps,
         order_expiration_seconds=order_expiration_seconds,
         status=status,
+        # Without this, a live run produces no mid at fill time and the campaign
+        # monitor can only ever report adverse selection as UNKNOWN - which is
+        # the single measurement a live run exists to buy.
+        journal=OrderJournal(path=journal_path) if journal_path else None,
     )
     stats = LiveRunStats(dry_run=dry_run)
     risk = RiskMonitor(limits=risk_limits or RiskLimits())

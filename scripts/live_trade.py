@@ -64,6 +64,7 @@ async def _run(args: argparse.Namespace):
         order_expiration_seconds=args.order_expiration_sec,
         cancel_on_stop=not args.leave_orders,
         status=print,
+        journal_path=Path(args.journal) if args.journal else None,
     )
 
 
@@ -101,25 +102,32 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-requote-sec",
         type=float,
-        default=0.25,
+        default=None,
         help="Minimum seconds between replacement creates per market. Default: 0.25.",
     )
     parser.add_argument(
         "--min-order-rest-sec",
         type=float,
-        default=0.50,
+        default=None,
         help="Minimum seconds to keep a changed quote resting before replacement. Default: 0.50.",
     )
     parser.add_argument(
         "--requote-price-threshold",
-        default="0.0200",
+        default=None,
         help="Replace only when target price moves by at least this much. Default: 0.0200.",
     )
     parser.add_argument(
         "--requote-size-threshold-bps",
         type=int,
-        default=5_000,
+        default=None,
         help="Replace only when target size changes by this many bps. Default: 5000.",
+    )
+    parser.add_argument(
+        "--journal",
+        help="Write an order journal here (JSONL). Records the book at "
+        "placement, the mid at each fill and the lag to it, and every "
+        "cancellation. Without it a run cannot measure adverse selection, which "
+        "is usually the only reason to do one.",
     )
     parser.add_argument(
         "--client-prefix",
@@ -175,13 +183,17 @@ def _parse_args() -> argparse.Namespace:
     if args.duration_sec is not None and args.duration_sec <= 0:
         parser.error("--duration-sec must be greater than zero")
 
-    if args.min_requote_sec < 0:
+    # None means "defer to RequotePolicy", so only validate what was supplied.
+    if args.min_requote_sec is not None and args.min_requote_sec < 0:
         parser.error("--min-requote-sec must be non-negative")
 
-    if args.min_order_rest_sec < 0:
+    if args.min_order_rest_sec is not None and args.min_order_rest_sec < 0:
         parser.error("--min-order-rest-sec must be non-negative")
 
-    if args.requote_size_threshold_bps < 0:
+    if (
+        args.requote_size_threshold_bps is not None
+        and args.requote_size_threshold_bps < 0
+    ):
         parser.error("--requote-size-threshold-bps must be non-negative")
 
     if args.order_expiration_sec < 0:
@@ -193,7 +205,7 @@ def _parse_args() -> argparse.Namespace:
     try:
         args.requote_price_threshold = _parse_price_delta(args.requote_price_threshold)
 
-        if args.requote_price_threshold < 0:
+        if args.requote_price_threshold is not None and args.requote_price_threshold < 0:
             parser.error("--requote-price-threshold must be non-negative")
 
         parse_adaptive_params(args.adaptive_param)
@@ -212,7 +224,12 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
-def _parse_price_delta(raw_text: str) -> int:
+def _parse_price_delta(raw_text: str | None) -> int | None:
+    """None passes through: it means "defer to RequotePolicy"."""
+
+    if raw_text is None:
+        return None
+
     text = raw_text.strip()
 
     if "." in text:
