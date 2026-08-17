@@ -57,6 +57,16 @@ from kalshi_mm_bot.live.journal import read_journal  # noqa: E402
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR  # noqa: E402
 
 PINNED = ("KXBTC15M", "KXETH15M")
+
+# Failures that mean "slow down" rather than "you are broken".
+TRANSIENT_SIGNS = (
+    "429",
+    "too_many_requests",
+    "ReadTimeout",
+    "ConnectError",
+    "RemoteProtocolError",
+    "503",
+)
 TICKS_PER_CENT = ONE_DOLLAR // 100
 
 
@@ -295,6 +305,8 @@ async def run(args: argparse.Namespace) -> None:
                 str(duration),
                 "--journal",
                 str(journal),
+                "--min-requote-sec",
+                str(args.min_requote_sec),
             ]
 
             if args.execute:
@@ -309,10 +321,21 @@ async def run(args: argparse.Namespace) -> None:
                 # discarded it, and a failing child produced 90 "successful"
                 # zero-fill cycles in seven minutes that looked like a quiet
                 # market rather than a broken command.
+                output = (result.stderr or result.stdout or "").strip()
                 log(f"  live_trade exited {result.returncode}")
 
-                for line in (result.stderr or result.stdout or "").strip().splitlines()[-6:]:
+                for line in output.splitlines()[-4:]:
                     log(f"    {line}")
+
+                # A rate limit or a dropped connection is the exchange telling
+                # us to slow down, not a broken session. Backing off and taking
+                # the next window is right; stopping a three-hour run over one
+                # 429 throws away the experiment. A bad argument, by contrast,
+                # will fail identically forever and must stop.
+                if any(sign in output for sign in TRANSIENT_SIGNS):
+                    log(f"  transient - backing off {args.backoff_seconds:.0f}s")
+                    await asyncio.sleep(args.backoff_seconds)
+                    continue
 
                 log("  stopping: a session that cannot trade should not keep cycling")
                 break
@@ -365,6 +388,14 @@ def main() -> None:
         "edge measured live is +0.27c above six minutes and +0.06c below it.",
     )
     parser.add_argument("--min-balance", type=float, default=35.0)
+    parser.add_argument("--backoff-seconds", type=float, default=90.0)
+    parser.add_argument(
+        "--min-requote-sec",
+        default="2.0",
+        help="Throttle requoting. The default strategy re-quotes on nearly "
+        "every book tick, which reached Kalshi's order rate limit and returned "
+        "429 within fourteen seconds of a session starting.",
+    )
     parser.add_argument("--journal-dir", default="data/session")
     parser.add_argument("--execute", action="store_true")
     parser.add_argument("--confirm-real-money", action="store_true")
