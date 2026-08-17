@@ -173,6 +173,16 @@ def rank_candidates(markets: list[dict], shortlist: int) -> list[str]:
     return [ticker for _, ticker in scored[:shortlist]]
 
 
+# Series whose markets are always worth a recording slot: rolling short-dated
+# windows, which are both the subject of the research and by far the most
+# active books on the exchange.
+PINNED_SERIES = ("KXBTC15M", "KXETH15M")
+
+
+def _is_short_window(ticker: str) -> bool:
+    return any(ticker.startswith(series) for series in PINNED_SERIES)
+
+
 def run_cycle(args: argparse.Namespace, cycle: int) -> Path | None:
     log(f"cycle {cycle}: selecting targets")
     markets = candidate_markets(tuple(args.series), args.min_volume)
@@ -184,7 +194,29 @@ def run_cycle(args: argparse.Namespace, cycle: int) -> Path | None:
     shortlisted = rank_candidates(markets, args.shortlist)
     log(f"  {len(markets)} candidates -> {len(shortlisted)} fee-plausible; probing churn")
 
-    tickers = pr._rank_by_churn(shortlisted, args.markets, gap_seconds=args.probe_gap)
+    # Always record the rolling short-dated windows, whatever churn says.
+    #
+    # Churn ranking is a reasonable way to spend spare slots and a bad way to
+    # choose the subject of the study. Left to itself it fills every slot with
+    # daily crypto strike ladders, which are busy in aggregate and nearly static
+    # per book: a cycle recorded that way carried 4 book deltas/sec/ticker while
+    # a KXBTC15M window measured 352. Recording the quiet markets in high
+    # fidelity is not an improvement over recording them badly.
+    #
+    # A 15-minute window is also the market this project is actually about, and
+    # it is systematically penalised by a churn probe - it can be seconds from
+    # settling, or freshly opened with an empty book, at the instant we look.
+    pinned = [t for t in (m["ticker"] for m in markets) if _is_short_window(t)]
+    remaining = max(0, args.markets - len(pinned))
+    ranked = pr._rank_by_churn(
+        [t for t in shortlisted if t not in pinned],
+        remaining,
+        gap_seconds=args.probe_gap,
+    ) if remaining else []
+    tickers = pinned + ranked
+
+    if pinned:
+        log(f"  pinned {len(pinned)} short-window market(s): {', '.join(pinned)}")
 
     if not tickers:
         log("  nothing moving; sleeping before retry")

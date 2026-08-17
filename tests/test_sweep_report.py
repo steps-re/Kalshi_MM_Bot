@@ -160,3 +160,20 @@ def test_resolution_is_per_ticker_so_breadth_does_not_pass_as_depth() -> None:
     ten = _resolution(deltas=100_000, tickers=10)
 
     assert ten.deltas_per_second_per_ticker == one.deltas_per_second_per_ticker / 10
+
+
+def test_short_window_series_are_pinned_for_recording() -> None:
+    """Churn ranking fills every slot with quiet daily strike ladders.
+
+    Measured on one cycle: the churn-picked markets carried 4-5 book
+    deltas/sec/ticker while the 15-minute windows carried 106 and 352. Recording
+    the quiet markets in high fidelity is not an improvement over recording them
+    badly, and the short windows are the subject of the research besides.
+    """
+
+    import collect_loop
+
+    assert collect_loop._is_short_window("KXBTC15M-26AUG170700-00")
+    assert collect_loop._is_short_window("KXETH15M-26AUG170700-00")
+    assert not collect_loop._is_short_window("KXBTCD-26AUG1717-T62999.99")
+    assert not collect_loop._is_short_window("KXNFLGAME-26AUG22DALARI-ARI")
