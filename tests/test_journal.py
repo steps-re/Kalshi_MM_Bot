@@ -174,3 +174,39 @@ def test_the_manager_journals_a_fill_against_the_book_it_happened_in() -> None:
         assert placed[0]["mid"] == parse_price_fp("0.4950")
 
     asyncio.run(run())
+
+
+def test_a_fill_is_journalled_even_when_its_order_is_gone() -> None:
+    """Measured on the first live run: 116 fills, 3 recorded.
+
+    With 1,280 replacements, almost every fill arrived for an order that had
+    already been cancelled or popped, and journalling inside the order lookup
+    dropped all of them. The exchange's fill message carries everything needed.
+    """
+
+    from kalshi_mm_bot.market.types import OrderFill
+    from tests.test_live_trader import FakeRest
+
+    journal = OrderJournal()
+    manager = LiveOrderManager(FakeRest(), dry_run=True, journal=journal)
+    manager.observe_orderbook(book())
+
+    assert not manager.orders, "no order is tracked - that is the point"
+
+    manager.handle_fill(
+        OrderFill(
+            trade_id="t1",
+            order_id="an-order-we-no-longer-hold",
+            market_ticker="M1",
+            is_taker=False,
+            side="yes",
+            action="buy",
+            yes_price=parse_price_fp("0.4900"),
+            count=ONE,
+            post_position=ONE,
+        )
+    )
+
+    filled = [e for e in journal.events if e["event"] == "filled"]
+    assert len(filled) == 1
+    assert filled[0]["mid_at_fill"] == parse_price_fp("0.4950")

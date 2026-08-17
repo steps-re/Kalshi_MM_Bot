@@ -357,25 +357,33 @@ class LiveOrderManager:
 
         self._seen_fill_trade_ids.add(fill.trade_id)
 
+        # Journal FIRST, and from the fill itself rather than from a tracked
+        # order. A fill can easily arrive for an order we no longer hold - it
+        # was replaced a moment earlier, or filled fully and popped - and
+        # journalling inside the lookup below silently dropped those. Measured
+        # on the first live run: 116 fills happened and 3 were recorded, because
+        # 1,280 replacements meant almost every fill belonged to an order that
+        # had already left the book. The exchange's fill message carries
+        # everything needed, so nothing has to be recovered from local state.
+        if self.journal is not None:
+            self.journal.record_filled(
+                order_id=str(fill.order_id),
+                trade_id=str(fill.trade_id),
+                market_ticker=str(fill.market_ticker),
+                action=str(fill.action),
+                yes_price=fill.yes_price,
+                count=fill.count,
+                is_taker=bool(getattr(fill, "is_taker", False)),
+                fee_micros=getattr(fill, "fees_paid", None),
+                book=self._last_book.get(str(fill.market_ticker)),
+            )
+
         for client_order_id, order in tuple(self.orders.items()):
             if order.order_id != fill.order_id:
                 continue
 
             order.fill_message_count += fill.count
             _sync_remaining_from_fill_counts(order)
-
-            if self.journal is not None:
-                self.journal.record_filled(
-                    order_id=order.order_id,
-                    trade_id=str(fill.trade_id),
-                    market_ticker=str(order.market_ticker),
-                    action=str(order.action),
-                    yes_price=fill.yes_price,
-                    count=fill.count,
-                    is_taker=bool(getattr(fill, "is_taker", False)),
-                    fee_micros=getattr(fill, "fees_paid", None),
-                    book=self._last_book.get(str(order.market_ticker)),
-                )
 
             if order.remaining_count <= 0:
                 self.orders.pop(client_order_id, None)
