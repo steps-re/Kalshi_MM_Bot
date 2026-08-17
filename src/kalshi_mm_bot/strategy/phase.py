@@ -1,20 +1,30 @@
 """Stop opening new risk once a window's edge has decayed.
 
-Measured live across 539 fills, markout by time remaining in a 15-minute window:
+Measured live across **784 fills**, markout by time remaining in a 15-minute
+window:
 
-    12-15m   +0.414c   75% favourable
-     9-12m   +0.416c   75%
-      6-8m   +0.232c   56%
-      4-6m   +0.078c   63%
-      2-4m   +0.002c   49%
-      1-2m   -0.068c   36%
-       <1m   -0.050c    0%
+    12m+     +0.354c   68% favourable   n=41
+     9-12m   +0.316c   66%              n=125
+      6-9m   +0.222c   63%              n=206
+      4-6m   +0.085c   53%              n=173
+      2-4m   +0.094c   55%              n=150
+      1-2m   -0.112c   38%              n=66
+       <1m   +0.104c   48%              n=23
 
-The edge is concentrated in the first half of a window and is gone by about six
-minutes out. That is what you would expect mechanically: as expiry approaches
-the traders still active are increasingly the ones who know where it settles,
+Edge decays through the window - roughly +0.27c with six minutes or more left
+against +0.06c inside that - which is what you would expect mechanically: as
+expiry approaches the traders still active increasingly know where it settles,
 and depth collapses about elevenfold, so a resting quote sits in a thinner and
 better-informed book.
+
+**But late is still positive**, and this threshold was set at 360 seconds on a
+sample a fifth this size that showed the last six minutes going negative. It did
+not. Only the 1-2 minute band is genuinely bad, so the default is 120 seconds:
+gating at 360 would refuse trades that make ~0.09c, which is small but not a
+loss, and every fill refused is also a fill unavailable for working inventory
+off. The larger sample moved this the same way it moved overall markout, from
++0.446c to +0.264c - small samples in this project have consistently flattered
+whatever they were measuring.
 
 ## Reduce-only, not stop
 
@@ -54,11 +64,9 @@ from kalshi_mm_bot.strategy.types import (
     StrategyContext,
 )
 
-# Six minutes. The 6-8m bucket still earns +0.23c and 4-6m is +0.08c, so this
-# sits at the point where the edge is small rather than where it turns negative
-# - opening risk for two hundredths of a cent is not worth the inventory it
-# leaves behind.
-DEFAULT_REDUCE_ONLY_SECONDS = 360.0
+# Two minutes: the only band measured to be negative (-0.112c, 38% favourable
+# over 66 fills). Everything above it still earns, thinly.
+DEFAULT_REDUCE_ONLY_SECONDS = 120.0
 
 
 @dataclass
