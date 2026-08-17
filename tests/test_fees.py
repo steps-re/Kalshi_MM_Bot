@@ -167,3 +167,34 @@ def test_fee_is_expressed_in_money_scale() -> None:
     fee = model.fee_micros(yes_price=HALF_DOLLAR, count=100 * COUNT_SCALE)
 
     assert fee == int(1.75 * MONEY_SCALE)
+
+
+def test_calibrate_accepts_the_shape_calibrate_fees_writes() -> None:
+    """The probe script writes dicts; requiring tuples broke the loop it exists
+    to close."""
+
+    from kalshi_mm_bot.market.fees import KalshiFeeModel, calibrate_from_fills
+
+    fills = [
+        {"yes_price": 5700, "count": 100, "is_taker": False, "fee_micros": 0},
+        {"yes_price": 6200, "count": 100, "is_taker": False, "fee_micros": 0},
+    ]
+
+    calibration = calibrate_from_fills(KalshiFeeModel(), fills)
+
+    assert calibration.sample_count == 2
+    assert calibration.actual_micros == 0
+    # The default model charges makers, so this is the mismatch the live probe
+    # actually found on KXBTC15M.
+    assert calibration.modelled_micros > 0
+
+
+def test_calibrate_still_accepts_tuples() -> None:
+    from kalshi_mm_bot.market.fees import KalshiFeeModel, calibrate_from_fills
+
+    calibration = calibrate_from_fills(
+        KalshiFeeModel(), [(5700, 100, False, 0), (6200, 100, False, 0)]
+    )
+
+    assert calibration.sample_count == 2
+    assert calibration.actual_micros == 0

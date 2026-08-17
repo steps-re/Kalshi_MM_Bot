@@ -232,7 +232,7 @@ class FeeCalibration:
 
 def calibrate_from_fills(
     model: KalshiFeeModel,
-    fills: Iterable[tuple[int, int, bool, int]],
+    fills: Iterable[tuple[int, int, bool, int] | dict],
 ) -> FeeCalibration:
     """Score `model` against real executions.
 
@@ -240,13 +240,18 @@ def calibrate_from_fills(
     exactly what `OrderFill` plus the account's reported `fees_paid` provide.
     A mismatch means the backtest is lying about costs - fix the model before
     trusting any optimizer output.
+
+    Mappings with those same keys are accepted too, because that is the shape
+    `scripts/calibrate_fees.py` writes to disk. Requiring tuples here meant the
+    one script that buys this measurement produced a file this function could
+    not read, and the loop only closed by hand.
     """
 
     sample_count = 0
     modelled = 0
     actual = 0
 
-    for yes_price, count, is_taker, actual_fee_micros in fills:
+    for yes_price, count, is_taker, actual_fee_micros in map(_as_fill_tuple, fills):
         sample_count += 1
         modelled += model.fee_micros(yes_price=yes_price, count=count, is_taker=is_taker)
         actual += actual_fee_micros
@@ -255,6 +260,18 @@ def calibrate_from_fills(
         sample_count=sample_count,
         modelled_micros=modelled,
         actual_micros=actual,
+    )
+
+
+def _as_fill_tuple(fill: tuple[int, int, bool, int] | dict) -> tuple[int, int, bool, int]:
+    if not isinstance(fill, dict):
+        return fill
+
+    return (
+        int(fill["yes_price"]),
+        int(fill["count"]),
+        bool(fill["is_taker"]),
+        int(fill["fee_micros"]),
     )
 
 
