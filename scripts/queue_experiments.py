@@ -47,6 +47,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from kalshi_mm_bot.api.auth import KalshiAuth  # noqa: E402
+from kalshi_mm_bot.api.parser import FEE_FIELDS, parse_fill_fee_micros  # noqa: E402
 from kalshi_mm_bot.api.rest import (  # noqa: E402
     CancelOrderRequest,
     CreateOrderRequest,
@@ -80,6 +81,14 @@ def _num(value) -> float:
 
 @dataclass
 class Trial:
+    """One order placed under known conditions, and what became of it.
+
+    Every field here is either a condition we chose or an outcome we observed.
+    The point of the record is that a later reader can tell which was which
+    without having been present, so anything ambiguous is spelled out rather
+    than inferred.
+    """
+
     ticker: str
     mode: str
     rest_seconds: float
@@ -91,7 +100,41 @@ class Trial:
     seconds_to_fill: float | None
     is_taker: bool | None
     fee_micros: int | None
+    # Wall-clock provenance. Trials from different sessions and different market
+    # regimes end up in the same directory, and "which run was this" is not
+    # recoverable from the file name once two runs overlap.
+    recorded_at: str = ""
+    # The regime variable. A 15-minute window at 12 minutes out and the same
+    # window at 30 seconds out are different markets: the price has migrated to
+    # the tail, the spread has collapsed to a tenth of a cent and the depth has
+    # fallen 11x. Pooling trials across that without recording where in the
+    # window each one sat produces an average of two unlike things.
+    seconds_to_close: float | None = None
+    # Book at the moment we filled, for markout. Without it there is no way to
+    # tell a good fill from one that was immediately run over.
+    mid_at_fill: int | None = None
     note: str = ""
+
+
+def _seconds_to_close(market: dict) -> float | None:
+    """Seconds of market left, or None if it cannot be determined.
+
+    None rather than a negative number for an already-closed market: a screen
+    that ranks on time remaining must not read "closed an hour ago" as urgent.
+    """
+
+    stamp = market.get("close_time") or market.get("expiration_time")
+
+    if not isinstance(stamp, str) or not stamp:
+        return None
+
+    try:
+        close = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+    remaining = (close - datetime.now(UTC)).total_seconds()
+    return remaining if remaining > 0 else None
 
 
 async def book_state(rest: KalshiRestClient, ticker: str) -> dict | None:
@@ -172,7 +215,13 @@ async def candidates(rest: KalshiRestClient, args: argparse.Namespace) -> list[d
                 volume = _num(market.get("volume_24h_fp"))
 
                 if 0.10 < bid < ask < 0.90 and volume >= args.min_volume:
-                    found.append({"ticker": market["ticker"], "volume": volume})
+                    found.append(
+                        {
+                            "ticker": market["ticker"],
+                            "volume": volume,
+                            "close_time": market.get("close_time"),
+                        }
+                    )
 
         if not cursor:
             break
@@ -229,6 +278,7 @@ async def _series_candidates(
                     # volume_fp is the market's own lifetime volume; volume_24h_fp
                     # is zero for anything younger than a day.
                     "volume": _num(market.get("volume_fp")),
+                    "close_time": market.get("close_time"),
                     **state,
                 }
             )
@@ -320,7 +370,18 @@ async def run_trial(
         mode=mode,
         rest_seconds=rest_seconds,
         spread_ticks=spread,
-        depth_ahead=state["bid_depth"] if mode == "touch" else 0.0,
+        # Depth at the price we actually joined. Recording 0.0 for the non-touch
+        # modes used to make "we jumped the queue" and "we never looked"
+        # indistinguishable in the data; an empty new level really is zero ahead
+        # of us, and a crossing order really does have none, but those are
+        # findings rather than placeholders.
+        depth_ahead=(
+            state["bid_depth"]
+            if mode == "touch"
+            else 0.0  # inside: new price level, nobody there. cross: immediate.
+        ),
+        recorded_at=datetime.now(UTC).isoformat(timespec="seconds"),
+        seconds_to_close=_seconds_to_close(market),
         our_price=price,
         mid=state["mid"],
         filled=False,
@@ -352,7 +413,13 @@ async def run_trial(
             trial.filled = True
             trial.seconds_to_fill = time.monotonic() - started
             trial.is_taker = bool(fill.get("is_taker"))
-            trial.fee_micros = parse_money_fp(str(fill.get("fees_paid_dollars", "0")))
+            # None means the payload did not report a fee. Never coerce that to
+            # zero: it is the difference between "free" and "we cannot read it".
+            trial.fee_micros = parse_fill_fee_micros(fill)
+            # Where the book sat when we traded, so adverse selection is
+            # measurable later rather than assumed away.
+            at_fill = await book_state(rest, ticker)
+            trial.mid_at_fill = at_fill["mid"] if at_fill else None
             break
 
         if trial.filled:
@@ -491,7 +558,20 @@ def report(trials: list[Trial]) -> None:
             f"{(statistics.median(times) if times else float('nan')):>12.0f}"
         )
 
-    fills = [t for t in trials if t.filled and t.fee_micros is not None]
+    filled_trials = [t for t in trials if t.filled]
+    fills = [t for t in filled_trials if t.fee_micros is not None]
+    unreadable = [t for t in filled_trials if t.fee_micros is None]
+
+    if unreadable:
+        # Loud, because this is exactly how the previous version lied: it read a
+        # field name Kalshi had renamed, defaulted the miss to "0", and reported
+        # every fill on the ledger as free - takers included, who are charged
+        # about 1.3c. Never let a read failure sum into a total.
+        print(
+            f"\n!! {len(unreadable)} of {len(filled_trials)} fill(s) reported NO fee field."
+        )
+        print("   These are UNREADABLE, not free. Check the payload before trusting")
+        print(f"   any fee conclusion. Known field names: {', '.join(FEE_FIELDS)}")
 
     if fills:
         print(f"\n{'price':>8}{'taker':>7}{'fee charged':>14}")
@@ -502,13 +582,33 @@ def report(trials: list[Trial]) -> None:
             )
 
         makers = [t for t in fills if not t.is_taker]
+        takers = [t for t in fills if t.is_taker]
 
         if makers:
-            charged = sum(t.fee_micros or 0 for t in makers)
+            charged = sum(t.fee_micros for t in makers)
+            verdict = "maker fees are REAL" if charged else "NO maker fee charged"
             print(
-                f"\nMAKER FILLS: {len(makers)}, total fee ${charged / MONEY_SCALE:.4f} -> "
-                + ("maker fees are REAL" if charged else "NO maker fee charged")
+                f"\nMAKER FILLS: {len(makers)} readable, total fee "
+                f"${charged / MONEY_SCALE:.4f} -> {verdict}"
             )
+
+            # A zero maker total only means something if the same reader saw a
+            # non-zero taker total. Without that control, "no fee" and "no
+            # working fee reader" look identical.
+            if not charged:
+                taker_charged = sum(t.fee_micros for t in takers)
+
+                if takers and taker_charged:
+                    print(
+                        f"   control: {len(takers)} taker fill(s) charged "
+                        f"${taker_charged / MONEY_SCALE:.4f}, so the reader works."
+                    )
+                else:
+                    print(
+                        "   NO CONTROL: no taker fill charged anything either, so a "
+                        "broken reader is indistinguishable from a free market. "
+                        "Cross once before believing this."
+                    )
         else:
             print("\nno maker fills yet - the fee question is still open")
 

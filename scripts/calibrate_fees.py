@@ -44,6 +44,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from kalshi_mm_bot.api.auth import KalshiAuth  # noqa: E402
+from kalshi_mm_bot.api.parser import parse_fill_fee_micros  # noqa: E402
 from kalshi_mm_bot.api.rest import (  # noqa: E402
     CancelOrderRequest,
     CreateOrderRequest,
@@ -312,7 +313,7 @@ async def _run(args: argparse.Namespace) -> None:
                     "yes_price": parse_price_fp(fill.get("yes_price_dollars", "0")),
                     "count": parse_count_fp(str(fill.get("count_fp", "0"))),
                     "is_taker": bool(fill.get("is_taker")),
-                    "fee_micros": parse_money_fp(str(fill.get("fees_paid_dollars", "0"))),
+                    "fee_micros": parse_fill_fee_micros(fill),
                     "action": fill.get("action"),
                 }
             )

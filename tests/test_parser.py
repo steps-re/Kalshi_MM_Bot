@@ -1,3 +1,5 @@
+import pytest
+
 from kalshi_mm_bot.api.parser import parse_market_position, parse_price_ranges
 from kalshi_mm_bot.market.types import MarketPosition, PriceRange
 
@@ -45,3 +47,50 @@ def test_parse_market_position_accepts_six_decimal_money_fields() -> None:
         fees_paid=17450,
         volume=125,
     )
+
+
+def test_fee_reader_finds_the_current_field_name() -> None:
+    """Kalshi returns `fee_cost` on REST /portfolio/fills."""
+
+    from kalshi_mm_bot.api.parser import parse_fill_fee_micros
+
+    assert parse_fill_fee_micros({"fee_cost": "0.011700"}) == 11_700
+
+
+def test_fee_reader_still_understands_legacy_names() -> None:
+    from kalshi_mm_bot.api.parser import parse_fill_fee_micros
+
+    assert parse_fill_fee_micros({"fees_paid_dollars": "0.020000"}) == 20_000
+    assert parse_fill_fee_micros({"fee_paid_dollars": "0.020000"}) == 20_000
+
+
+def test_a_missing_fee_field_is_unknown_and_never_zero() -> None:
+    """The regression that made every fill on the ledger look free.
+
+    The old reader asked for a field Kalshi had renamed and defaulted the miss
+    to "0", so 38 taker fills that were really charged $0.48 in total reported
+    as costless - and so did the makers, which is the answer the project wanted.
+    A fee we cannot read must never be summable.
+    """
+
+    from kalshi_mm_bot.api.parser import parse_fill_fee_micros
+
+    assert parse_fill_fee_micros({"yes_price_dollars": "0.53"}) is None
+    assert parse_fill_fee_micros({"fee_cost": ""}) is None
+    assert parse_fill_fee_micros({"fee_cost": None}) is None
+    assert parse_fill_fee_micros({}) is None
+
+
+def test_zero_is_reported_as_zero_not_as_unknown() -> None:
+    """A genuine zero is a measurement; it must survive as one."""
+
+    from kalshi_mm_bot.api.parser import parse_fill_fee_micros
+
+    assert parse_fill_fee_micros({"fee_cost": "0.000000"}) == 0
+
+
+def test_an_unparseable_fee_raises_rather_than_reading_as_free() -> None:
+    from kalshi_mm_bot.api.parser import parse_fill_fee_micros
+
+    with pytest.raises(ValueError):
+        parse_fill_fee_micros({"fee_cost": "not-a-number"})

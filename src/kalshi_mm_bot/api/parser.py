@@ -60,6 +60,39 @@ def parse_market_position(msg: dict[str, Any]) -> MarketPosition:
     )
 
 
+# Kalshi has renamed this field; REST /portfolio/fills currently returns
+# `fee_cost`. Older payloads and the websocket use the `*_dollars` spellings.
+FEE_FIELDS = ("fee_cost", "fees_paid_dollars", "fee_paid_dollars")
+
+
+def parse_fill_fee_micros(fill: dict[str, Any]) -> int | None:
+    """Fee charged on one REST fill, or None when the payload does not say.
+
+    Returns None rather than zero on purpose, and callers must keep the
+    distinction. Both scripts that measure fees used to read a field name that
+    no longer exists with a `"0"` default, so every fill on the ledger came back
+    free - including takers, who are demonstrably charged about 1.3c. That bug
+    reported exactly the result the project wanted to be true, which is why it
+    survived a whole session of looking straight at it.
+
+    An unknown fee is a measurement failure. Silently calling it zero turns a
+    broken reader into evidence for the most profitable hypothesis available.
+    """
+
+    for field in FEE_FIELDS:
+        value = fill.get(field)
+
+        if value in (None, ""):
+            continue
+
+        try:
+            return parse_money_fp(str(value))
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"{field}={value!r}: {error}") from error
+
+    return None
+
+
 def _parse_field(
     parser: Callable[[str], int],
     data: dict[str, Any],
