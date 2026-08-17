@@ -47,8 +47,10 @@ Same reason as the momentum defence. `horizon` already has this machinery and
 whichever strategy is in front, keeps the rule in one testable place, and lets
 the same strategy be run with and against it for comparison.
 
-Note that horizon's own thresholds are far too late: it goes reduce-only at 120
-seconds and stops at 30, while the measurement says the edge is gone by 360.
+Note that horizon's own reduce-only threshold is 120 seconds, which the 784-fill
+measurement says is right. An earlier draft of this file called it "far too
+late" on the strength of a 539-fill sample; that was wrong, and horizon had it
+correct all along.
 """
 
 from __future__ import annotations
