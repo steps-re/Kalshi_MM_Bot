@@ -263,3 +263,21 @@ def test_a_queue_clearing_only_at_the_bell_is_not_reachable() -> None:
 
     assert late.wait_seconds < 300
     assert not late.reachable
+
+
+def test_window_alignment_targets_the_quarter_hour() -> None:
+    """Cycles must start where a 15-minute window opens.
+
+    Recording on a fixed clock produced a book with 95% of its fills inside six
+    minutes of close and nothing at all in the 6-12 minute band, which is where
+    live markout is +0.41c. The backtests built on it were measuring the regime
+    the strategy should avoid.
+    """
+
+    import collect_loop
+
+    assert collect_loop.seconds_to_next_window(0) == 900
+    assert collect_loop.seconds_to_next_window(1) == 899
+    assert collect_loop.seconds_to_next_window(899) == 1
+    # Exactly on a boundary means a full window is available, not zero.
+    assert collect_loop.seconds_to_next_window(900) == 900

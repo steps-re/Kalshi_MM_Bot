@@ -104,6 +104,39 @@ FEE_MODEL = KalshiFeeModel()
 SCORE_SIZE = 50 * COUNT_SCALE
 
 
+# Short-dated crypto windows open and close on the quarter hour. Recording on a
+# fixed clock instead means every cycle starts wherever it happens to start,
+# which produced a book with 95% of its fills inside six minutes of close and
+# NOTHING in the 6-12 minute band - the half of a window where live markout is
+# +0.41c. Every backtest run on that book was measuring the regime we least want
+# to trade.
+WINDOW_SECONDS = 15 * 60
+
+
+def seconds_to_next_window(now: float | None = None) -> float:
+    """Seconds until the next quarter-hour boundary, where a window opens."""
+
+    now = time.time() if now is None else now
+    return WINDOW_SECONDS - (now % WINDOW_SECONDS)
+
+
+def wait_for_window_open(max_wait: float = WINDOW_SECONDS) -> float:
+    """Sleep until the next window opens. Returns how long it waited.
+
+    Waiting up to fifteen minutes to start looks wasteful and is not: a cycle
+    that begins mid-window records the tail of a market nobody should be quoting
+    and misses the part that pays.
+    """
+
+    delay = min(seconds_to_next_window(), max_wait)
+
+    if delay > 1.0:
+        log(f"  aligning to window open in {delay:.0f}s")
+        time.sleep(delay)
+
+    return delay
+
+
 def now_stamp() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
@@ -275,6 +308,13 @@ def main() -> None:
     parser.add_argument("--min-volume", type=float, default=200.0)
     parser.add_argument("--interval", type=float, default=1.0)
     parser.add_argument("--cycle-min", type=int, default=20)
+    parser.add_argument(
+        "--align-windows",
+        action="store_true",
+        help="Start each cycle at a quarter-hour boundary, where the 15-minute "
+        "crypto windows open. Without this a cycle lands mid-window and the "
+        "recording misses the half of a window that carries the edge.",
+    )
     parser.add_argument("--probe-gap", type=float, default=8.0)
     parser.add_argument("--max-cycles", type=int, default=0, help="0 means run forever.")
     parser.add_argument(
@@ -293,6 +333,9 @@ def main() -> None:
         cycle += 1
 
         try:
+            if args.align_windows:
+                wait_for_window_open()
+
             directory = run_cycle(args, cycle)
 
             if directory is None:
