@@ -468,14 +468,28 @@ async def _run(args: argparse.Namespace) -> None:
 
         plan = []
 
-        for mode in MODES:
+        for mode in args.modes:
             pool = wide if mode == "inside" else (thin or markets)
 
             for market in pool[: args.per_mode]:
                 for rest_seconds in args.rests:
                     plan.append((market, mode, float(rest_seconds)))
 
-        plan = plan[: args.trials]
+        # Built mode-major, so a plain slice would spend the whole budget on
+        # the first mode and leave the others unmeasured. Round-robin instead.
+        by_mode: dict[str, list] = {}
+
+        for entry in plan:
+            by_mode.setdefault(entry[1], []).append(entry)
+
+        interleaved = []
+
+        while any(by_mode.values()):
+            for mode in list(by_mode):
+                if by_mode[mode]:
+                    interleaved.append(by_mode[mode].pop(0))
+
+        plan = interleaved[: args.trials]
         log(f"planned {len(plan)} trial(s), 1 contract each")
 
         if not args.execute:
@@ -626,6 +640,14 @@ def _parse_args() -> argparse.Namespace:
         help="Restrict to these series (e.g. KXBTC15M). Repeatable. Skips the "
         "exchange-wide volume ranking, which otherwise picks whatever is busiest "
         "rather than what is under study.",
+    )
+    parser.add_argument(
+        "--modes",
+        nargs="+",
+        choices=MODES,
+        default=list(MODES),
+        help="Which quoting modes to test. Use --modes touch to gather maker "
+        "fills only, which is what a markout distribution needs.",
     )
     parser.add_argument("--thin-depth", type=float, default=100.0)
     parser.add_argument("--min-volume", type=float, default=2000.0)
