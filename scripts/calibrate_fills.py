@@ -136,6 +136,116 @@ def record(series: str, minutes: float, out: Path, interval: float) -> Path:
     return out
 
 
+def calibrate_websocket(path: Path, trades_by_ticker: dict[str, float]) -> dict:
+    """Shrinkage from the delta feed, which sees every change rather than a net.
+
+    This is the measurement polling cannot make. A REST snapshot every second
+    reports the *net* change over that second, so a level that traded 500
+    contracts and was refilled by another 500 reads as unchanged - the trade is
+    invisible and the shrinkage is never counted. The delta feed reports both
+    events, so summing negative deltas gives true shrinkage rather than a lower
+    bound on it.
+
+    Since polling understates shrinkage and shrinkage is the denominator, the
+    polled trade_fraction is biased *up*. This should therefore come out lower
+    than the 0.286 polling reported, and if it does not, the polling result was
+    not suffering the bias we assumed it was.
+    """
+
+    per_ticker: dict[str, dict] = defaultdict(
+        lambda: {
+            "bid_shrink": 0.0,
+            "ask_shrink": 0.0,
+            "bid_traded": 0.0,
+            "ask_traded": 0.0,
+            "unattributed_traded": 0.0,
+            "snapshots": 0,
+        }
+    )
+
+    for line in path.open():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+
+        message = (row.get("msg") or {}).get("msg") or {}
+        kind = (row.get("msg") or {}).get("type")
+        ticker = message.get("market_ticker")
+
+        if not ticker:
+            continue
+
+        stats = per_ticker[ticker]
+
+        if kind == "orderbook_snapshot":
+            stats["snapshots"] += 1
+            continue
+
+        if kind != "orderbook_delta":
+            continue
+
+        try:
+            delta = float(message.get("delta_fp") or message.get("delta") or 0)
+        except (TypeError, ValueError):
+            continue
+
+        if delta >= 0:
+            continue  # growth is new liquidity, not queue consumption
+
+        side = message.get("side")
+
+        if side == "yes":
+            stats["bid_shrink"] += -delta
+        elif side == "no":
+            stats["ask_shrink"] += -delta
+
+    # Trades come from REST; the delta channel does not carry them.
+    for ticker, traded in trades_by_ticker.items():
+        if ticker in per_ticker:
+            per_ticker[ticker]["bid_traded"] = traded / 2.0
+            per_ticker[ticker]["ask_traded"] = traded / 2.0
+
+    return dict(per_ticker)
+
+
+def fetch_trades_since(ticker: str, since_ts: float) -> float:
+    """Total contracts traded in `ticker` at or after `since_ts`."""
+
+    total = 0.0
+    cursor = None
+
+    for _ in range(40):
+        params = {"ticker": ticker, "limit": 200}
+
+        if cursor:
+            params["cursor"] = cursor
+
+        data = pr.get("/markets/trades", params)
+        page = data.get("trades") or []
+
+        for trade in page:
+            stamp = trade.get("created_time")
+
+            try:
+                when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+            except (TypeError, ValueError):
+                continue
+
+            if when >= since_ts:
+                try:
+                    total += float(trade.get("count_fp") or 0)
+                except (TypeError, ValueError):
+                    continue
+
+        cursor = data.get("cursor")
+
+        if not cursor or not page:
+            break
+
+    return total
+
+
 def calibrate(path: Path) -> dict:
     """Shrinkage attributable to trades, versus all shrinkage."""
 
@@ -204,7 +314,36 @@ def calibrate(path: Path) -> dict:
     return dict(per_ticker)
 
 
-def report(stats: dict) -> str:
+def _ws_window(path: Path) -> tuple[float, float, list[str]]:
+    """First and last observation times, and the tickers seen."""
+
+    first = last = None
+    tickers: set[str] = set()
+
+    for line in path.open():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+
+        stamp = row.get("observed_at_utc")
+
+        try:
+            when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+        except (TypeError, ValueError):
+            continue
+
+        first = when if first is None else min(first, when)
+        last = when if last is None else max(last, when)
+        ticker = ((row.get("msg") or {}).get("msg") or {}).get("market_ticker")
+
+        if ticker:
+            tickers.add(str(ticker))
+
+    return (first or 0.0), (last or 0.0), sorted(tickers)
+
+
+def report(stats: dict, *, websocket: bool = False) -> str:
     lines = [
         f"{'ticker':<28}{'snaps':>7}{'shrink':>11}{'traded':>10}"
         f"{'trade_frac':>12}{'cancel':>9}"
@@ -268,12 +407,21 @@ def report(stats: dict) -> str:
     else:
         lines.append("\n-> Close enough to the 0.5 default that it was a lucky guess.")
 
-    lines.append(
-        "\nPolling sees net change per interval, so a level that traded and "
-        "refilled inside one tick reads as unchanged. That understates shrinkage "
-        "and overstates this fraction. Treat it as an upper bound until a "
-        "websocket-recorded run confirms it."
-    )
+    if websocket:
+        lines.append(
+            "\nMeasured from the delta feed, which reports every book change "
+            "rather than a net per interval, so shrinkage is exact rather than a "
+            "lower bound. This is the number to use."
+        )
+    else:
+        lines.append(
+            "\nPolling sees net change per interval, so a level that traded and "
+            "refilled inside one tick reads as unchanged. That understates "
+            "shrinkage and overstates this fraction, so treat it as an UPPER "
+            "bound - the websocket measurement came in at roughly half the "
+            "polled figure."
+        )
+
     return "\n".join(lines)
 
 
@@ -284,7 +432,25 @@ def main() -> None:
     parser.add_argument("--interval", type=float, default=1.0)
     parser.add_argument("--output", type=Path, default=Path("fill_calibration.jsonl"))
     parser.add_argument("--replay", type=Path)
+    parser.add_argument(
+        "--ws-replay",
+        type=Path,
+        help="A websocket recording (events.jsonl) from record_markets.py. Sees "
+        "every book change rather than a net-per-second, so shrinkage is exact.",
+    )
     args = parser.parse_args()
+
+    if args.ws_replay:
+        first, last, tickers = _ws_window(args.ws_replay)
+        log(f"websocket window {last - first:.0f}s over {len(tickers)} ticker(s)")
+        trades = {t: fetch_trades_since(t, first) for t in tickers}
+
+        for ticker, traded in trades.items():
+            log(f"  {ticker}: {traded:,.0f} contracts traded in window")
+
+        stats = calibrate_websocket(args.ws_replay, trades)
+        print(report(stats, websocket=True))
+        return
 
     path = args.replay or record(args.series, args.minutes, args.output, args.interval)
     stats = calibrate(path)

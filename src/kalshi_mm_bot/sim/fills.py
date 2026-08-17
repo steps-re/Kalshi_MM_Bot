@@ -185,26 +185,27 @@ class _QueueState:
 class QueueAwareFillModel:
     name = "queue"
 
-    # Measured, not guessed. Across two consecutive KXBTC15M windows (342 book
-    # snapshots, 4.35M contracts of level shrinkage against 1.22M contracts of
-    # published trades) the two windows agreed closely at 0.274 and 0.297:
+    # Measured from the websocket delta feed, which reports every book change
+    # rather than a net per polling interval:
     #
-    #   ~71% of the book's shrinkage is people cancelling, not trading.
+    #   KXBTC15M 0.138, KXETH15M 0.188  ->  ~84% of shrinkage is cancellation
     #
-    # The old 0.5 default was a guess, and it made the model eat the queue ahead
-    # of a resting order roughly twice as fast as reality - the mechanism behind
-    # a simulated 31% fill rate against a live 0%.
+    # The 0.5 default was a guess and it was out by a factor of three, which is
+    # the mechanism behind a simulated 31% fill rate against a live 0%: the model
+    # ate the queue ahead of a resting order three times faster than the book
+    # actually gives it up.
     #
-    # Treat it as an *upper* bound. Polling sees net change per interval, so a
-    # level that traded and refilled within one second reads as unchanged, which
-    # understates shrinkage and inflates this ratio. The true figure is at most
-    # this, so the residual error still runs toward optimism, and it should be
-    # revisited from a websocket recording rather than adjusted by guess.
+    # Three measurements, each correcting the last, all in the same direction:
     #
-    # A first attempt read 0.327 because the trades endpoint returns recent
-    # history on the first poll, and that backlog was counted against shrinkage
-    # never observed. See scripts/calibrate_fills.py.
-    MEASURED_TRADE_FRACTION = 0.286
+    #   0.327  polling, but counting the trades endpoint's first-poll backlog
+    #   0.286  polling, backlog excluded
+    #   0.163  websocket deltas - no missed intra-second changes
+    #
+    # Polling reports the NET change per interval, so a level that traded and was
+    # refilled inside one second reads as unchanged; that hides shrinkage, and
+    # shrinkage is the denominator. Hence every polled figure was an upper bound,
+    # and the true value sat at roughly half of it. See scripts/calibrate_fills.py.
+    MEASURED_TRADE_FRACTION = 0.163
 
     def __init__(
         self,
