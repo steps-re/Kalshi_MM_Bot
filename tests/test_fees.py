@@ -10,18 +10,46 @@ ONE_CONTRACT = COUNT_SCALE
 
 
 def test_fee_matches_kalshi_published_example() -> None:
-    # Kalshi's own worked example: one contract at $0.50 owes
-    # 0.07 * 1 * 0.5 * 0.5 = $0.0175, billed as $0.02 after the per-order ceiling.
-    model = KalshiFeeModel()
-
-    exact = KalshiFeeModel(round_up_to_cent=False).fee_micros(
+    # Kalshi's documented worked example: one contract at $0.50 owes
+    # 0.07 * 1 * 0.5 * 0.5 = $0.0175, described as billing $0.02 after a
+    # per-order ceiling to the next cent. The ceiling is opt-in now because the
+    # ledger does not apply it - see the measured test below.
+    exact = KalshiFeeModel().fee_micros(yes_price=HALF_DOLLAR, count=ONE_CONTRACT)
+    with_cent_ceiling = KalshiFeeModel(round_up_to_cent=True).fee_micros(
         yes_price=HALF_DOLLAR,
         count=ONE_CONTRACT,
     )
-    billed = model.fee_micros(yes_price=HALF_DOLLAR, count=ONE_CONTRACT)
 
     assert exact == 17_500
-    assert billed == 20_000
+    assert with_cent_ceiling == 20_000
+
+
+def test_default_model_reproduces_what_kalshi_actually_billed() -> None:
+    """Measured against the live ledger, not the documentation.
+
+    One contract, taker, at four prices we were really charged for. The
+    published cent ceiling would give $0.02 for the first three and overstate
+    the total by 48% across the 48 taker fills this came from.
+    """
+
+    model = KalshiFeeModel()
+    charged = {5200: 17_500, 6200: 16_500, 5000: 17_500, 100: 700}
+
+    for yes_price, expected in charged.items():
+        assert (
+            model.fee_micros(yes_price=yes_price, count=ONE_CONTRACT, is_taker=True)
+            == expected
+        ), yes_price
+
+
+def test_makers_are_free_when_not_charged_the_taker_rate() -> None:
+    """25 maker fills across two series were charged $0.0000."""
+
+    model = KalshiFeeModel(charge_makers_taker_rate=False)
+
+    assert model.fee_micros(yes_price=5000, count=ONE_CONTRACT, is_taker=False) == 0
+    # The same model must still bill takers, or a zero maker total proves nothing.
+    assert model.fee_micros(yes_price=5000, count=ONE_CONTRACT, is_taker=True) > 0
 
 
 def test_fee_is_symmetric_about_fifty_cents() -> None:
@@ -35,7 +63,9 @@ def test_fee_is_symmetric_about_fifty_cents() -> None:
 
 
 def test_ceiling_surcharge_shrinks_as_size_grows() -> None:
-    model = KalshiFeeModel()
+    # Explicitly opts into the cent ceiling: this test is about that mechanism,
+    # which is no longer the default because Kalshi does not bill it.
+    model = KalshiFeeModel(round_up_to_cent=True)
 
     small = model.breakeven_edge_ticks(yes_price=HALF_DOLLAR, count=ONE_CONTRACT)
     large = model.breakeven_edge_ticks(yes_price=HALF_DOLLAR, count=1000 * COUNT_SCALE)

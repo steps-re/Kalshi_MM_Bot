@@ -68,11 +68,12 @@ def test_separate_orders_each_pay_their_own_ceiling() -> None:
     # At a penny the exact fee is a fraction of a cent, so the ceiling is the
     # whole cost and splitting one order into two doubles it. (At fifty cents
     # both cases round to the same figure, which is why this uses a tail price.)
-    two_orders = SimPortfolio()
+    ceiling_model = KalshiFeeModel(round_up_to_cent=True)
+    two_orders = SimPortfolio(fee_model=ceiling_model)
     two_orders.apply_fill(fill(order_id="a", price=100, count=ONE))
     two_orders.apply_fill(fill(order_id="b", price=100, count=ONE))
 
-    one_order = SimPortfolio()
+    one_order = SimPortfolio(fee_model=ceiling_model)
     one_order.apply_fill(fill(order_id="c", price=100, count=2 * ONE))
 
     assert two_orders.total_fees() == 2 * one_order.total_fees()

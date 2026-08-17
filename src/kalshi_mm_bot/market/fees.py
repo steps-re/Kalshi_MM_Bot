@@ -14,19 +14,28 @@ with `rate` 0.07 on standard markets and P the price in dollars. Note that
 P * (1 - P) is symmetric about $0.50, so YES and NO orders at equivalent
 prices owe the same fee and we can always compute from the YES price.
 
-Two things matter more than the headline rate:
+**That published ceiling is wrong, and we measured it.** Kalshi's ledger rounds
+up to $0.0001, not to the next cent. Across 48 taker fills the raw formula
+predicts $0.5860 and Kalshi charged $0.5879; a cent ceiling would have charged
+$0.8700. So `round_up_to_cent` now defaults to False.
 
-* The ceiling is applied **per order**, not per contract. One contract at
-  $0.50 owes $0.0175 and pays $0.02 - a 14% surcharge that only shows up at
-  the small sizes we are actually testing with.
-* Maker and taker schedules differ by market and have changed over time.
-  Rather than hardcode a guess, `KalshiFeeModel` is configurable and
-  `calibrate_from_fills` reconciles it against the `fees_paid` Kalshi reports
-  on real executions. Run one live session, calibrate, then trust backtests.
+The error only bites at small sizes, which is exactly why it survived: a ceiling
+to a whole cent is nearly the entire fee when the fee is under two cents, and
+almost invisible on an order of a few hundred contracts. Every live test we ran
+used one contract.
 
-Defaults are deliberately conservative: every fill is charged the taker
-formula. That overstates cost if maker fills turn out to be cheaper, which is
-the direction of error we want in a system that decides whether to risk money.
+Two things still matter more than the headline rate:
+
+* Fees are charged **per order**, so a round trip pays twice. A strategy that
+  budgets for one side is short by half.
+* Maker and taker schedules differ. Measured on this account: **takers pay the
+  formula and makers pay nothing** - 25 maker fills charged $0.0000 against 48
+  taker fills charged $0.5879, across two independent series at mid prices,
+  with the taker total serving as the control that proves the reader works.
+
+`calibrate_from_fills` reconciles the model against what Kalshi actually billed.
+Run one live session, calibrate, then trust backtests - and note that the two
+corrections above were both found that way rather than by reading the docs.
 """
 
 from __future__ import annotations
@@ -38,6 +47,12 @@ from kalshi_mm_bot.market.price import COUNT_SCALE, MONEY_SCALE, ONE_DOLLAR, PRI
 
 BPS_SCALE = 10_000
 CENT_MICROS = MONEY_SCALE // 100
+# Measured, not published. Kalshi's documentation describes a per-order ceiling
+# to the next cent; the ledger rounds up to a hundredth of a cent instead. Over
+# 48 taker fills the raw formula predicts $0.5860 and Kalshi charged $0.5879,
+# while ceiling to a whole cent would have charged $0.8700 - a 48% overstatement.
+# Examples: 0.017472 -> 0.017500, 0.016492 -> 0.016500, 0.000966 -> 0.001000.
+FEE_ROUNDING_MICROS = MONEY_SCALE // 10_000
 
 DEFAULT_TRADING_FEE_BPS = 700
 DEFAULT_MAKER_FEE_PER_CONTRACT_MICROS = 0
@@ -55,14 +70,20 @@ class KalshiFeeModel:
             `charge_makers_taker_rate` is False.
         charge_makers_taker_rate: When True (default) every fill pays the
             formula regardless of maker/taker. Conservative.
-        round_up_to_cent: Apply Kalshi's per-order ceiling. Leave True; turning
-            it off is only useful for isolating how much the rounding costs.
+        round_up_to_cent: Round the per-order fee up to a whole cent. Kalshi's
+            published description says it does this; its ledger does not, so
+            this now defaults to False. It rounds up to $0.0001 instead. Leaving
+            it True inflates the fee on small orders enormously - 48% across the
+            one-contract fills we measured - because a ceiling to a cent is
+            nearly the whole fee when the fee is under two cents. At realistic
+            order sizes the two agree to well under a percent, which is why the
+            error hid for so long: it only bites at the sizes used for testing.
     """
 
     trading_fee_bps: int = DEFAULT_TRADING_FEE_BPS
     maker_fee_per_contract_micros: int = DEFAULT_MAKER_FEE_PER_CONTRACT_MICROS
     charge_makers_taker_rate: bool = True
-    round_up_to_cent: bool = True
+    round_up_to_cent: bool = False
 
     def __post_init__(self) -> None:
         if self.trading_fee_bps < 0:
@@ -81,7 +102,7 @@ class KalshiFeeModel:
         else:
             raw = self.maker_fee_per_contract_micros * count // COUNT_SCALE
 
-        return _ceil_to_cent(raw) if self.round_up_to_cent else raw
+        return _ceil_to_cent(raw) if self.round_up_to_cent else _ceil_to_fee_tick(raw)
 
     def edge_ticks_per_contract(self, yes_price: int) -> int:
         """Price edge, in ticks, needed to cover one side's fee on one contract.
@@ -277,6 +298,12 @@ def _as_fill_tuple(fill: tuple[int, int, bool, int] | dict) -> tuple[int, int, b
 
 def _ceil_to_cent(micros: int) -> int:
     return _ceil_div(micros, CENT_MICROS) * CENT_MICROS
+
+
+def _ceil_to_fee_tick(micros: int) -> int:
+    """Round up to the granularity Kalshi's ledger actually bills at."""
+
+    return _ceil_div(micros, FEE_ROUNDING_MICROS) * FEE_ROUNDING_MICROS
 
 
 def _ceil_div(numerator: int, denominator: int) -> int:
