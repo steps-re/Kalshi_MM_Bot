@@ -141,10 +141,14 @@ class LiveOrderManager:
         *,
         dry_run: bool = True,
         client_prefix: str = "kmm",
-        min_requote_seconds: float = 0.0,
-        min_order_rest_seconds: float = 0.0,
-        requote_price_threshold: int = 0,
-        requote_size_threshold_bps: int = 0,
+        # None means "whatever RequotePolicy considers safe". Spelling the
+        # defaults out here once meant zeros silently overrode the policy's own
+        # queue-preserving values, which is how the bot ended up re-quoting on
+        # every tick.
+        min_requote_seconds: float | None = None,
+        min_order_rest_seconds: float | None = None,
+        requote_price_threshold: int | None = None,
+        requote_size_threshold_bps: int | None = None,
         order_expiration_seconds: float | None = None,
         rejection_cooldown_seconds: float = 1.0,
         status: StatusCallback | None = None,
@@ -162,11 +166,14 @@ class LiveOrderManager:
         self.rest = rest
         self.dry_run = dry_run
         self.client_prefix = normalized_prefix
+        overrides = {
+            "min_requote_seconds": min_requote_seconds,
+            "min_order_rest_seconds": min_order_rest_seconds,
+            "price_change_threshold": requote_price_threshold,
+            "size_change_threshold_bps": requote_size_threshold_bps,
+        }
         self.requote_policy = RequotePolicy(
-            min_requote_seconds=min_requote_seconds,
-            min_order_rest_seconds=min_order_rest_seconds,
-            price_change_threshold=requote_price_threshold,
-            size_change_threshold_bps=requote_size_threshold_bps,
+            **{k: v for k, v in overrides.items() if v is not None}
         )
         self.rejection_cooldown_seconds = rejection_cooldown_seconds
         self.order_expiration_seconds = order_expiration_seconds

@@ -20,10 +20,30 @@ class RestingQuote(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class RequotePolicy:
+    """When to give up queue position in exchange for a better price.
+
+    Defaults are deliberately sticky. Every replacement cancels a resting order
+    and sends the new one to the back of the queue, and on Kalshi that queue is
+    long: 1,400 to 4,100 contracts sit at the touch of a 15-minute crypto
+    window. With all four thresholds at zero - the previous defaults - any
+    one-tick move counted as material, so the bot re-quoted on essentially
+    every book update and never advanced. It placed about 2,000 orders for 74
+    fills. The machinery to hold position existed and was switched off.
+
+    A quoted price that is one tick stale costs a tick. Losing queue position
+    costs every fill you would have had while you walk back up, which in a
+    market that recycles in tens of seconds is much more. So the bar for
+    abandoning a spot is a full cent of price movement, and orders get a floor
+    of thirty seconds to work before ordinary drift can dislodge them.
+
+    `_forces_requote` remains the escape hatch: a move of twice the threshold
+    is a genuine repricing rather than noise, and beats holding a stale quote.
+    """
+
     min_requote_seconds: float = 0.0
-    min_order_rest_seconds: float = 0.0
-    price_change_threshold: int = 0
-    size_change_threshold_bps: int = 0
+    min_order_rest_seconds: float = 30.0
+    price_change_threshold: int = 100  # ticks; 100 == one cent
+    size_change_threshold_bps: int = 2_500
 
     def __post_init__(self) -> None:
         if self.min_requote_seconds < 0:

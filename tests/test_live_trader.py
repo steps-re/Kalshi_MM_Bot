@@ -8,6 +8,7 @@ from kalshi_mm_bot.market.orderbook import Orderbook
 from kalshi_mm_bot.market.price import COUNT_SCALE, parse_price_fp
 from kalshi_mm_bot.market.types import MarketPosition, OrderFill, PriceRange
 from kalshi_mm_bot.strategy import DumbMarketMakerStrategy
+from kalshi_mm_bot.strategy.requote import RequotePolicy
 from kalshi_mm_bot.strategy.types import QuoteIntent, StrategyContext
 
 
@@ -120,7 +121,16 @@ def make_book(
 
 def test_live_order_manager_dry_run_replaces_changed_quotes() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=0,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
 
         created, canceled = await manager.sync_quotes("M1", [buy_intent()], now=1)
         assert (created, canceled) == (1, 0)
@@ -135,7 +145,16 @@ def test_live_order_manager_dry_run_replaces_changed_quotes() -> None:
 
 def test_live_order_manager_removes_own_quotes_from_strategy_book() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=0,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
         await manager.sync_quotes(
             "M1",
             [buy_intent("0.5000"), sell_intent("0.5100")],
@@ -173,7 +192,16 @@ def test_live_order_manager_removes_own_quotes_from_strategy_book() -> None:
 
 def test_live_order_manager_external_book_clamps_oversized_tracked_order() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=0,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
         await manager.sync_quotes(
             "M1",
             [buy_intent("0.5000", count=2 * COUNT_SCALE)],
@@ -191,7 +219,16 @@ def test_live_order_manager_external_book_clamps_oversized_tracked_order() -> No
 
 def test_live_order_manager_rate_limits_replacement_without_canceling_resting_quote() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=10)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=10,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
 
         assert await manager.sync_quotes("M1", [buy_intent()], now=1) == (1, 0)
         assert await manager.sync_quotes("M1", [buy_intent("0.4900")], now=2) == (0, 0)
@@ -202,7 +239,16 @@ def test_live_order_manager_rate_limits_replacement_without_canceling_resting_qu
 
 def test_live_order_manager_keeps_matching_quote_inside_requote_interval() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=10)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=10,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
 
         assert await manager.sync_quotes("M1", [buy_intent()], now=1) == (1, 0)
         assert await manager.sync_quotes("M1", [buy_intent()], now=2) == (0, 0)
@@ -213,7 +259,16 @@ def test_live_order_manager_keeps_matching_quote_inside_requote_interval() -> No
 
 def test_live_order_manager_creates_replacement_after_requote_interval() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=10)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=10,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
 
         assert await manager.sync_quotes("M1", [buy_intent()], now=1) == (1, 0)
         assert await manager.sync_quotes("M1", [buy_intent("0.4900")], now=2) == (0, 0)
@@ -245,6 +300,9 @@ def test_live_order_manager_replaces_material_quote_changes() -> None:
             dry_run=True,
             requote_price_threshold=parse_price_fp("0.0200"),
             requote_size_threshold_bps=5_000,
+            # Isolate the price threshold: with the default rest floor in play,
+            # a one-second-old order only moves for twice the threshold.
+            min_order_rest_seconds=0,
         )
 
         assert await manager.sync_quotes("M1", [buy_intent()], now=1) == (1, 0)
@@ -460,7 +518,16 @@ def test_live_order_manager_sets_live_order_expiration_time() -> None:
 
 def test_live_order_manager_updates_remaining_count_from_user_orders() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=0,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
 
         await manager.sync_quotes("M1", [buy_intent()], now=1)
         old_client_order_id = next(iter(manager.orders))
@@ -487,7 +554,16 @@ def test_live_order_manager_updates_remaining_count_from_user_orders() -> None:
 
 def test_live_order_manager_updates_remaining_count_from_fills() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=0,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
 
         await manager.sync_quotes("M1", [buy_intent()], now=1)
         order = next(iter(manager.orders.values()))
@@ -531,7 +607,16 @@ def test_live_order_manager_updates_remaining_count_from_fills() -> None:
 
 def test_live_order_manager_does_not_double_count_fill_after_user_order_update() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=0,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
 
         await manager.sync_quotes("M1", [buy_intent()], now=1)
         client_order_id = next(iter(manager.orders))
@@ -570,7 +655,16 @@ def test_live_order_manager_does_not_double_count_fill_after_user_order_update()
 
 def test_live_order_manager_drops_expired_user_orders() -> None:
     async def run() -> None:
-        manager = LiveOrderManager(FakeRest(), dry_run=True, min_requote_seconds=0)
+        manager = LiveOrderManager(
+            FakeRest(),
+            dry_run=True,
+            min_requote_seconds=0,
+            # These tests exercise the replacement mechanism itself, so they
+            # opt out of the queue-preserving defaults deliberately.
+            min_order_rest_seconds=0,
+            requote_price_threshold=0,
+            requote_size_threshold_bps=0,
+        )
 
         await manager.sync_quotes("M1", [buy_intent()], now=1)
         client_order_id = next(iter(manager.orders))
@@ -738,3 +832,43 @@ def test_live_portfolio_applies_private_position_messages() -> None:
 
     portfolio.apply_message(position)
     assert portfolio.position("M1") == 2 * COUNT_SCALE
+
+
+def test_default_policy_holds_queue_position_through_a_one_tick_move() -> None:
+    """The regression that cost ~2,000 orders for 74 fills.
+
+    With every threshold at zero, a one-tick change counted as material and the
+    bot cancelled and re-queued behind thousands of contracts. The defaults must
+    now sit still for noise.
+    """
+
+    async def run() -> None:
+        manager = LiveOrderManager(FakeRest(), dry_run=True)
+
+        assert await manager.sync_quotes("M1", [buy_intent()], now=1) == (1, 0)
+        # One tick away, one second later: hold the spot.
+        assert await manager.sync_quotes("M1", [buy_intent("0.4990")], now=2) == (0, 0)
+
+    asyncio.run(run())
+
+
+def test_default_policy_still_abandons_position_on_a_real_repricing() -> None:
+    """Sticky is not frozen: twice the threshold beats a stale quote."""
+
+    async def run() -> None:
+        manager = LiveOrderManager(FakeRest(), dry_run=True)
+
+        assert await manager.sync_quotes("M1", [buy_intent()], now=1) == (1, 0)
+        assert await manager.sync_quotes("M1", [buy_intent("0.4700")], now=2) == (1, 1)
+
+    asyncio.run(run())
+
+
+def test_trader_defaults_do_not_shadow_the_requote_policy() -> None:
+    """Passing nothing must inherit the policy's values, not silently zero them."""
+
+    manager = LiveOrderManager(FakeRest(), dry_run=True)
+
+    assert manager.requote_policy == RequotePolicy()
+    assert manager.requote_policy.min_order_rest_seconds > 0
+    assert manager.requote_policy.price_change_threshold > 0
