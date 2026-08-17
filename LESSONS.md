@@ -21,22 +21,32 @@ most dangerous.
 Kalshi's trading fee is
 
 ```
-fee = round_up_to_next_cent(0.07 × contracts × P × (1 − P))
+fee = round_up(0.07 × contracts × P × (1 − P))
 ```
 
 applied **per order**. At $0.50 that is 1.75c per side, **3.5c for a round
 trip**, against a tick of 1c.
+
+(Kalshi's docs say that rounding goes up to the next cent. It does not — see
+"the cent ceiling does not exist" below. And the whole formula turns out to
+apply only to takers.)
 
 Sit with that. The minimum price increment on the exchange is one cent. The fee
 to buy and sell one contract at the midpoint is three and a half cents. A market
 maker who captures the **entire** bid-ask spread of a 2c-wide market at $0.50
 loses 1.5c per contract per round trip.
 
-There is no parameter that fixes this. Not spread, not size, not inventory
-skew, not requote logic. It is arithmetic.
+No *quoting* parameter fixes this. Not spread, not size, not inventory skew, not
+requote logic. It is arithmetic.
 
-This is why your live runs saw fees eat everything. It was not an execution
-problem or a tuning problem. It was the market selection.
+There is exactly one thing that fixes it, and it is not a parameter: **never
+cross.** That turned out to be the whole ballgame, and it is measured two
+sections down.
+
+This is why your live runs saw fees eat everything **whenever you crossed the
+spread**. It was not an execution problem or a tuning problem. It was paying the
+taker fee on a 1c tick. Read on, though: resting orders are billed differently,
+and that changes the conclusion.
 
 ### Where it *does* work
 
@@ -60,36 +70,76 @@ applied it everywhere, which subtracted liquidity that was never there and
 declared every tick-wide market dead. That is why 1c and 3c land in the same
 band above: at 1c you join and keep all of it.
 
-### The per-order ceiling is a fixed cost
+### The caveat that inverted all of this
 
-The fee rounds **up to the cent, per order**. One contract at $0.50 owes
-$0.0175 and pays $0.02. That 14% surcharge does not scale with size, so it
-behaves like a fixed cost:
+Everything above assumed the 0.07 formula applies to **maker** fills. It ended
+with a warning that if Kalshi bills makers differently, "this entire section is
+wrong."
 
-| contracts | round-trip fee | breakeven edge |
-| --------: | -------------: | -------------: |
-|         1 |        $0.0400 |          4.00c |
-|        10 |        $0.3600 |          3.60c |
-|       100 |        $3.5000 |          3.50c |
-|      1000 |       $35.0000 |          3.50c |
+**It does, and it was.** Measured on a live account, 63 fills:
 
-Two consequences. Small live tests read *worse* than the strategy really is,
-because you are paying the rounding on every order. And there is a **minimum
-economically viable order size** below which no quote can win — implemented as
-`KalshiFeeModel.minimum_viable_count`.
+| | fills | total fee | mean per fill |
+| --- | ---: | ---: | ---: |
+| **maker** (resting) | 25 | **$0.0000** | $0.0000 |
+| **taker** (crossing) | 48 | $0.5879 | $0.0127 |
 
-### The caveat that could invert all of this
+Zero. Not reduced — zero. Confirmed at midpoint prices, where the fee is
+largest, in two independent series:
 
-Everything above assumes the 0.07 formula applies to **maker** fills. Kalshi has
-had a separate flat per-contract maker fee on some markets. If your account is
-billed that way, midpoint market making becomes viable and this entire section
-is wrong.
+```
+KXBTC15M   maker @ 0.50 -> $0.0000    taker @ 0.52 -> $0.0175
+KXETH15M   maker @ 0.59 -> $0.0000    taker @ 0.62 -> $0.0165
+```
 
-I did not guess. `market/fees.py` has `calibrate_from_fills`, which reconciles
-the model against the `fees_paid` Kalshi already reports on real executions.
-Your existing fills contain the answer. **Run this before trusting any backtest,
-including the fixed one.** It is one session of data and it decides the whole
-thesis.
+**This is the explanation for both halves of your experience.** You made a
+dollar or so resting orders, and you watched fees eat everything when you
+crossed. Same market, opposite sign, decided entirely by whether the order rests
+or crosses. At the midpoint one cross costs 1.75c against a 1c spread — you
+cannot cross your way out of a position and keep the edge.
+
+So the "3.5c round trip" above is the cost of crossing **both** ways. Rest both
+ways and it is zero. Everything in the fee-viability screen still holds for a
+taker; for a pure maker, the price-band table stops binding.
+
+Do not read that as "midpoint market making is free money." It moves the binding
+constraint rather than removing it: what decides profitability now is queue
+position and adverse selection, which is where the rest of this document goes.
+
+### Two bugs worth more than the result
+
+The way that measurement went wrong is more useful than the number.
+
+**The fee reader was broken, and it lied in our favour.** Both measuring scripts
+asked for `fees_paid_dollars` with a `"0"` default. The REST fills endpoint
+returns `fee_cost`. So every fill on the ledger came back free, and a full
+session reported "NO MAKER FEE CHARGED" from a reader that could not have said
+anything else. It survived because it confirmed the hypothesis we wanted.
+
+What exposed it was the **takers** also reading zero, which the formula says is
+impossible at 53c. Had the bug flattered only the maker side, it would still be
+in place.
+
+The habit that follows: **a zero needs a control.** A maker total of $0.00 means
+nothing unless taker fills in the same sample were charged something, because a
+broken parser and a free market are the same observation. That check is now
+enforced in code, and the run prints `control: N taker fill(s) charged $X, so
+the reader works` or refuses to conclude. An unreadable fee is recorded as
+unknown and never summed as zero.
+
+**The cent ceiling does not exist.** Kalshi documents rounding the per-order fee
+up to the next cent. Its ledger rounds up to $0.0001. Across 48 taker fills the
+raw formula predicts $0.5860 and we were charged $0.5879; the cent ceiling would
+have charged $0.8700 — a **48% overstatement**.
+
+That error hid because it only bites at small sizes: a ceiling to a whole cent
+is nearly the entire fee when the fee is under two cents, and disappears on an
+order of a few hundred contracts. Every live test used one contract, which is
+the one regime where it mattered most.
+
+Note the directions. The reader bug made trading look better than reality; the
+ceiling bug made it look worse. Both came from trusting a description instead of
+the ledger. **The exchange's own billing record is the only authority on what
+the exchange charges** — not its documentation, and not our model.
 
 ---
 
