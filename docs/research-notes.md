@@ -391,3 +391,45 @@ One methodological note: the first version of this model judged fills on a
 30-second forward drift while calibrating against immediate markout. Thinning
 half the "favourable" fills moved measured markout from +1.093c to +1.131c -
 no effect - because thinning on one quantity cannot calibrate another.
+
+## Fixed: the simulator was filling orders that could not trade
+
+The 2.4x optimism was mostly one bug. `QueueAwareFillModel` treated a size
+reduction at **any** price level as containing trades, so a cancellation three
+levels deep drained our queue and eventually filled us at a price the market
+never reached.
+
+Measured before the fix: **71% of queue fills happened behind the touch**,
+median 0.30c back, p90 a full cent. Buying under the market always marks up,
+which is why those fills looked so good, why simulated markout ran 2.4x live,
+and why discarding fills never helped - they were not mis-selected, they were
+impossible.
+
+Requiring an order to be reachable at the touch before a reduction can fill it:
+
+                    before    after     live
+    early          +1.093c  +0.555c  +0.268c
+    late           +0.579c  +0.285c  +0.058c
+    fills            1,562      662        -
+
+    by reason, after:  queue_exhausted 326 @ +0.507c
+                       through         197 @ +0.454c
+                       cross_or_touch  139 @ -0.295c
+
+Also fixed on the way, though it turned out immaterial (1,562 -> 1,531 fills):
+`_fractional_count` floored at one unit, so any reduction too small to round up
+still consumed queue and nothing ever rounded down. Queue consumption now
+carries the fractional remainder across events.
+
+### The residual is adverse selection, and it is now quantified
+
+Buying at the best bid of a one-cent market yields +0.5c of markout
+mechanically, and the simulator now reports roughly that. Live reports about
+half. The difference - **~0.25c per fill** - is the cost of being selected
+against: the counterparty who lifts a resting quote is more often right about
+the next few seconds than we are.
+
+That is not a bug to fix. The simulator cannot represent it without knowing why
+somebody traded, and the recordings carry no counterparty identity. It is a
+haircut to apply when reading simulated edge, and it is now printed on every
+sweep report.

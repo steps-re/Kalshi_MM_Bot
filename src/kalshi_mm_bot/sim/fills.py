@@ -180,6 +180,11 @@ class PessimisticFillModel:
 @dataclass(slots=True)
 class _QueueState:
     queue_ahead: int
+    # Fractional consumption carried between events. Without it, every level
+    # change is rounded independently and a rounding floor of one unit turns
+    # thousands of tiny deltas into thousands of units of phantom queue
+    # consumption. See _consume_queue.
+    residue: float = 0.0
 
 
 class QueueAwareFillModel:
@@ -266,7 +271,21 @@ class QueueAwareFillModel:
                 continue
 
             state = self._states.setdefault(order.order_id, _QueueState(queue_ahead=0))
-            effective_reduction = _fractional_count(-delta.delta_count, self.trade_fraction)
+
+            # A reduction away from the touch is somebody cancelling, not
+            # trading. It can still advance our queue position, but it must
+            # never fill us.
+            reachable = _at_touch(order, book)
+            effective_reduction = _consume_queue(
+                state, -delta.delta_count, self.trade_fraction
+            )
+
+            if not reachable:
+                # Advance the queue, then stop: no trade happened at our price.
+                if state.queue_ahead > 0:
+                    state.queue_ahead = max(0, state.queue_ahead - effective_reduction)
+
+                continue
 
             if state.queue_ahead > 0:
                 consumed_ahead = min(state.queue_ahead, effective_reduction)
@@ -320,6 +339,30 @@ def fill_model_from_name(name: str) -> FillModel:
         return QueueAwareFillModel()
 
     raise ValueError(f"unknown fill model: {name!r}")
+
+
+def _at_touch(order: SimulatedOrder, book: Orderbook) -> bool:
+    """Is this order at the front price, where trades can actually reach it?
+
+    A resting buy below the best bid cannot trade: the market has to come down
+    to it first. The queue model ignored this and treated a reduction at ANY
+    price level as containing trades, so a cancellation three levels deep
+    drained our queue and eventually "filled" us at a price the market never
+    touched.
+
+    Measured before the fix: **71% of queue_exhausted fills happened behind the
+    touch**, median 0.30c back and p90 a full cent. Those fills mark up
+    beautifully - buying under the market always does - which is exactly why
+    simulated markout ran 2.4x live and why discarding fills never helped. They
+    were not mis-selected, they were impossible.
+    """
+
+    if order.book_side == "bid":
+        # An empty bid side means our order is the best bid, not that it is
+        # unreachable - the level emptying is exactly when a trade sweeps us.
+        return book.best_bid is None or order.yes_price >= book.best_bid
+
+    return book.best_ask is None or order.yes_price <= book.best_ask
 
 
 def _same_level_reduction(order: SimulatedOrder, delta: OrderbookDelta) -> bool:
@@ -393,6 +436,18 @@ def _book_mid(book: Orderbook | None) -> int | None:
 
 
 def _fractional_count(count: int, fraction: float) -> int:
+    """Deprecated: rounds each reduction independently, with a floor of one.
+
+    Kept only because other fill models still call it. The floor made every
+    sub-threshold reduction consume a whole unit of queue: at trade_fraction
+    0.163 any reduction under three units rounds to zero and was forced to one,
+    and the websocket feed delivers hundreds of such deltas a second. Queue
+    consumption was therefore biased upward with no compensating downward
+    error, draining a 140-contract queue in seconds of book noise.
+
+    `_consume_queue` carries the remainder instead and should be preferred.
+    """
+
     if count <= 0 or fraction <= 0:
         return 0
 
@@ -402,3 +457,21 @@ def _fractional_count(count: int, fraction: float) -> int:
         return 1
 
     return min(count, result)
+
+
+def _consume_queue(state: "_QueueState", count: int, fraction: float) -> int:
+    """Queue units consumed by a reduction, carrying the fractional remainder.
+
+    Ten reductions that each represent 0.16 of a unit consume one unit between
+    them, not ten. Rounding each in isolation - and flooring at one so nothing
+    ever rounds down - is what made the simulator fill us where reality would
+    not.
+    """
+
+    if count <= 0 or fraction <= 0:
+        return 0
+
+    exact = count * fraction + state.residue
+    consumed = int(exact)
+    state.residue = exact - consumed
+    return min(count, consumed)

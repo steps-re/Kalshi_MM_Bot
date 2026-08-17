@@ -179,3 +179,75 @@ def test_fills_are_judged_at_the_horizon_the_metric_uses() -> None:
     )
 
     assert run(model) == (), "judged favourable by its own mark, so thinned"
+
+
+# --- queue consumption -------------------------------------------------------
+
+
+def test_small_reductions_no_longer_each_consume_a_whole_unit() -> None:
+    """The bug that drained queues in seconds of book noise.
+
+    _fractional_count floored at one, so any reduction too small to round up
+    still consumed a unit - and nothing ever rounded down. At trade_fraction
+    0.163 the websocket feed's hundreds of tiny deltas a second ate a
+    140-contract queue that reality would have left intact.
+    """
+
+    from kalshi_mm_bot.sim.fills import _QueueState, _consume_queue, _fractional_count
+
+    # One unit reduced, 16.3% of it traded: a sixth of a unit, not a whole one.
+    assert _fractional_count(1, 0.163) == 1, "the old behaviour, kept for callers"
+
+    state = _QueueState(queue_ahead=1000)
+    consumed = sum(_consume_queue(state, 1, 0.163) for _ in range(6))
+
+    assert consumed == 0, "six tenths of a unit is not a unit"
+
+    # Across enough events the fraction does accumulate, exactly once.
+    state = _QueueState(queue_ahead=1000)
+    total = sum(_consume_queue(state, 1, 0.163) for _ in range(100))
+
+    assert 15 <= total <= 17, f"expected ~16 units from 100 events, got {total}"
+
+
+def test_consumption_never_exceeds_the_reduction() -> None:
+    from kalshi_mm_bot.sim.fills import _QueueState, _consume_queue
+
+    state = _QueueState(queue_ahead=1000, residue=0.99)
+
+    assert _consume_queue(state, 1, 1.0) <= 1
+
+
+def test_an_order_behind_the_touch_cannot_be_filled() -> None:
+    """A resting buy below the best bid cannot trade.
+
+    Measured before this check: 71% of queue_exhausted fills happened behind the
+    touch, median 0.30c back. Buying under the market always marks up, which is
+    why simulated markout ran 2.4x live.
+    """
+
+    from kalshi_mm_bot.market.orderbook import Orderbook
+    from kalshi_mm_bot.market.types import PriceRange
+    from kalshi_mm_bot.sim.fills import _at_touch
+    from kalshi_mm_bot.sim.orders import SimulatedOrder
+
+    ranges = (PriceRange(start=0, end=10000, step=100),)
+    book = Orderbook.from_snapshot(
+        market_ticker="M1", seq=1,
+        bids_raw=(("0.4900", "500.00"),), asks_raw=(("0.5000", "500.00"),),
+        price_ranges=ranges,
+    )
+
+    def order(price, side="bid"):
+        # book_side is derived from action/side, not passed.
+        return SimulatedOrder(
+            order_id="o", quote_id="q", market_ticker="M1",
+            action="buy" if side == "bid" else "sell", side="yes",
+            yes_price=parse_price_fp(price), count=ONE, remaining_count=ONE,
+            status="active", created_offset_seconds=0.0, active_offset_seconds=0.0,
+        )
+
+    assert _at_touch(order("0.4900"), book), "at the best bid"
+    assert not _at_touch(order("0.4800"), book), "a cent behind it"
+    assert _at_touch(order("0.5000", "ask"), book), "at the best ask"
+    assert not _at_touch(order("0.5100", "ask"), book), "a cent behind it"

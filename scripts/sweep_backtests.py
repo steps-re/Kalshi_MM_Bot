@@ -73,20 +73,29 @@ MIN_FILLS_FOR_CONFIDENCE = 200
 # Polling faster helps a little; it does not fix the netting.
 MIN_DELTAS_PER_SECOND = 50.0
 
-# Simulated markout over live markout, measured on identical fills in the same
-# markets. The simulator marks a fill at +0.640c where live measurement of the
-# same strategy in the same books gives +0.264c.
+# Simulated markout over live markout, on identical fills in the same markets.
 #
-# Only about a quarter of that is the marking horizon - the same fills marked
-# forward give +0.619c at 2s, +0.570c at 10s, +0.486c at 30s, so waiting does
-# not close it. The rest is fill eligibility: the queue model fills us at prices
-# reality would not, and discarding fills does not fix it (thinning 95% of
-# favourable fills left markout at +1.006c against a +0.268c target).
+# Most of the original 2.4x gap was orders being filled where they could not
+# trade: 71% of queue fills happened BEHIND the touch, median 0.30c back, and
+# buying under the market always marks up. Requiring an order to be reachable
+# before a reduction can fill it halved simulated markout:
 #
-# So spread capture reported here is roughly 2.4x what the same strategy earns
-# live. The ratio is stated rather than applied: silently scaling the numbers
-# would make them look like measurements of something.
-SIM_TO_LIVE_MARKOUT = 0.264 / 0.640
+#                  before    after     live
+#     early       +1.093c  +0.555c  +0.268c
+#     late        +0.579c  +0.285c  +0.058c
+#
+# What remains is adverse selection proper, and it has a clean reading. Buying
+# at the best bid of a one-cent market yields +0.5c of markout mechanically, and
+# the simulator now reports roughly that. Live reports about half, because in
+# reality the counterparty who lifts a quote is more often right about the next
+# few seconds. The difference - **about 0.25c per fill** - is the cost of being
+# selected against, and the simulator cannot represent it without knowing why
+# somebody traded.
+#
+# Stated rather than applied: silently scaling the numbers would make them look
+# like measurements of something.
+SIM_TO_LIVE_MARKOUT = 0.268 / 0.555
+ADVERSE_SELECTION_CENTS = 0.25
 
 
 @dataclass(frozen=True, slots=True)
@@ -340,11 +349,11 @@ def report(runs: list[Run]) -> str:
         "just as easily by quoting wider and trading less as by quoting better."
     )
     lines.append(
-        f"!! Simulated markout runs ~{1 / SIM_TO_LIVE_MARKOUT:.1f}x live on identical "
-        "fills (+0.640c against +0.264c measured). Only a quarter of that is the "
-        "marking horizon; the rest is the queue model filling us where reality "
-        "would not. Treat every capture figure here as a RELATIVE score between "
-        "strategies, never as money."
+        f"!! Simulated markout still runs ~{1 / SIM_TO_LIVE_MARKOUT:.1f}x live "
+        f"(+0.555c against +0.268c). The residual is adverse selection - about "
+        f"{ADVERSE_SELECTION_CENTS:.2f}c a fill that the simulator cannot see, "
+        "because it does not know why anyone traded. Treat capture here as a "
+        "RELATIVE score between strategies, never as money."
     )
     lines.append(
         "Residual is contracts still held at the end. A run that ends at its "
