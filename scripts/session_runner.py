@@ -151,13 +151,17 @@ async def flatten(rest: KalshiRestClient, tickers: tuple[str, ...]) -> int:
             log(f"  cannot flatten {ticker}: no two-sided book")
             continue
 
-        # Sell into the bid, buy from the ask.
-        if position > 0:
-            price = max(int(float(p) * ONE_DOLLAR) for p, _ in yes)
-            side, action = "no", "buy"
-        else:
-            price = ONE_DOLLAR - max(int(float(p) * ONE_DOLLAR) for p, _ in no)
-            side, action = "yes", "buy"
+        best_bid = max(int(round(float(p) * ONE_DOLLAR)) for p, _ in yes)
+        best_ask = ONE_DOLLAR - max(int(round(float(p) * ONE_DOLLAR)) for p, _ in no)
+
+        # `side` is the BOOK side, not the outcome. A long is closed by resting
+        # an ask that crosses into the bid, and a short by a bid that crosses
+        # into the ask. Passing "yes"/"no" here is rejected with
+        # "side must be bid or ask", which is how the first version silently
+        # left every position open - the very thing this function exists to
+        # prevent.
+        side = "ask" if position > 0 else "bid"
+        price = best_bid if position > 0 else best_ask
 
         try:
             await rest.batch_create_orders(
@@ -165,17 +169,22 @@ async def flatten(rest: KalshiRestClient, tickers: tuple[str, ...]) -> int:
                     CreateOrderRequest(
                         ticker=ticker,
                         side=side,
-                        price=price if side == "yes" else ONE_DOLLAR - price,
+                        price=price,
                         count=abs(position),
                         client_order_id=f"flat-{int(time.time() * 1000)}",
                         post_only=False,
                     )
                 ]
             )
-            closed += abs(position) // COUNT_SCALE
-            log(f"  flattened {ticker}: {position / COUNT_SCALE:+.0f}")
+            await asyncio.sleep(2.0)
+            left = (await rest.get_positions((ticker,))).get(ticker, 0)
+            closed += (abs(position) - abs(left)) // COUNT_SCALE
+            log(
+                f"  flattened {ticker}: {position / COUNT_SCALE:+.0f} -> "
+                f"{left / COUNT_SCALE:+.0f}"
+            )
         except Exception as error:
-            log(f"  flatten failed for {ticker}: {type(error).__name__} {error}")
+            log(f"  flatten FAILED for {ticker}: {type(error).__name__} {error}")
 
     return closed
 
