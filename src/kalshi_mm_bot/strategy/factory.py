@@ -13,6 +13,10 @@ from kalshi_mm_bot.strategy.types import Strategy
 STRATEGY_NAMES: tuple[str, ...] = ("horizon", "adaptive", "dumb")
 
 
+from kalshi_mm_bot.strategy.defended import MomentumDefendedStrategy
+from kalshi_mm_bot.strategy.momentum_taker import MomentumTakerStrategy
+
+
 def strategy_from_name(
     name: str,
     *,
@@ -34,6 +38,23 @@ def strategy_from_name(
         params.setdefault("max_position", max_position)
         return AdaptivePredictionMarketMakerStrategy(
             **params,
+        )
+
+    if normalized in {"momo", "momentum_taker", "taker"}:
+        return MomentumTakerStrategy(count=count, max_position=max_position)
+
+    # "defended:<name>" wraps any strategy in the momentum defence, so the two
+    # can be compared by running the same inner strategy either way.
+    if normalized.startswith(("defended:", "symmetric:")):
+        prefix, inner_name = normalized.split(":", 1)
+        return MomentumDefendedStrategy(
+            inner=strategy_from_name(
+                inner_name,
+                count=count,
+                max_position=max_position,
+                adaptive_params=adaptive_params,
+            ),
+            symmetric=prefix == "symmetric",
         )
 
     if normalized in {"dumb", "benchmark", "dumb_join_top"}:
