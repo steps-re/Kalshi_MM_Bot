@@ -1,0 +1,119 @@
+"""The sweep's reporting, which decides which strategy looks best.
+
+This tool has produced three wrong numbers already - capture labelled in cents
+while holding dollars, residual inventory summed across tickers so ten small
+positions read as one huge one, and a ranking on capture-per-fill that promoted
+a configuration earning a third as much as its neighbour. None were caught by a
+test, because there were none. These are that test.
+"""
+
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+
+from sweep_backtests import MIN_FILLS_FOR_CONFIDENCE, Run, report  # noqa: E402
+
+MICROS = 1_000_000
+
+
+def run(
+    *,
+    strategy="s",
+    fills=1000,
+    capture_dollars=10.0,
+    inventory_dollars=0.0,
+    residual=0.0,
+    markets=1,
+    recording="rec",
+):
+    return Run(
+        recording=recording,
+        strategy=strategy,
+        fills=fills,
+        spread_capture=int(capture_dollars * MICROS),
+        inventory=int(inventory_dollars * MICROS),
+        net=int((capture_dollars + inventory_dollars) * MICROS),
+        residual_contracts=residual,
+        markets_held=markets,
+    )
+
+
+def test_ranks_on_money_earned_not_on_the_per_fill_rate() -> None:
+    """The horizon tuning case: per-fill promoted a config earning a third as much.
+
+    edge=100 earned $6.15 over 540 fills; edge=150 earned $2.10 over 165. The
+    second has the better rate and the first has the money.
+    """
+
+    rows = [
+        run(strategy="earns_more", fills=540, capture_dollars=6.15),
+        run(strategy="better_rate", fills=165, capture_dollars=2.10),
+    ]
+
+    lines = report(rows).splitlines()
+    order = [line.split()[0] for line in lines[1:3]]
+
+    assert order[0] == "earns_more"
+
+
+def test_a_thin_sample_is_flagged_rather_than_promoted() -> None:
+    thin = [run(strategy="rare", fills=MIN_FILLS_FOR_CONFIDENCE - 1, capture_dollars=50.0)]
+
+    text = report(thin)
+
+    assert "!!" in text
+    assert "rare" in text
+    assert "rarer one" in text
+
+
+def test_a_healthy_sample_is_not_flagged() -> None:
+    ample = [run(strategy="busy", fills=MIN_FILLS_FOR_CONFIDENCE + 1)]
+
+    assert "!!" not in report(ample)
+
+
+def test_residual_is_per_market_so_spread_inventory_is_not_read_as_a_limit() -> None:
+    """Eight contracts in each of ten markets is not eighty in one."""
+
+    spread_out = run(residual=80.0, markets=10)
+    concentrated = run(residual=80.0, markets=1)
+
+    assert spread_out.residual_per_market == 8.0
+    assert concentrated.residual_per_market == 80.0
+
+
+def test_a_run_holding_nothing_counts_as_flat() -> None:
+    flat = [run(strategy="flat", residual=0.0, markets=0)]
+
+    assert "1/1" in report(flat)
+
+
+def test_a_run_at_its_position_limit_is_not_counted_as_flat() -> None:
+    loaded = [run(strategy="loaded", residual=50.0, markets=1)]
+
+    assert "0/1" in report(loaded)
+
+
+def test_capture_is_reported_in_dollars() -> None:
+    """It was labelled in cents while holding dollars - a 100x display error."""
+
+    text = report([run(capture_dollars=61.22, fills=1690)])
+
+    assert "61.22$" in text
+
+
+def test_per_fill_is_reported_in_cents() -> None:
+    # $10 over 1000 fills is one cent each.
+    text = report([run(capture_dollars=10.0, fills=1000)])
+
+    assert "1.00c" in text
+
+
+def test_zero_fill_strategies_do_not_crash_the_report() -> None:
+    """A strategy can legitimately place nothing - horizon did for a whole run."""
+
+    text = report([run(strategy="silent", fills=0, capture_dollars=0.0)])
+
+    assert "silent" in text
