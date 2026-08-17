@@ -73,9 +73,12 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("tickers", nargs="+", help="Market tickers to trade.")
     parser.add_argument(
         "--strategy",
-        choices=STRATEGY_NAMES,
         default="adaptive",
-        help="Strategy to run. Default: adaptive.",
+        help="Strategy to run: "
+        + ", ".join(STRATEGY_NAMES)
+        + ", or a wrapper such as phased:adaptive or symmetric:adaptive. "
+        "Not a fixed choice list, because the wrappers compose - the factory "
+        "raises on an unknown name.",
     )
     parser.add_argument(
         "--order-size",
