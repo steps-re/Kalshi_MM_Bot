@@ -282,3 +282,70 @@ Fixing this needs recordings aligned to window open, which is a collector change
 (start a cycle when a window opens rather than on a fixed clock), not a strategy
 change. Until then the gate should be judged live, where the 539-fill decay
 curve came from.
+
+---
+
+# The backtest cannot measure adverse selection (2026-08-17)
+
+With the collector finally recording whole windows, the simulator's markout can
+be compared to live markout on the same markets, bucket by bucket. They do not
+agree, and the disagreement is structural rather than a calibration offset.
+
+| time left | SIMULATED | in favour | LIVE | in favour |
+|---|---|---|---|---|
+| 12m+ | +1.008c | 87% | +0.354c | 68% |
+| 9-12m | +1.250c | 88% | +0.316c | 66% |
+| 6-9m | +0.574c | 79% | +0.222c | 63% |
+| 4-6m | +0.471c | 85% | +0.085c | 53% |
+| 2-4m | +0.521c | 84% | +0.094c | 55% |
+| 1-2m | +0.545c | 77% | **-0.112c** | 38% |
+| <1m | +0.179c | 42% | +0.104c | 48% |
+
+    simulated:  early +0.663c   late +0.505c    (n=3,634)
+    live:       early +0.268c   late +0.058c    (n=784)
+
+Two separate problems:
+
+**Level.** The simulator overstates markout by 2.5x early and **8.7x** late.
+
+**Shape.** Live markout decays hard through a window - +0.27c early against
++0.06c late, and negative in the 1-2 minute band. The simulator shows almost no
+decay at all (0.66 -> 0.51) and stays strongly positive in the band where live
+trading loses money. It is blind to the single effect that governs when we
+should be quoting.
+
+## Why
+
+The queue model fills us on mechanical book events - a level shrinks past our
+position, so we trade - and then marks the fill against the mid immediately
+after that same event. Nothing in that loop knows *who* traded against us or
+why. In reality the fills that hurt are the ones taken deliberately by someone
+who knows where the market is going, and that selection is exactly what the
+simulator has no representation of.
+
+A comment in `sim/fills.py` claims marking against the post-event mid "slightly
+understates captured edge - the conservative direction". Measured, it overstates
+it by up to nine times.
+
+## What this invalidates
+
+Every strategy comparison in this project measures spread capture **in a world
+without adverse selection**. On aligned data the ranking is:
+
+    dumb              4,292 fills   $9.65 capture   0.22c/fill   resid 2.2
+    adaptive          1,562 fills   $7.93           0.51c        resid 0.4
+    phased:adaptive   1,428 fills   $7.29           0.51c        resid 0.7
+    horizon             672 fills   $3.82           0.57c        resid 0.7
+
+That ordering is a ranking of who captures the most spread when nobody picks
+them off. It cannot answer which strategy survives being picked off, which is
+the question that decides whether any of this makes money - and live markout
+says the difference between regimes is the whole game.
+
+## What to trust instead
+
+Live measurement, which is why the 784-fill decay curve is the most valuable
+artifact of the session. The simulator remains useful for mechanics - does a
+strategy quote, does it manage inventory, does it stay flat - and for relative
+fill rates. It should not be used to choose between strategies on edge, and no
+parameter that trades off fill quality against fill quantity can be tuned on it.
