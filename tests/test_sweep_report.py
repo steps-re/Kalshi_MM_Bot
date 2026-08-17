@@ -310,3 +310,15 @@ def test_a_window_expiring_right_now_is_not_pinned() -> None:
     assert collect_loop._pinnable(fresh, now)
     # Still a short window by name - the name was never the problem.
     assert collect_loop._is_short_window(just_closed["ticker"])
+
+
+def test_a_freshly_opened_window_survives_the_volume_floor() -> None:
+    """Aligning to window open means looking at a market seconds after it opens,
+    when it has traded almost nothing. A volume filter then rejects exactly the
+    market the alignment exists to capture."""
+
+    import collect_loop
+
+    assert collect_loop._is_short_window("KXBTC15M-26AUG171300-00")
+    # Not a pinned series, so the floor still applies to it.
+    assert not collect_loop._is_short_window("KXBTCD-26AUG1717-T63499.99")

@@ -174,7 +174,19 @@ def candidate_markets(series: tuple[str, ...], min_volume: float) -> list[dict]:
                 pr._num(market.get("volume_24h_fp")),
             )
 
-            if 0 < bid < ask < 1 and volume >= min_volume:
+            # Pinned series bypass the volume floor. Aligning cycles to window
+            # open means we look at a market seconds after it opens, when it has
+            # traded almost nothing - so a volume filter rejects precisely the
+            # market the alignment exists to capture. Two cycles recorded no
+            # 15-minute window at all for this reason, after the alignment and
+            # expiry-race fixes had both landed.
+            #
+            # These are pinned by policy rather than by liquidity, so liquidity
+            # is not the gate. The two-sided check still applies: a market with
+            # no book is not recordable whatever we intend.
+            if 0 < bid < ask < 1 and (
+                volume >= min_volume or _is_short_window(market["ticker"])
+            ):
                 seen[market["ticker"]] = market
 
     return list(seen.values())
