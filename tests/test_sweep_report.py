@@ -69,9 +69,12 @@ def test_a_thin_sample_is_flagged_rather_than_promoted() -> None:
 
 
 def test_a_healthy_sample_is_not_flagged() -> None:
+    """Specifically the thin-sample flag. Every report also carries the
+    sim-to-live warning, which is unconditional and not what this checks."""
+
     ample = [run(strategy="busy", fills=MIN_FILLS_FOR_CONFIDENCE + 1)]
 
-    assert "!!" not in report(ample)
+    assert "rarer one" not in report(ample)
 
 
 def test_residual_is_per_market_so_spread_inventory_is_not_read_as_a_limit() -> None:
@@ -340,3 +343,17 @@ def test_alignment_waits_past_the_boundary_for_the_book_to_form() -> None:
         collect_loop.seconds_to_next_window(0) + collect_loop.WINDOW_SETTLE_SECONDS
         > collect_loop.WINDOW_SECONDS
     )
+
+
+def test_report_warns_that_simulated_capture_is_not_money() -> None:
+    """Measured: the simulator marks identical fills at +0.640c where live gives
+    +0.264c, and only a quarter of that is the marking horizon."""
+
+    from sweep_backtests import SIM_TO_LIVE_MARKOUT
+
+    assert 0 < SIM_TO_LIVE_MARKOUT < 1
+
+    text = report([run(strategy="s", fills=1000, capture_dollars=10.0)])
+
+    assert "never as money" in text
+    assert "x live" in text

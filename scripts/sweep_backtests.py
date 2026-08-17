@@ -73,6 +73,21 @@ MIN_FILLS_FOR_CONFIDENCE = 200
 # Polling faster helps a little; it does not fix the netting.
 MIN_DELTAS_PER_SECOND = 50.0
 
+# Simulated markout over live markout, measured on identical fills in the same
+# markets. The simulator marks a fill at +0.640c where live measurement of the
+# same strategy in the same books gives +0.264c.
+#
+# Only about a quarter of that is the marking horizon - the same fills marked
+# forward give +0.619c at 2s, +0.570c at 10s, +0.486c at 30s, so waiting does
+# not close it. The rest is fill eligibility: the queue model fills us at prices
+# reality would not, and discarding fills does not fix it (thinning 95% of
+# favourable fills left markout at +1.006c against a +0.268c target).
+#
+# So spread capture reported here is roughly 2.4x what the same strategy earns
+# live. The ratio is stated rather than applied: silently scaling the numbers
+# would make them look like measurements of something.
+SIM_TO_LIVE_MARKOUT = 0.264 / 0.640
+
 
 @dataclass(frozen=True, slots=True)
 class Resolution:
@@ -323,6 +338,13 @@ def report(runs: list[Run]) -> str:
         "Ranked on total spread capture - the money the quoting earned. Per fill "
         "is shown beside it as a quality signal, NOT as the ranking: it is raised "
         "just as easily by quoting wider and trading less as by quoting better."
+    )
+    lines.append(
+        f"!! Simulated markout runs ~{1 / SIM_TO_LIVE_MARKOUT:.1f}x live on identical "
+        "fills (+0.640c against +0.264c measured). Only a quarter of that is the "
+        "marking horizon; the rest is the queue model filling us where reality "
+        "would not. Treat every capture figure here as a RELATIVE score between "
+        "strategies, never as money."
     )
     lines.append(
         "Residual is contracts still held at the end. A run that ends at its "
