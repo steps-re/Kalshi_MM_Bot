@@ -74,16 +74,37 @@ def test_ceiling_surcharge_shrinks_as_size_grows() -> None:
     # amortizes away by a thousand. This is why small live tests read worse than
     # the strategy actually is - and why they still cannot win at fifty cents.
     assert small > large
-    assert large == 350  # 3.50 cents of round-trip edge needed at the midpoint
+    # 1.75c each way. Only the taker side is billed now, so a maker-in /
+    # taker-out round trip costs one side's fee, not two.
+    assert large == 175
 
 
-def test_round_trip_costs_two_ceilings() -> None:
+def test_round_trip_bills_only_the_crossing_side() -> None:
+    """Rest in, cross out: one fee, not two.
+
+    While the maker schedule was unknown this charged both sides. Measured, the
+    entry is free, so a round trip costs exactly what the exit costs - and a
+    strategy that rests on BOTH sides pays nothing at all.
+    """
+
     model = KalshiFeeModel()
 
-    one_side = model.fee_micros(yes_price=HALF_DOLLAR, count=ONE_CONTRACT)
+    taker_side = model.fee_micros(
+        yes_price=HALF_DOLLAR, count=ONE_CONTRACT, is_taker=True
+    )
+    maker_side = model.fee_micros(
+        yes_price=HALF_DOLLAR, count=ONE_CONTRACT, is_taker=False
+    )
     round_trip = model.round_trip_micros(yes_price=HALF_DOLLAR, count=ONE_CONTRACT)
 
-    assert round_trip == 2 * one_side
+    assert maker_side == 0
+    assert round_trip == taker_side
+
+    # And the old behaviour is still reachable for a market that bills makers.
+    both_sides = KalshiFeeModel(charge_makers_taker_rate=True)
+    assert both_sides.round_trip_micros(
+        yes_price=HALF_DOLLAR, count=ONE_CONTRACT
+    ) == 2 * taker_side
 
 
 def test_minimum_viable_count_rejects_hopeless_edge() -> None:
@@ -170,6 +191,8 @@ def test_maker_schedule_bypasses_the_formula_when_enabled() -> None:
 
 
 def test_calibration_detects_a_wrong_schedule() -> None:
+    """A model that says makers are free, against fills that were billed."""
+
     model = KalshiFeeModel()
     # Real fills that were actually billed a flat quarter cent per contract.
     fills = [(HALF_DOLLAR, ONE_CONTRACT, False, 2_500)] * 4
@@ -178,7 +201,10 @@ def test_calibration_detects_a_wrong_schedule() -> None:
 
     assert calibration.sample_count == 4
     assert not calibration.matches
-    assert calibration.error_micros > 0
+    # Negative: the model UNDER-charges relative to reality, which is the
+    # dangerous direction and the one the default now risks if Kalshi ever
+    # starts billing makers.
+    assert calibration.error_micros < 0
     assert "MISMATCH" in calibration.describe()
 
 
@@ -214,9 +240,9 @@ def test_calibrate_accepts_the_shape_calibrate_fees_writes() -> None:
 
     assert calibration.sample_count == 2
     assert calibration.actual_micros == 0
-    # The default model charges makers, so this is the mismatch the live probe
-    # actually found on KXBTC15M.
-    assert calibration.modelled_micros > 0
+    # The default now agrees with the ledger: free makers, nothing charged.
+    assert calibration.modelled_micros == 0
+    assert calibration.matches
 
 
 def test_calibrate_still_accepts_tuples() -> None:

@@ -207,7 +207,10 @@ class HorizonAwareMarketMaker:
     def _required_edge(self, snapshot: MarketSnapshot) -> int:
         """Ticks of edge demanded on each side, before the per-order fee check."""
 
-        fee_edge = self.fee_model.edge_ticks_per_contract(snapshot.mid)
+        # These are resting quotes, so they are billed as maker fills. Asking a
+        # resting quote to earn back a taker's fee is asking it to cover a cost
+        # it never incurs.
+        fee_edge = self.fee_model.edge_ticks_per_contract(snapshot.mid, is_taker=False)
         adverse = (
             self.adverse_selection_bps
             * self._expected_move(snapshot, self.quote_lifetime_seconds)
@@ -406,8 +409,18 @@ class HorizonAwareMarketMaker:
             available_edge=available_edge,
             required_edge=required_edge,
         )
-        desired = int(desired * self._volatility_taper(snapshot))
-        desired = int(desired * self._time_taper(snapshot))
+        # Tapers scale size down for volatility and for approaching expiry. They
+        # must not scale it below the ramp's own floor, because the floor check
+        # further down treats "smaller than min_count" as "do not quote at all".
+        # Without this clamp the two interact to silence the strategy entirely:
+        # the ramp floors at min_count whenever the touch is tighter than our
+        # hurdle, a taper of anything under 1.0 then drops it a fraction below,
+        # and the quote is discarded. In a market quoted one cent wide - which
+        # is 91% of a crypto window - the touch is always tighter than the
+        # hurdle, so this fired on every single event: 15,180 events, 0 orders.
+        tapered = int(desired * self._volatility_taper(snapshot))
+        tapered = int(tapered * self._time_taper(snapshot))
+        desired = max(tapered, self.min_count) if desired >= self.min_count else tapered
         desired = _apply_inventory_size_penalty(
             desired,
             action=action,

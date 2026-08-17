@@ -68,8 +68,16 @@ class KalshiFeeModel:
         maker_fee_per_contract_micros: Flat per-contract fee applied instead of
             the formula when a fill is known to be a maker fill and
             `charge_makers_taker_rate` is False.
-        charge_makers_taker_rate: When True (default) every fill pays the
-            formula regardless of maker/taker. Conservative.
+        charge_makers_taker_rate: When True, every fill pays the taker formula
+            regardless of who made the market. That was the default while the
+            maker schedule was unknown, on the principle that overstating cost
+            is the safe direction. It is now measured - 25 maker fills charged
+            $0.0000 against 48 taker fills charged $0.5879, at midpoint prices
+            in two independent series - so the default is False. Leaving it True
+            does not make a backtest conservative any more, it makes it wrong:
+            it charges roughly 1.75c per midpoint fill that the exchange does
+            not charge, which is larger than the entire spread being captured
+            and turns every profitable maker strategy into a losing one.
         round_up_to_cent: Round the per-order fee up to a whole cent. Kalshi's
             published description says it does this; its ledger does not, so
             this now defaults to False. It rounds up to $0.0001 instead. Leaving
@@ -82,7 +90,7 @@ class KalshiFeeModel:
 
     trading_fee_bps: int = DEFAULT_TRADING_FEE_BPS
     maker_fee_per_contract_micros: int = DEFAULT_MAKER_FEE_PER_CONTRACT_MICROS
-    charge_makers_taker_rate: bool = True
+    charge_makers_taker_rate: bool = False
     round_up_to_cent: bool = False
 
     def __post_init__(self) -> None:
@@ -104,16 +112,32 @@ class KalshiFeeModel:
 
         return _ceil_to_cent(raw) if self.round_up_to_cent else _ceil_to_fee_tick(raw)
 
-    def edge_ticks_per_contract(self, yes_price: int) -> int:
+    def edge_ticks_per_contract(self, yes_price: int, *, is_taker: bool = True) -> int:
         """Price edge, in ticks, needed to cover one side's fee on one contract.
 
         This is what a strategy should add to its required spread. It excludes
         the per-order ceiling, which cannot be expressed per contract - see
         `ceiling_surcharge_micros` for that piece.
+
+        `is_taker` is not cosmetic. A **resting** quote pays no fee under the
+        measured schedule, so demanding edge to cover one is demanding edge to
+        cover nothing. That defaulted to the taker rate and quietly made the
+        horizon strategy inert: at a midpoint price it required 1.75c of edge on
+        every quote, which in a market quoted one cent wide put its bid two and a
+        half cents below the touch, past max_quote_away, so it placed literally
+        zero orders across 15,180 events. The strategy looked broken and the
+        arithmetic was simply charging a maker a taker's fee.
         """
 
         if self.trading_fee_bps <= 0:
             return 0
+
+        if not is_taker and not self.charge_makers_taker_rate:
+            # Resting fills are free; a flat per-contract maker fee, if the
+            # account has one, still has to be earned back.
+            return _ceil_div(
+                self.maker_fee_per_contract_micros * PRICE_SCALE, MONEY_SCALE
+            )
 
         return _ceil_div(
             self.trading_fee_bps * yes_price * (ONE_DOLLAR - yes_price),

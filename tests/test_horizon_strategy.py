@@ -4,6 +4,7 @@ from kalshi_mm_bot.market.types import PriceRange
 from kalshi_mm_bot.sim import SimPortfolio
 from kalshi_mm_bot.market.fees import ZERO_FEE_MODEL
 from kalshi_mm_bot.strategy import strategy_from_name
+from kalshi_mm_bot.market.fees import KalshiFeeModel
 from kalshi_mm_bot.strategy.horizon import HorizonAwareMarketMaker, parse_horizon_params
 from kalshi_mm_bot.strategy.types import StrategyContext
 
@@ -115,9 +116,31 @@ def test_quotes_tighter_in_the_tails_than_at_the_midpoint() -> None:
     middle_width = _quoted_width(middle)
     tail_width = _quoted_width(tail)
 
-    # Identical twenty cent books. The tail can be quoted far tighter because
-    # the fee is proportional to P*(1-P), which is where the edge actually is.
-    assert tail_width < middle_width
+    # Identical twenty cent books. Under the measured schedule a resting quote
+    # pays no fee at either price, so the fee term that used to separate these
+    # two is now zero on both sides and the widths match. That is the correct
+    # consequence of the measurement, not a regression: the tail's advantage was
+    # never about volatility, it was entirely a fee effect.
+    assert tail_width == middle_width
+
+    # On an account that IS billed for maker fills, the old asymmetry returns -
+    # which is what makes it a fee effect rather than a property of the tails.
+    billed = HorizonAwareMarketMaker(
+        count=20 * COUNT_SCALE,
+        max_position=100 * COUNT_SCALE,
+        max_quote_away=5_000,
+        max_spread=5_000,
+        fee_model=KalshiFeeModel(charge_makers_taker_rate=True),
+    )
+
+    billed_middle = _quoted_width(
+        billed.on_orderbook(context(), "M1", make_book("0.4000", "0.6000"), SimPortfolio())
+    )
+    billed_tail = _quoted_width(
+        billed.on_orderbook(context(), "M2", make_book("0.0100", "0.2100"), SimPortfolio())
+    )
+
+    assert billed_tail < billed_middle
 
 
 def _quoted_width(intents) -> int:
