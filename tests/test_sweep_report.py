@@ -202,3 +202,64 @@ def test_short_window_series_are_pinned_for_recording() -> None:
     assert collect_loop._is_short_window("KXETH15M-26AUG170700-00")
     assert not collect_loop._is_short_window("KXBTCD-26AUG1717-T62999.99")
     assert not collect_loop._is_short_window("KXNFLGAME-26AUG22DALARI-ARI")
+
+
+def _candidate(depth=1819.0, volume=5468.0, age=522.0, life=378.0, mid=2300):
+    from capacity_scan import Candidate
+
+    return Candidate(
+        ticker="KXBTC15M-TEST",
+        series="KXBTC15M",
+        mid=mid,
+        spread_ticks=100,
+        depth=depth,
+        volume_contracts=volume,
+        age_seconds=age,
+        seconds_to_close=life,
+    )
+
+
+def test_queue_wait_credits_cancellations_not_only_trades() -> None:
+    """The correction that made this screen agree with reality.
+
+    Measured off the websocket feed, 84% of a level's shrinkage is people
+    cancelling, and an order ahead of us that cancels advances us exactly as
+    much as one that trades. Dividing depth by traded flow alone overstates the
+    wait about six times - it rated KXBTC15M unreachable at a 347s wait against
+    a 378s life, in a market we had traded that afternoon for 116 fills.
+    """
+
+    from capacity_scan import TRADE_FRACTION
+
+    btc = _candidate()
+
+    trades_only = btc.depth / btc.flow_per_second
+    assert trades_only > 300, "the naive model says unreachable"
+
+    assert btc.wait_seconds < 60, "crediting cancellations says otherwise"
+    assert btc.reachable
+    # The whole difference is the measured trade fraction.
+    assert abs(btc.wait_seconds - trades_only * TRADE_FRACTION) < 1e-6
+
+
+def test_a_long_lived_dead_market_is_not_reachable() -> None:
+    """A 45-hour life must not excuse a hopeless queue.
+
+    With only a fractional test, four dead esports books qualified on waits of
+    9,000-38,000 seconds purely because they lived long enough for that to look
+    proportionate.
+    """
+
+    dead = _candidate(depth=511.0, volume=200.0, age=86_400.0, life=45 * 3600.0)
+
+    assert dead.wait_seconds > 300
+    assert not dead.reachable
+
+
+def test_a_queue_clearing_only_at_the_bell_is_not_reachable() -> None:
+    """Reaching the front exactly as the market closes is not a business."""
+
+    late = _candidate(depth=1819.0, volume=5468.0, age=522.0, life=60.0)
+
+    assert late.wait_seconds < 300
+    assert not late.reachable
