@@ -16,9 +16,17 @@ market. That choice is the entire point:
   part a market maker controls and the only part that should generalise from
   one window to the next.
 
-A strategy is ranked by capture per fill rather than total capture, because
-total capture rewards whichever strategy happened to trade the most, and a
-strategy can always trade more by quoting worse.
+**Neither total capture nor capture-per-fill is a safe ranking on its own, and
+this tool learned that the hard way.** Total capture rewards whichever strategy
+traded most, and any strategy can trade more by quoting worse. Capture per fill
+is the mirror image: any strategy can raise it by quoting wider and trading
+less. Ranking horizon on per-fill picked a configuration earning a third as much
+as the one next to it.
+
+So the ranking is on total capture - the money actually earned by quoting - and
+per-fill is reported beside it as the quality signal. A configuration with a
+high per-fill and very few fills is flagged rather than promoted, because a
+handful of fills does not distinguish a good quote from a lucky one.
 
 Residual inventory is reported alongside. A run that ends flat earned its
 number; a run that ends at its position limit has taken a directional bet that
@@ -42,8 +50,13 @@ from kalshi_mm_bot.analytics.performance import attribute_pnl  # noqa: E402
 from kalshi_mm_bot.market.price import COUNT_SCALE, MONEY_SCALE, parse_count_fp  # noqa: E402
 from kalshi_mm_bot.sim import fill_model_from_name, run_replay_backtest  # noqa: E402
 from kalshi_mm_bot.strategy import strategy_from_name  # noqa: E402
+from kalshi_mm_bot.strategy.factory import parse_params_for  # noqa: E402
 
 STRATEGIES = ("adaptive", "horizon", "dumb")
+
+# Below this many fills across the whole book, a per-fill figure says more about
+# luck than about the quote.
+MIN_FILLS_FOR_CONFIDENCE = 200
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +96,7 @@ async def one_run(
                 strategy_name,
                 count=parse_count_fp(args.order_size),
                 max_position=parse_count_fp(args.max_position),
+                adaptive_params=parse_params_for(strategy_name, args.param),
             ),
             fill_model=fill_model_from_name(args.fill_model),
             speed_multiplier=0,
@@ -123,11 +137,11 @@ def report(runs: list[Run]) -> str:
         f"{'per fill':>11}{'inventory $':>12}{'resid/mkt':>11}{'flat runs':>11}"
     ]
 
+    # Rank on money earned, not on the per-fill rate. See the module docstring:
+    # per-fill is trivially gamed by quoting wider and trading less.
     ranked = sorted(
         by_strategy.items(),
-        key=lambda kv: -(
-            sum(r.spread_capture for r in kv[1]) / max(1, sum(r.fills for r in kv[1]))
-        ),
+        key=lambda kv: -sum(r.spread_capture for r in kv[1]),
     )
 
     for strategy, group in ranked:
@@ -146,11 +160,26 @@ def report(runs: list[Run]) -> str:
             f"{flat:>7}/{len(group):<3}"
         )
 
+    thin = [
+        strategy
+        for strategy, group in by_strategy.items()
+        if sum(r.fills for r in group) < MIN_FILLS_FOR_CONFIDENCE
+    ]
+
     lines.append("")
+
+    if thin:
+        lines.append(
+            f"!! {', '.join(thin)}: under {MIN_FILLS_FOR_CONFIDENCE} fills across the "
+            "whole book. A high per-fill figure on a sample this thin is not "
+            "evidence of a better quote, only of a rarer one."
+        )
+        lines.append("")
+
     lines.append(
-        "Ranked on capture per fill, which is the part the quoting earns. Total "
-        "capture would reward whichever strategy traded most, and any strategy "
-        "can trade more by quoting worse."
+        "Ranked on total spread capture - the money the quoting earned. Per fill "
+        "is shown beside it as a quality signal, NOT as the ranking: it is raised "
+        "just as easily by quoting wider and trading less as by quoting better."
     )
     lines.append(
         "Residual is contracts still held at the end. A run that ends at its "
@@ -168,7 +197,12 @@ async def _main(args: argparse.Namespace) -> None:
     if not recordings:
         raise SystemExit(f"no recordings with a manifest under {args.book}")
 
-    print(f"{len(recordings)} recording(s) x {len(args.strategies)} strategies")
+    tag = f" [{args.label}]" if args.label else ""
+    overrides = f" {args.param}" if args.param else ""
+    print(
+        f"{len(recordings)} recording(s) x {len(args.strategies)} strategies"
+        f"{tag}{overrides}"
+    )
     runs: list[Run] = []
 
     for recording in recordings:
@@ -197,6 +231,19 @@ def main() -> None:
     parser.add_argument("--fill-model", default="queue")
     parser.add_argument("--order-size", default="5")
     parser.add_argument("--max-position", default="50")
+    parser.add_argument(
+        "--param",
+        action="append",
+        help="Strategy parameter override, KEY=VALUE. Repeatable. Applies to "
+        "whichever strategies accept it, so a sweep can compare one knob across "
+        "the whole book instead of one lucky window.",
+    )
+    parser.add_argument(
+        "--label",
+        default="",
+        help="Tag for this configuration, printed with the summary so several "
+        "sweeps can be compared by eye.",
+    )
     args = parser.parse_args()
 
     asyncio.run(_main(args))
