@@ -205,3 +205,28 @@ Binance candle, and **Binance is geo-blocked from this location**. So today we
 can price neither venue's settlement source directly - we are approximating both
 from Coinbase, Kraken, Deribit and OKX. Closing that gap (a BRTI feed, and a
 Binance-equivalent price) is a prerequisite before any size goes near this.
+
+## Cross-venue gap, resolved with real implied vol and live books
+
+The 26.5-point gap does not survive proper measurement. Two errors made it:
+
+1. **Guessed volatility.** Replacing a back-of-envelope sigma with Deribit's
+   DVOL (34.2% annualised) changed the basis-explained share from 12 points to
+   16.
+2. **Stale prices.** Polymarket's gamma `outcomePrices` / `bestBid` were **14
+   points stale** against the live CLOB book - 0.83 cached against a real
+   midpoint of 0.97 at the same instant. The live figure agreed with fair value
+   to within a cent. The entire apparent mispricing was the cache.
+
+Priced against each venue's own underlying, with live books:
+
+    USD 64,125  USDT 64,189  basis +$63.89  DVOL 34.2%  9 minutes left
+    strike   K mid  K fair  K edge   P mid  P fair  P edge   basis
+    64,000   0.945   0.918   +2.7c   0.971   0.982   -1.1c   +6.4pts
+
+**Both venues are efficient within a few cents of their own fair value.** There
+is no cross-venue edge here, only a basis that is exactly what it should be.
+
+`scripts/cross_venue.py` reads live CLOB midpoints and refuses to fall back to
+cached quotes - returning None instead - because a stale price that looks live
+is how this nearly became a trade.
