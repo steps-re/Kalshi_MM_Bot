@@ -71,7 +71,7 @@ async def mid_timeline(recording: Path) -> dict[str, list[tuple[float, float]]]:
     if ORDERBOOK_CHANNEL not in reader.manifest.channels:
         return {}
 
-    start = parse_iso(reader.manifest.metadata.get("started_at_utc"))
+    start = parse_iso(reader.manifest.started_at_utc)
 
     if start is None:
         return {}
