@@ -57,7 +57,22 @@ from kalshi_mm_bot.live.journal import read_journal  # noqa: E402
 from kalshi_mm_bot.market.bookio import rest_top  # noqa: E402
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR  # noqa: E402
 
-PINNED = ("KXBTC15M", "KXETH15M")
+# Ranked by simulated per-venue markout (2026-08-18, 11 recordings): the
+# commodity 15-minute windows out-rank the crypto majors 2-4x, because BTC/ETH
+# are the thickest, most-competed books and our resting quotes sit behind the
+# most informed flow. WTI/silver/gold/doge are less picked-over. Order here is
+# the trading priority; the session takes the top --max-books that have a live
+# window this cycle. Sim ranking is a hypothesis - live fills re-rank it.
+DEFAULT_FAMILY = (
+    "KXWTI15M",     # +0.96c sim, 86% favourable, thickest of the new ones
+    "KXSILVER15M",  # +0.74c, 81%
+    "KXXRP15M",     # +0.57c, 77%
+    "KXGOLD15M",    # +0.61c, 79%
+    "KXSOL15M",     # +0.55c, 73%
+    "KXDOGE15M",    # +1.03c but thinnest, so lower priority despite top markout
+    "KXBTC15M",     # +0.29c - kept so live data keeps re-ranking it
+    "KXETH15M",     # +0.27c
+)
 
 # Failures a long run must NOT survive: they will fail identically forever, so
 # retrying is just burning the session quietly. Everything else is treated as
@@ -260,10 +275,26 @@ async def flatten(
     return closed
 
 
-def live_windows(min_left: float, max_left: float) -> tuple[str, ...]:
+def live_windows(
+    min_left: float,
+    max_left: float,
+    family: tuple[str, ...],
+    max_books: int,
+) -> tuple[str, ...]:
+    """The first `max_books` series (in priority order) with a live window.
+
+    Priority order matters: capping simultaneous books is the rate-limit
+    guardrail - eight books re-quoting at once is what 429'd earlier sessions -
+    so the cap must take the BEST-ranked windows, not the first ones the API
+    happens to return.
+    """
+
     found = []
 
-    for series in PINNED:
+    for series in family:
+        if len(found) >= max_books:
+            break
+
         try:
             data = pr.get(
                 "/markets", {"status": "open", "limit": 5, "series_ticker": series}
@@ -289,6 +320,7 @@ def live_windows(min_left: float, max_left: float) -> tuple[str, ...]:
 
             if min_left <= left <= max_left:
                 found.append(market["ticker"])
+                break  # one window per series - the currently-open one
 
     return tuple(found)
 
@@ -350,7 +382,12 @@ async def run(args: argparse.Namespace) -> None:
                     )
                     break
 
-                tickers = live_windows(args.stop_before + 60, args.stop_before + 660)
+                tickers = live_windows(
+                    args.stop_before + 60,
+                    args.stop_before + 660,
+                    tuple(args.series),
+                    args.max_books,
+                )
             except Exception as error:
                 failures += 1
 
@@ -477,6 +514,21 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hours", type=float, default=3.0)
     parser.add_argument("--strategy", default="phased:adaptive")
+    parser.add_argument(
+        "--series",
+        nargs="+",
+        default=list(DEFAULT_FAMILY),
+        help="15-minute series to trade, in priority order. Default is the full "
+        "family ranked by simulated markout, commodities first.",
+    )
+    parser.add_argument(
+        "--max-books",
+        type=int,
+        default=4,
+        help="Max simultaneous books per cycle. The rate-limit guardrail: eight "
+        "books re-quoting at once 429'd earlier runs; four at a 2s requote floor "
+        "sits comfortably inside the ~4 orders/s limit.",
+    )
     parser.add_argument("--order-size", default="1")
     parser.add_argument("--max-position", default="5")
     parser.add_argument(

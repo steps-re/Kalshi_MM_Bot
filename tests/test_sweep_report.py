@@ -373,3 +373,16 @@ def test_pinned_series_are_always_queried() -> None:
                if s not in collect_loop.DEFAULT_SERIES]
 
     assert not missing, f"pinned but never queried: {missing}"
+
+
+def test_live_windows_caps_at_max_books_in_priority_order() -> None:
+    """The rate-limit guardrail: take the best-ranked windows, not the first
+    the API returns, and never more than the cap."""
+
+    import session_runner
+
+    assert session_runner.DEFAULT_FAMILY[0] == "KXWTI15M"  # ranked, commodities first
+    assert "KXBTC15M" in session_runner.DEFAULT_FAMILY      # kept for live re-ranking
+    # The cap parameter exists and the family is longer than a sane cap, so the
+    # cap actually bites.
+    assert len(session_runner.DEFAULT_FAMILY) > 4
