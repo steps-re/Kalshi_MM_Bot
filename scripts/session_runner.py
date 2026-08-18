@@ -58,15 +58,28 @@ from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR  # noqa: E402
 
 PINNED = ("KXBTC15M", "KXETH15M")
 
-# Failures that mean "slow down" rather than "you are broken".
-TRANSIENT_SIGNS = (
-    "429",
-    "too_many_requests",
-    "ReadTimeout",
-    "ConnectError",
-    "RemoteProtocolError",
-    "503",
+# Failures a long run must NOT survive: they will fail identically forever, so
+# retrying is just burning the session quietly. Everything else is treated as
+# transient and backed off.
+#
+# An allowlist of transient signs was tried first and was wrong in exactly the
+# way an allowlist always is: it listed ConnectError but not
+# ConnectionClosedError, so a dropped websocket ended a three-hour experiment
+# after twenty-five minutes. The failures that should stop a session are few and
+# knowable; the ways a network can break are not.
+PERMANENT_SIGNS = (
+    "error: argument",          # argparse rejected the command
+    "error: unrecognized",
+    "invalid choice",
+    "401 Unauthorized",
+    "403 Forbidden",
+    "ModuleNotFoundError",
+    "ImportError",
+    "unknown strategy",
 )
+
+# Even so, something unrecognised must not spin forever.
+MAX_CONSECUTIVE_FAILURES = 5
 TICKS_PER_CENT = ONE_DOLLAR // 100
 
 
@@ -267,6 +280,7 @@ async def run(args: argparse.Namespace) -> None:
     journals.mkdir(parents=True, exist_ok=True)
     deadline = time.time() + args.hours * 3600
     index = 0
+    failures = 0
 
     try:
         start_balance = await balance(rest)
@@ -332,13 +346,24 @@ async def run(args: argparse.Namespace) -> None:
                 # the next window is right; stopping a three-hour run over one
                 # 429 throws away the experiment. A bad argument, by contrast,
                 # will fail identically forever and must stop.
-                if any(sign in output for sign in TRANSIENT_SIGNS):
-                    log(f"  transient - backing off {args.backoff_seconds:.0f}s")
-                    await asyncio.sleep(args.backoff_seconds)
-                    continue
+                if any(sign in output for sign in PERMANENT_SIGNS):
+                    log("  permanent failure - stopping")
+                    break
 
-                log("  stopping: a session that cannot trade should not keep cycling")
-                break
+                failures += 1
+
+                if failures >= MAX_CONSECUTIVE_FAILURES:
+                    log(f"  {failures} consecutive failures - stopping")
+                    break
+
+                log(
+                    f"  transient ({failures}/{MAX_CONSECUTIVE_FAILURES}) - "
+                    f"backing off {args.backoff_seconds:.0f}s"
+                )
+                await asyncio.sleep(args.backoff_seconds)
+                continue
+
+            failures = 0
 
             closed = await flatten(rest, tickers) if args.execute else 0
             await asyncio.sleep(3)
