@@ -22,9 +22,9 @@ st.markdown(
 st.header("How Nate made ~$1.50 (and why our bot didn't, at first)")
 st.markdown(
     """
-The puzzle: Nate hand-tuned settings on BTC 15-minute markets, managed his queue
-position carefully, and ended up **+$1.50 on a few dollars**. Our automated
-version, with more infrastructure, bled money. There was no secret setting.
+The puzzle: Nate ran an **automated** bot on BTC 15-minute markets, tuned its
+settings, and ended up **+$1.50 on a few dollars**. Our automated version, with
+more infrastructure, bled money on the same book. There was no secret setting.
 
 The ledger reconciles it in one line:
 
@@ -34,11 +34,10 @@ The ledger reconciles it in one line:
 | **taker** (crossing) | 107 | **$1.02** |
 
 Every taker fill is a cross - a fee **plus** the half-spread paid to get out.
-Nate's "thoughtful queue management" was exactly the discipline of **not
-crossing**: rest a buy, rest a sell, let both fill for free, capture the spread.
-He also traded selectively and tiny, so he could decline the bad fills an
-always-on bot takes automatically. He hit "fees ate everything" too - in the
-episodes where he *did* cross. His net is the free round-trips minus those.
+The profitable behaviour is to **not cross**: rest a buy, rest a sell, let both
+fill for free, capture the spread. His tuned bot did that; ours forced a cross
+every cycle to flatten. He hit "fees ate everything" too - in the episodes where
+his settings did cross. His net is the free round-trips minus those.
 
 **He did this on BTC 15M only, and he AUTOMATED it** - which removes the last
 hand-wave. It was never human-discretion vs bot. An automated bot can win on
@@ -49,12 +48,10 @@ fill for free. Nate simply never wrote that line. When we removed it (exit
 passively, cross only the stub), our first corrected cycle went **+$1.32 on the
 account against +$0.52 of markout** - the drag inverted into a tailwind.
 
-There was no secret setting. There was one wrong line in our exit.
-
-**We over-automated.** Our bot quoted continuously and then flattened every
-cycle **by crossing** - mechanising the one action Nate's discretion avoided.
+There was no secret setting. There was one wrong line in our exit - a
+force-flatten that crossed the spread - that his bot's settings never triggered.
 The fix, now live, exits passively (rest the flatten, wait, cross only the stub
-that won't fill), turning his hand-judgment into a rule.
+that won't fill). First corrected cycle: **+$1.32 account vs +$0.52 markout.**
 """
 )
 
@@ -78,7 +75,9 @@ st.markdown(
 | BTC 15M | +0.36c | 71% |
 | **ETH 15M** | **-0.52c** | 56% |
 
-We had been anchored to BTC/ETH - the two *worst* books on the list.
+We had been anchored to BTC/ETH. BTC is fine - middling but positive, the book
+Nate used. ETH is the one genuine loser. Small and positive is the goal, not the
+top of the list.
 """
 )
 
