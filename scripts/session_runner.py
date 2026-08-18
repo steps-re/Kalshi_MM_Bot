@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import subprocess
 import sys
 import time
@@ -436,11 +437,19 @@ async def run(args: argparse.Namespace) -> str:
     index = 0
     failures = 0
     stop_reason = "deadline"  # overwritten only by a floor halt or permanent stop
-    ab_edges = [int(x) for x in args.ab_edges.split(",") if x.strip()]
+    if args.ab_arms:
+        arm_specs = [a.strip() for a in args.ab_arms.split(";") if a.strip()]
+    elif args.ab_edges:
+        arm_specs = [
+            f"min_profit_edge={e.strip()}" for e in args.ab_edges.split(",") if e.strip()
+        ]
+    else:
+        arm_specs = []
+
     ab_ledger = journals / "ab_ledger.jsonl"
 
-    if ab_edges:
-        log(f"A/B on min_profit_edge {ab_edges}, round-robin per cycle -> {ab_ledger}")
+    if arm_specs:
+        log(f"A/B arms {arm_specs}, round-robin per cycle -> {ab_ledger}")
 
     try:
         start_balance = await balance(rest)
@@ -494,10 +503,16 @@ async def run(args: argparse.Namespace) -> str:
 
             # Round-robin the A/B arm by cycle so each arm sees the same venue
             # basket and differs only in regime, which the rotation balances.
-            if ab_edges:
-                edge = ab_edges[(index - 1) % len(ab_edges)]
-                arm_label = f"edge{edge}"
-                arm_params = ["--adaptive-param", f"min_profit_edge={edge}"]
+            if arm_specs:
+                spec = arm_specs[(index - 1) % len(arm_specs)]
+                # Filename/ledger-safe label (no '_', '=', ',' - the journal name
+                # and the slicer's arm parser both split on '_').
+                arm_label = re.sub(r"[^A-Za-z0-9]", "", spec) or "arm"
+                arm_params = []
+
+                for kv in spec.split(","):
+                    if kv.strip():
+                        arm_params += ["--adaptive-param", kv.strip()]
             else:
                 arm_label = "default"
                 arm_params = []
@@ -670,12 +685,20 @@ def main() -> None:
         "--ab-edges",
         default="",
         help=(
-            "Comma-separated min_profit_edge values to A/B, e.g. '25,75,150'. Each "
-            "cycle round-robins to the next value (all books that cycle share it), so "
-            "every arm sees the same venue basket and only the regime differs, which "
-            "round-robin balances. min_profit_edge is how far from mid we quote: wider "
-            "means fewer, less adversely-selected fills - the direct lever on the "
-            "residual leak. Empty = no A/B, use the strategy's own default."
+            "Shortcut for an A/B over min_profit_edge, e.g. '25,75,150'. Superseded "
+            "by --ab-arms when that is set."
+        ),
+    )
+    parser.add_argument(
+        "--ab-arms",
+        default="",
+        help=(
+            "General A/B: semicolon-separated arms, each a comma-separated set of "
+            "adaptive key=value overrides, e.g. 'obi_skew=0;obi_skew=42;obi_skew=85'. "
+            "Each cycle round-robins to the next arm (all books that cycle share it), "
+            "so every arm sees the same venue basket and only the regime differs, "
+            "which the rotation balances. This is how the microprice (obi_skew) center "
+            "is measured head-to-head against the mid-centered default on live P&L."
         ),
     )
     parser.add_argument(

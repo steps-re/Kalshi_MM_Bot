@@ -132,3 +132,46 @@ def test_strategy_factory_applies_adaptive_overrides() -> None:
 
     assert isinstance(strategy, AdaptivePredictionMarketMakerStrategy)
     assert strategy.min_profit_edge == parse_price_fp("0.0100")
+
+
+def test_obi_shift_moves_center_toward_the_heavy_side() -> None:
+    strategy = AdaptivePredictionMarketMakerStrategy(obi_skew=100)
+    bid_heavy = make_book(bid_size="9.00", ask_size="1.00")  # OBI = +0.8
+    ask_heavy = make_book(bid_size="1.00", ask_size="9.00")  # OBI = -0.8
+
+    up = strategy._obi_shift(bid_heavy, bid_heavy.best_bid, bid_heavy.best_ask)
+    down = strategy._obi_shift(ask_heavy, ask_heavy.best_bid, ask_heavy.best_ask)
+
+    assert up == 80  # round(100 * 0.8)
+    assert down == -80
+
+
+def test_obi_shift_is_off_when_skew_zero() -> None:
+    strategy = AdaptivePredictionMarketMakerStrategy(obi_skew=0)
+    book = make_book(bid_size="9.00", ask_size="1.00")
+
+    assert strategy._obi_shift(book, book.best_bid, book.best_ask) == 0
+
+
+def test_obi_skew_lifts_both_quotes_on_a_bid_heavy_book() -> None:
+    context = StrategyContext(event_count=1, offset_seconds=0)
+    book = make_book(bid_size="9.00", ask_size="1.00")
+
+    base = AdaptivePredictionMarketMakerStrategy().on_orderbook(
+        context, "M1", book, SimPortfolio()
+    )
+    skewed = AdaptivePredictionMarketMakerStrategy(obi_skew=100).on_orderbook(
+        context, "M1", book, SimPortfolio()
+    )
+
+    base_prices = {i.action: i.yes_price for i in base}
+    skewed_prices = {i.action: i.yes_price for i in skewed}
+
+    # Bid-heavy => center up => neither quote sits below its mid-centered price.
+    for action in ("buy", "sell"):
+        if action in base_prices and action in skewed_prices:
+            assert skewed_prices[action] >= base_prices[action]
+
+
+def test_parse_adaptive_params_accepts_obi_skew() -> None:
+    assert parse_adaptive_params("obi_skew=85") == {"obi_skew": 85}
