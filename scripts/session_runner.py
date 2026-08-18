@@ -54,6 +54,7 @@ from kalshi_mm_bot.api.auth import KalshiAuth  # noqa: E402
 from kalshi_mm_bot.api.rest import CreateOrderRequest, KalshiRestClient  # noqa: E402
 from kalshi_mm_bot.config import load_settings  # noqa: E402
 from kalshi_mm_bot.live.journal import read_journal  # noqa: E402
+from kalshi_mm_bot.market.bookio import rest_top  # noqa: E402
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR  # noqa: E402
 
 PINNED = ("KXBTC15M", "KXETH15M")
@@ -149,12 +150,25 @@ async def balance(rest: KalshiRestClient) -> float:
     return await rest.get_available_balance_cents() / 100
 
 
-async def flatten(rest: KalshiRestClient, tickers: tuple[str, ...]) -> int:
-    """Cross out any residual position. Returns contracts closed.
+async def flatten(
+    rest: KalshiRestClient,
+    tickers: tuple[str, ...],
+    settle_band_ticks: int = 300,
+) -> int:
+    """Close residual positions, choosing the cheaper of crossing and settling.
 
-    Crossing costs the taker fee and half a spread, and that is the point: a
-    position left to settle is a coin flip on a binary, which is not the
-    business. Paying to be flat is a cost worth measuring, not avoiding.
+    Crossing out costs half a spread plus the taker fee, every cycle. Settling
+    costs nothing but carries the binary's remaining variance. Near the ends of
+    the price range that variance is pennies while the crossing cost is not, so
+    inside `settle_band_ticks` of 0 or 1 the position is left to settle and the
+    saving is logged. Everywhere else it is crossed, because a mid-priced binary
+    held to settlement is a coin flip, which is not the business.
+
+    Nineteen positions were once left to settle by accident and dominated the
+    day's P&L; the band makes the same choice deliberate, bounded, and only
+    where the lottery ticket is nearly worthless or nearly certain.
+
+    Returns contracts closed by crossing.
     """
 
     closed = 0
@@ -164,27 +178,28 @@ async def flatten(rest: KalshiRestClient, tickers: tuple[str, ...]) -> int:
         if not position:
             continue
 
-        book = pr.get(f"/markets/{ticker}/orderbook", {"depth": 1}).get(
-            "orderbook_fp", {}
+        top = rest_top(
+            pr.get(f"/markets/{ticker}/orderbook", {"depth": 1}).get(
+                "orderbook_fp", {}
+            )
         )
-        yes = book.get("yes_dollars") or []
-        no = book.get("no_dollars") or []
 
-        if not yes or not no:
+        if top is None:
             log(f"  cannot flatten {ticker}: no two-sided book")
             continue
 
-        best_bid = max(int(round(float(p) * ONE_DOLLAR)) for p, _ in yes)
-        best_ask = ONE_DOLLAR - max(int(round(float(p) * ONE_DOLLAR)) for p, _ in no)
+        if top.mid <= settle_band_ticks or top.mid >= ONE_DOLLAR - settle_band_ticks:
+            log(
+                f"  leaving {ticker} ({position / COUNT_SCALE:+.0f}) to settle: "
+                f"mid {top.mid / ONE_DOLLAR:.2f} is inside the certainty band, "
+                "crossing would pay real cost to remove negligible variance"
+            )
+            continue
 
-        # `side` is the BOOK side, not the outcome. A long is closed by resting
-        # an ask that crosses into the bid, and a short by a bid that crosses
-        # into the ask. Passing "yes"/"no" here is rejected with
-        # "side must be bid or ask", which is how the first version silently
-        # left every position open - the very thing this function exists to
-        # prevent.
+        # `side` is the BOOK side: a long is closed by an ask crossing into the
+        # bid, a short by a bid crossing into the ask.
         side = "ask" if position > 0 else "bid"
-        price = best_bid if position > 0 else best_ask
+        price = top.bid if position > 0 else top.ask
 
         try:
             await rest.batch_create_orders(
@@ -365,7 +380,11 @@ async def run(args: argparse.Namespace) -> None:
 
             failures = 0
 
-            closed = await flatten(rest, tickers) if args.execute else 0
+            closed = (
+                await flatten(rest, tickers, args.settle_band_ticks)
+                if args.execute
+                else 0
+            )
             await asyncio.sleep(3)
             after = await balance(rest)
             fills, mark = journal_markout(journal)
@@ -414,6 +433,14 @@ def main() -> None:
     )
     parser.add_argument("--min-balance", type=float, default=35.0)
     parser.add_argument("--backoff-seconds", type=float, default=90.0)
+    parser.add_argument(
+        "--settle-band-ticks",
+        type=int,
+        default=300,
+        help="Leave residual positions to settle when the mid is within this "
+        "many ticks of 0 or 1 (300 = 3 cents). Crossing there pays real cost "
+        "to remove negligible variance.",
+    )
     parser.add_argument(
         "--min-requote-sec",
         default="2.0",
