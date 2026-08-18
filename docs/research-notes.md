@@ -599,3 +599,42 @@ That closes the late-window question from both directions, and closes the last
 untested item on the alpha queue that could be tested from here. Remaining:
 per-venue markout on the newly recorded 15M family (data accumulating), and
 Polymarket (gated on jurisdiction, not on research).
+
+---
+
+# Per-venue markout: the commodity 15M windows beat crypto
+
+11 aligned recordings (2026-08-18), adaptive at 1 contract, simulated markout
+(apply the ~0.25c adverse-selection haircut; rank relatively):
+
+    series        recs  fills  sim markout  in fav   capture
+    KXDOGE15M        7    826   +1.028c      77%      5.63$
+    KXWTI15M         7   1460   +0.961c      86%     11.72$   <- oil, thickest
+    KXSILVER15M      8   1197   +0.737c      81%      8.04$
+    KXBTCD           7    484   +0.732c      94%      3.40$   <- hourly strike
+    KXGOLD15M        8   1037   +0.607c      79%      4.81$
+    KXETHD           3     98   +0.587c      77%
+    KXXRP15M         7   1408   +0.569c      77%      5.31$
+    KXSOL15M         6    947   +0.554c      73%
+    KXBTC15M         9   1325   +0.286c      82%      3.14$   <- what we trade
+    KXETH15M         7   2921   +0.266c      71%      5.51$   <- what we trade
+
+**The two venues we have been trading are the two WORST on the list.** BTC and
+ETH are the thickest, most-competed books, so our resting quotes there sit
+behind the most informed flow. The commodity 15M windows - oil, silver, gold,
+doge - show 2-4x the simulated markout, because they are less picked-over: WTI
+at +0.96c/86% favourable is a different animal from BTC at +0.29c/82%.
+
+Caveats held firmly: these are simulator numbers, ~2x optimistic and blind to
+adverse selection by ~0.25c/fill, so the absolute values are not money. But the
+RANKING is the trustworthy part - every series ran through the identical model,
+so relative order survives the haircut. And thinner books mean lower capacity:
+WTI/silver fill a few hundred contracts a window against ETH's thousands, so
+this is a per-book edge, not a volume story.
+
+**Actionable:** the live session should widen from BTC/ETH to the whole family
+and let live markout re-rank them with real fills. If the sim ranking holds even
+partially, WTI/silver/gold at 80-86% favourable are where the coffee fund gets
+earned - not the crypto majors we started on. Capacity was 2, then 5; this says
+the useful number is closer to 8-10 books, each thin but each an independent
+draw, which is exactly the breadth that beats sizing up.
