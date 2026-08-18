@@ -91,8 +91,10 @@ async def walk(recording: Path) -> dict[str, list[tuple[float, float, float]]]:
         if book is None or book.best_bid is None or book.best_ask is None:
             continue
 
-        bid_sz = book.bids.get(book.best_bid, 0)
-        ask_sz = book.asks.get(book.best_ask, 0)
+        # bids/asks are lists indexed by price tick, not dicts; best_bid/ask are
+        # valid indices by construction.
+        bid_sz = book.bids[book.best_bid]
+        ask_sz = book.asks[book.best_ask]
         total = bid_sz + ask_sz
 
         if total <= 0:
