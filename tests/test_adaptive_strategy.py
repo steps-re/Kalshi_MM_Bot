@@ -175,3 +175,14 @@ def test_obi_skew_lifts_both_quotes_on_a_bid_heavy_book() -> None:
 
 def test_parse_adaptive_params_accepts_obi_skew() -> None:
     assert parse_adaptive_params("obi_skew=85") == {"obi_skew": 85}
+
+
+def test_obi_skew_zero_and_negative_are_valid() -> None:
+    # obi_skew=0 is the A/B control arm; a >1 rule would silently break it.
+    assert parse_adaptive_params("obi_skew=0") == {"obi_skew": 0}
+    assert parse_adaptive_params("obi_skew=-40") == {"obi_skew": -40}
+    # trend_lookback keeps its floor.
+    import pytest
+
+    with pytest.raises(ValueError):
+        parse_adaptive_params("trend_lookback=1")

@@ -302,8 +302,11 @@ def _parse_adaptive_value(name: str, raw_value: str) -> int:
     if name in _BPS_PARAMS and value < 0:
         raise ValueError(f"{name} must be non-negative")
 
-    if name in _INT_PARAMS and value <= 1:
-        raise ValueError(f"{name} must be greater than one")
+    # Only trend_lookback needs a floor (a deque of <=1 has no trend). obi_skew is
+    # a signed coefficient: 0 is the control arm and negatives are a valid
+    # wrong-direction test, so it must NOT inherit the >1 rule.
+    if name == "trend_lookback" and value <= 1:
+        raise ValueError("trend_lookback must be greater than one")
 
     return value
 
