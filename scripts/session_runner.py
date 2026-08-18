@@ -409,7 +409,18 @@ def journal_markout(path: Path) -> tuple[int, float | None]:
     return fills, (sum(values) / len(values) if values else None)
 
 
-async def run(args: argparse.Namespace) -> None:
+# Exit codes let the supervisor distinguish "the run finished, start another"
+# from "a safety limit tripped, stay down". systemd restarts on DEADLINE (and
+# on a crash) but never on FLOOR or PERMANENT - see the unit's
+# RestartPreventExitStatus. Without this, a floor halt and a 12h deadline both
+# exit 0 and auto-restart would drive a drained account straight back into the
+# floor every 30 seconds.
+EXIT_DEADLINE = 0
+EXIT_FLOOR = 10
+EXIT_PERMANENT = 11
+
+
+async def run(args: argparse.Namespace) -> str:
     settings = load_settings()
     environment = settings.environment(prod=True)
     rest = KalshiRestClient(
@@ -422,6 +433,7 @@ async def run(args: argparse.Namespace) -> None:
     deadline = time.time() + args.hours * 3600
     index = 0
     failures = 0
+    stop_reason = "deadline"  # overwritten only by a floor halt or permanent stop
 
     try:
         start_balance = await balance(rest)
@@ -441,6 +453,7 @@ async def run(args: argparse.Namespace) -> None:
                         f"HALT: balance ${current:,.2f} below floor "
                         f"${args.min_balance:,.2f}"
                     )
+                    stop_reason = "floor"
                     break
 
                 tickers = live_windows(
@@ -454,6 +467,7 @@ async def run(args: argparse.Namespace) -> None:
 
                 if failures >= MAX_CONSECUTIVE_FAILURES:
                     log(f"  {failures} consecutive runner failures - stopping")
+                    stop_reason = "permanent"
                     break
 
                 log(
@@ -516,12 +530,14 @@ async def run(args: argparse.Namespace) -> None:
                 # will fail identically forever and must stop.
                 if any(sign in output for sign in PERMANENT_SIGNS):
                     log("  permanent failure - stopping")
+                    stop_reason = "permanent"
                     break
 
                 failures += 1
 
                 if failures >= MAX_CONSECUTIVE_FAILURES:
                     log(f"  {failures} consecutive failures - stopping")
+                    stop_reason = "permanent"
                     break
 
                 log(
@@ -569,6 +585,8 @@ async def run(args: argparse.Namespace) -> None:
     finally:
         await rest.close()
         print(session.report())
+
+    return stop_reason
 
 
 def main() -> None:
@@ -631,7 +649,8 @@ def main() -> None:
     if args.execute and not args.confirm_real_money:
         parser.error("--execute requires --confirm-real-money")
 
-    asyncio.run(run(args))
+    reason = asyncio.run(run(args))
+    sys.exit({"floor": EXIT_FLOOR, "permanent": EXIT_PERMANENT}.get(reason, EXIT_DEADLINE))
 
 
 if __name__ == "__main__":
