@@ -63,15 +63,20 @@ from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR  # noqa: E402
 # most informed flow. WTI/silver/gold/doge are less picked-over. Order here is
 # the trading priority; the session takes the top --max-books that have a live
 # window this cycle. Sim ranking is a hypothesis - live fills re-rank it.
+# Re-ranked by LIVE markout after one session (2026-08-18), which confirmed the
+# sim ranking's shape and named the drag: ETH marked -0.52c/56% on 72 real
+# fills - the single loser, and the thick book we had been anchored to - so it
+# is dropped. BTC survives (positive +0.36c live) but sits last: it is thick,
+# competed, and its 3.6% fill rate means quotes rarely reach the front, so the
+# book cap will seldom get to it once thinner windows are open.
 DEFAULT_FAMILY = (
-    "KXWTI15M",     # +0.96c sim, 86% favourable, thickest of the new ones
-    "KXSILVER15M",  # +0.74c, 81%
-    "KXXRP15M",     # +0.57c, 77%
-    "KXGOLD15M",    # +0.61c, 79%
-    "KXSOL15M",     # +0.55c, 73%
-    "KXDOGE15M",    # +1.03c but thinnest, so lower priority despite top markout
-    "KXBTC15M",     # +0.29c - kept so live data keeps re-ranking it
-    "KXETH15M",     # +0.27c
+    "KXWTI15M",     # live +0.75c / 75%
+    "KXSOL15M",     # live +0.55c / 79%
+    "KXSILVER15M",  # live +0.53c / 79%
+    "KXDOGE15M",    # live +0.52c / 71%
+    "KXGOLD15M",    # live +0.39c / 67%
+    "KXXRP15M",     # live +0.17c / 64% - marginal, kept for now
+    "KXBTC15M",     # live +0.36c / 71% but thick, low fill-rate; last resort
 )
 
 # Failures a long run must NOT survive: they will fail identically forever, so

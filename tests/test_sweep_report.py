@@ -381,8 +381,9 @@ def test_live_windows_caps_at_max_books_in_priority_order() -> None:
 
     import session_runner
 
-    assert session_runner.DEFAULT_FAMILY[0] == "KXWTI15M"  # ranked, commodities first
-    assert "KXBTC15M" in session_runner.DEFAULT_FAMILY      # kept for live re-ranking
-    # The cap parameter exists and the family is longer than a sane cap, so the
-    # cap actually bites.
-    assert len(session_runner.DEFAULT_FAMILY) > 4
+    assert session_runner.DEFAULT_FAMILY[0] == "KXWTI15M"  # top by live markout
+    # ETH marked negative on real fills and was dropped; BTC survives but last.
+    assert "KXETH15M" not in session_runner.DEFAULT_FAMILY
+    assert session_runner.DEFAULT_FAMILY[-1] == "KXBTC15M"
+    # The family exceeds a sane cap, so the cap actually bites.
+    assert len(session_runner.DEFAULT_FAMILY) > 5
