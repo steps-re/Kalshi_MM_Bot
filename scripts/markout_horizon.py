@@ -156,45 +156,51 @@ async def main() -> None:
     rec_dir = Path(sys.argv[2] if len(sys.argv) > 2 else "/var/tmp/kalshi-recordings")
 
     recordings = sorted(p for p in rec_dir.iterdir() if (p / "manifest.json").exists())
-    timeline: dict[str, list[tuple[float, float]]] = defaultdict(list)
+
+    fills = load_fills(journal_dir)
+    fills_by_ticker: dict[str, list[dict]] = defaultdict(list)
+
+    for fill in fills:
+        fills_by_ticker[fill["ticker"]].append(fill)
+
+    # markouts[horizon] and by_arm[arm][horizon] = list of signed cents.
+    # Streamed one recording at a time: a fill's 15M ticker lives in exactly one
+    # recording, so matching per-recording and discarding its timeline keeps
+    # memory flat across the whole corpus (122 recordings would not fit at once).
+    markouts: dict[float, list[float]] = defaultdict(list)
+    by_arm: dict[str, dict[float, list[float]]] = defaultdict(lambda: defaultdict(list))
+    matched: set[int] = set()
 
     for rec in recordings:
         try:
-            for ticker, series in (await mid_timeline(rec)).items():
-                timeline[ticker].extend(series)
+            timeline = await mid_timeline(rec)
         except Exception as error:  # noqa: BLE001
             print(f"  skipped {rec.name}: {type(error).__name__} {error}")
-
-    for series in timeline.values():
-        series.sort()
-
-    fills = load_fills(journal_dir)
-    # markouts[horizon] and by_arm[arm][horizon] = list of signed cents
-    markouts: dict[float, list[float]] = defaultdict(list)
-    by_arm: dict[str, dict[float, list[float]]] = defaultdict(lambda: defaultdict(list))
-    matched = 0
-
-    for fill in fills:
-        series = timeline.get(fill["ticker"])
-
-        if not series:
             continue
 
-        matched += 1
-        sign = 1.0 if fill["action"] == "buy" else -1.0
+        for ticker, series in timeline.items():
+            series.sort()
 
-        for horizon in HORIZONS:
-            future = mid_at(series, fill["at"] + horizon)
+            for fill in fills_by_ticker.get(ticker, ()):
+                sign = 1.0 if fill["action"] == "buy" else -1.0
+                hit = False
 
-            if future is None:
-                continue
+                for horizon in HORIZONS:
+                    future = mid_at(series, fill["at"] + horizon)
 
-            move = sign * (future - fill["yes_price"]) / TICKS_PER_CENT
-            markouts[horizon].append(move)
-            by_arm[fill["arm"]][horizon].append(move)
+                    if future is None:
+                        continue
 
-    print(f"{len(fills)} fills, {matched} matched to a recorded book; "
-          f"{len(timeline)} tickers in the timeline\n")
+                    hit = True
+                    move = sign * (future - fill["yes_price"]) / TICKS_PER_CENT
+                    markouts[horizon].append(move)
+                    by_arm[fill["arm"]][horizon].append(move)
+
+                if hit:
+                    matched.add(id(fill))
+
+    print(f"{len(fills)} fills, {len(matched)} matched to a recorded book; "
+          f"{len(recordings)} recordings scanned\n")
 
     print("markout vs horizon (all fills):")
     print(f"  {'horizon':>8}{'n':>8}{'mean':>10}")
