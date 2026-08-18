@@ -25,7 +25,8 @@ st.set_page_config(
 )
 
 pages = [
-    st.Page("views/opportunity.py", title="The opportunity", icon="📈", default=True),
+    st.Page("views/findings.py", title="What we found", icon="🎯", default=True),
+    st.Page("views/opportunity.py", title="The opportunity", icon="📈"),
     st.Page("views/fee_wall.py", title="Why fees decide it", icon="🧱"),
     st.Page("views/exchange.py", title="What the exchange offers", icon="🔎"),
     st.Page("views/venues.py", title="Kalshi vs the universe", icon="🌐"),

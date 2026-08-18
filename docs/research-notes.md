@@ -638,3 +638,48 @@ partially, WTI/silver/gold at 80-86% favourable are where the coffee fund gets
 earned - not the crypto majors we started on. Capacity was 2, then 5; this says
 the useful number is closer to 8-10 books, each thin but each an independent
 draw, which is exactly the breadth that beats sizing up.
+
+---
+
+# Reconciling Nate's ~$1.50: he did by hand exactly what our bot failed to automate
+
+The open puzzle: Nate made ~$1.50 on $10, using a few dollars, hand-tuning
+settings on BTC15M and "thoughtfully managing queue issues" - while our
+automated version bled. Nothing we measured contradicts his result; it explains
+it, and the explanation is the fix we just deployed.
+
+**The single number that reconciles it: 1,621 maker fills cost $0.01 in fees,
+107 taker fills cost $1.02.** Every profitable thing on Kalshi is a resting
+maker round-trip (buy rests, sell rests, both fill, zero fees, spread captured).
+Every loss is a cross - the taker fee plus the half-spread paid to get out.
+
+What Nate did, translated:
+- **He round-tripped as a maker and did not cross to exit.** "Thoughtfully
+  managing queue issues" is precisely this - rest, hold your place, wait for the
+  other side to fill, do NOT pay to get out. His profitable trades were free
+  maker fills on both legs.
+- **He was selective and tiny.** A human watching a few dollars trades when the
+  setup looks good and sits out otherwise. At a few contracts he was negligible
+  size with no adverse impact, and he could decline the bad fills our always-on
+  bot takes automatically.
+- Mike's own earlier note: Nate ALSO hit "fees ate everything" - in exactly the
+  episodes where he crossed. His net +$1.50 is the maker round-trips minus the
+  cross episodes he learned to avoid.
+
+**Where we diverged from him: automation re-introduced the exact cost he learned
+to avoid by hand.** Our bot quoted continuously (taking every fill, good and
+bad), and then FLATTENED EVERY CYCLE BY CROSSING. We mechanised the one action
+Nate's discretion was avoiding. Positive markout, negative account - because we
+paid to exit what he waited to exit for free.
+
+This is not a story about a secret setting we failed to replicate. It is the
+opposite: he had no edge we lack. He had discretion where we had a mechanical
+flatten, and discretion happened to do the profitable thing. The deployed fix -
+exit passively, cross only the stub - is our attempt to encode his hand-judgment
+as a rule.
+
+Two honest caveats. $1.50 is a handful of round-trips and partly luck at that
+sample size; it is consistent with the mechanism, not proof of a repeatable
+rate. And a human's selectivity - trading only good setups - is itself an edge a
+naive always-on bot does not have, which is a separate lever (quote only when
+the book/flow looks favourable) we have not yet built.
