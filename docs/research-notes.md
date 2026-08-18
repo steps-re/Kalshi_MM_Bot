@@ -499,3 +499,41 @@ Untested, ranked by cost of finding out:
 3. **Window-open dislocation** - the first thin minute after open, priced
    against the prior window's continuous path.
 4. **Polymarket maker-rebate MM** - the ceiling raiser; whole playbook applies.
+
+---
+
+# Polymarket venue recon (agent research, sourced from docs.polymarket.com)
+
+The economics are precisely shaped for what we built, and the blocker is
+jurisdiction, not technology.
+
+**For a resting-quote MM:**
+- Makers pay **zero fees and zero gas** (off-chain EIP-712 orders; operator
+  settles on Polygon). Takers pay C x feeRate x p(1-p), crypto feeRate 0.07 -
+  the same formula as Kalshi.
+- **Liquidity Rewards: ~$1M/month**, concentrated exactly on the 5-min/15-min
+  crypto up/down markets ($550k + $350k monthly), paid daily, scored per-minute
+  by a quadratic closeness-to-mid function with a min-of-both-sides rule that
+  requires two-sided quoting. This program pays people to do what our strategy
+  already does for free on Kalshi.
+- **Maker rebates on top**: 15-25% of taker fees redistributed pro-rata by
+  filled maker volume (crypto 20%).
+- Rate limits: 40 orders/s base (Kalshi 429'd us at ~4/s), scaling with volume.
+- Their short crypto markets settle on a **60-second TWAP of Chainlink** since
+  Aug 7, 2026 (changed after a manipulation incident) - meaning the settlement
+  lock-in analysis we built for Kalshi applies to Polymarket identically.
+- Volume: ~$153M/day in 5/15-min crypto markets (Apr 2026 reporting).
+
+**The blocker:** the US is on the main CLOB's close-only geoblock list,
+IP-enforced - a US person/entity cannot OPEN positions via the API. KYC does
+not unlock it. The CFTC-regulated "Polymarket US" (via the QCEX DCM/DCO
+acquisition) is a separate, intermediated, invite-only venue that does not
+expose the rewarded crypto CLOB markets; Polymarket was still seeking CFTC
+approval to open the main exchange to US users as of April 2026.
+
+**Standing decision for Mike, not for the tooling:** the strategy is runnable
+there today only through a non-US entity, or by waiting for the pending CFTC
+approval. We do not route around geoblocks. Until that changes, Polymarket is
+a monitored option, not an executable one - worth re-checking the CFTC status
+periodically, because when it opens, the playbook and codebase port almost
+unchanged (same fee formula, same TWAP settlement, richer rewards).
