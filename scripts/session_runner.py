@@ -51,7 +51,11 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import poll_record as pr  # noqa: E402
 
 from kalshi_mm_bot.api.auth import KalshiAuth  # noqa: E402
-from kalshi_mm_bot.api.rest import CreateOrderRequest, KalshiRestClient  # noqa: E402
+from kalshi_mm_bot.api.rest import (  # noqa: E402
+    CancelOrderRequest,
+    CreateOrderRequest,
+    KalshiRestClient,
+)
 from kalshi_mm_bot.config import load_settings  # noqa: E402
 from kalshi_mm_bot.live.journal import read_journal  # noqa: E402
 from kalshi_mm_bot.market.bookio import rest_top  # noqa: E402
@@ -181,6 +185,7 @@ async def flatten(
     tickers: tuple[str, ...],
     settle_band_ticks: int = 300,
     settle_max_contracts: int = 2,
+    rest_exit_seconds: float = 45.0,
 ) -> int:
     """Close residual positions, choosing the cheaper of crossing and settling.
 
@@ -249,10 +254,61 @@ async def flatten(
             )
             continue
 
-        # `side` is the BOOK side: a long is closed by an ask crossing into the
-        # bid, a short by a bid crossing into the ask.
-        side = "ask" if position > 0 else "bid"
-        price = top.bid if position > 0 else top.ask
+        # Exit passively FIRST. The account truth this whole runner exists to
+        # measure said the quiet part out loud: 1,621 maker fills cost $0.01 in
+        # fees while 107 taker fills - almost all of them these flattens - cost
+        # $1.02, and that taker drag exceeded the entire paper markout edge.
+        # Crossing to flatten was handing back the edge we collected for free.
+        #
+        # We stop trading with ~7 minutes of window left, so a resting exit at
+        # the touch has time to fill as a maker (zero fee). Only the stub that
+        # has not rested by the deadline is crossed.
+        rest_side = "ask" if position > 0 else "bid"
+        rest_price = top.ask if position > 0 else top.bid  # join the touch we exit into
+
+        try:
+            await rest.batch_create_orders(
+                [
+                    CreateOrderRequest(
+                        ticker=ticker,
+                        side=rest_side,
+                        price=rest_price,
+                        count=abs(position),
+                        client_order_id=f"rflat-{int(time.time() * 1000)}",
+                        post_only=True,
+                    )
+                ]
+            )
+        except Exception as error:
+            log(f"  resting exit rejected for {ticker} ({type(error).__name__})")
+
+        await asyncio.sleep(rest_exit_seconds)
+        remaining = (await rest.get_positions((ticker,))).get(ticker, 0)
+
+        if remaining == 0:
+            log(f"  exited {ticker} passively (free): {position / COUNT_SCALE:+.0f} -> 0")
+            continue
+
+        # Cancel the unfilled resting exit before crossing the stub, or we would
+        # hold two opposing orders.
+        try:
+            resting = await rest.get_orders(ticker=ticker, status="resting")
+            stale = [
+                str(o.get("order_id"))
+                for o in resting
+                if str(o.get("client_order_id", "")).startswith("rflat-")
+            ]
+            if stale:
+                await rest.batch_cancel_orders(
+                    [CancelOrderRequest(order_id=i) for i in stale]
+                )
+        except Exception as error:
+            log(f"  could not cancel resting exit for {ticker} ({type(error).__name__})")
+
+        # Cross the remainder. `side` is the BOOK side: a long is closed by an
+        # ask crossing into the bid, a short by a bid crossing into the ask.
+        side = "ask" if remaining > 0 else "bid"
+        price = top.bid if remaining > 0 else top.ask
 
         try:
             await rest.batch_create_orders(
@@ -261,7 +317,7 @@ async def flatten(
                         ticker=ticker,
                         side=side,
                         price=price,
-                        count=abs(position),
+                        count=abs(remaining),
                         client_order_id=f"flat-{int(time.time() * 1000)}",
                         post_only=False,
                     )
@@ -269,10 +325,10 @@ async def flatten(
             )
             await asyncio.sleep(2.0)
             left = (await rest.get_positions((ticker,))).get(ticker, 0)
-            closed += (abs(position) - abs(left)) // COUNT_SCALE
+            closed += (abs(remaining) - abs(left)) // COUNT_SCALE
             log(
-                f"  flattened {ticker}: {position / COUNT_SCALE:+.0f} -> "
-                f"{left / COUNT_SCALE:+.0f}"
+                f"  crossed stub {ticker}: {remaining / COUNT_SCALE:+.0f} -> "
+                f"{left / COUNT_SCALE:+.0f} (passive exit left {(position - remaining) / COUNT_SCALE:+.0f})"
             )
         except Exception as error:
             log(f"  flatten FAILED for {ticker}: {type(error).__name__} {error}")
