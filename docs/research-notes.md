@@ -433,3 +433,69 @@ That is not a bug to fix. The simulator cannot represent it without knowing why
 somebody traded, and the recordings carry no counterparty identity. It is a
 haircut to apply when reading simulated edge, and it is now printed on every
 sweep report.
+
+---
+
+# Alpha candidate tests, round 2 (offline, 7 aligned recordings)
+
+## BTC -> ETH cross-window lead: DEAD
+
+BTC15M's book is ~20x thicker than ETH15M's, and both windows record
+simultaneously every cycle, so if information reached the thick book first the
+thin one would lag. It does not:
+
+    BTC(past 10s) -> ETH(next 10s):  n=867  corr -0.027
+    control ETH -> BTC:              n=867  corr -0.074
+    after a >=1c BTC move: ETH same-sign 290/594 (48.8%), signed mean -0.014c
+
+Same conclusion as the spot test: everything watching the same underlying
+prices it contemporaneously. There is no cross-asset lag at horizons we can act
+on. That is now three lead-lag hypotheses dead (spot->Kalshi, Kalshi<->Poly,
+BTC->ETH), which is itself a finding: these markets are informationally flat.
+
+## Cancellation-flow signal: ALIVE, with the opposite sign to the hypothesis
+
+Hypothesis was "makers pull the side about to be run over" - bids pulled means
+down. Measured (trailing 10s of side-classified reductions, next 10s mid move,
+n=1,951 windowed samples):
+
+    bids-pulled dominant (>50% imbalance):  next move +0.288c  (n=403)
+    asks-pulled dominant:                   next move -0.077c  (n=339)
+
+Bids being pulled predicts UP. The story consistent with the sign: heavy
+bid-side shrinkage is what upward REPRICING looks like - stale bids cancelled
+and re-placed higher while the mid climbs. So this is largely the 74%
+momentum-continuation effect read from order flow instead of price, but it is
+observable in real time, costs nothing to compute from the feed we already
+consume, and the conditional spread between states is ~0.37c over 10s with the
+states active ~38% of the time. Rough scale: +0.288c on n=403 against ~2c move
+noise is about three standard errors.
+
+Monetisation is the open question, and the failures already on record apply:
+as a taker it cannot beat half-spread plus fee; as a symmetric widen/withhold it
+recreates the momentum defence, which lost. The untested shape is **asymmetric
+joining** - when bid-pulls dominate, place only the join-bid (ride the
+repricing) and let the ask rest wider. That is a one-parameter change testable
+live for a few dollars, and it should be tested live, not in the simulator,
+whose residual 2x optimism sits exactly on fill quality.
+
+## Updated alpha map
+
+Dead by measurement: spot lead, BTC->ETH lead, cross-venue basis (efficient),
+momentum taker (fees), momentum defence (inventory turnover), late-window
+making (informed flow).
+
+Alive by measurement: early-window making (+0.27c, the base business);
+repricing-flow signal (above, monetisation open).
+
+Untested, ranked by cost of finding out:
+1. **Smart flatten** - when |price - settlement certainty| is tiny at cycle end,
+   settling beats paying half-spread+fee to cross. Pure cost reduction, sizeable
+   from existing journals, zero new risk.
+2. **Settlement-average lock-in** - Kalshi settles on a 60s AVERAGE of BRTI, so
+   during the final minute the settlement value is progressively determined by
+   already-observed seconds; variance collapses linearly while books may price
+   it as still open. Needs a spot sidecar recorder next to the book feed.
+3. **Window-open dislocation** - the first thin minute after open, priced
+   against the prior window's continuous path.
+4. **Polymarket maker-rebate MM** - the ceiling raiser; whole playbook applies.
