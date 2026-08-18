@@ -81,6 +81,45 @@ top of the list.
 """
 )
 
+st.header("The paradigm, applied to every market we considered")
+st.markdown(
+    """
+The passive-exit insight is a **screen**, not a tweak. A resting-quote MM keeps
+its edge only where **both** hold: (1) you can rest an exit and it fills before
+you must be flat - needs continuous two-sided flow and time; (2) when a cross is
+unavoidable it is cheap - the taker fee `0.07 x P(1-P)` peaks at mid-price 0.50
+and vanishes in the tails.
+
+Measured cross-rate x cost per book (ledger):
+
+| book | forced-cross rate | fee per fill |
+|---|---:|---:|
+| BTC15M | 9% | 0.107c |
+| ETH15M | 5% | 0.036c |
+| commodities | 2-5% | 0.004-0.031c |
+| WTI15M | 2% | 0.004c |
+
+The crypto majors cross **most often and most expensively** - they live near
+0.50. This is the same fact as their worse markout, seen through cost.
+
+**Full circle:** day one said "quote near an end, where the fee is cheap." The
+maker-free discovery seemed to retire that. The paradigm brings it back for a
+subtler reason - price decides the cost of the *unavoidable* crosses, not the
+entries. Re-scoring the shelved markets:
+
+- **Hourly strike ladders** - the two conditions are anti-correlated across a
+  ladder (deep strikes are cheap to cross but never trade; the ATM strike trades
+  but is near 0.50). A single 15M window that trades AND drifts to the tail as
+  it resolves beats a ladder structurally.
+- **In-play sports / esports** - fail both at once: lumpy directional flow (no
+  resting exit) and near-0.50 during a close game (expensive crosses).
+- **News / political** - the book gaps on news; you can't rest an exit through a
+  jump.
+- **The 15M commodity family** - the sweet spot: continuous flow + tail-drift =
+  free exits, confirmed twice.
+"""
+)
+
 st.header("What's false (killed by measurement)")
 st.markdown(
     """

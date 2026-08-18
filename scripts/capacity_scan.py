@@ -131,6 +131,22 @@ class Candidate:
 
         return self.wait_seconds <= self.seconds_to_close * MAX_WAIT_FRACTION_OF_LIFE
 
+    @property
+    def cross_cost_cents(self) -> float:
+        """Fee to cross one contract at this mid - the cost of a forced exit.
+
+        0.07 x P(1-P) peaks at 0.50 and vanishes in the tails. This is the
+        second condition of the passive-exit paradigm: a book that lives near
+        the middle makes every unavoidable flatten expensive, which is why the
+        crypto majors (near 0.50) lose to the commodity windows (tail-drifting)
+        even when both are reachable.
+        """
+
+        p = self.mid / ONE_DOLLAR
+        return DEFAULT_FEE_MODEL.fee_micros(
+            yes_price=self.mid, count=COUNT_SCALE, is_taker=True
+        ) / 10_000
+
     def taker_exit_cents(self, count: int) -> float:
         """What crossing out would cost, at this market's own price."""
 
@@ -257,17 +273,22 @@ def main() -> None:
     print()
     print(
         f"{'ticker':<30}{'mid':>7}{'spr':>6}{'depth':>9}"
-        f"{'flow/s':>9}{'wait':>9}{'life':>8}{'exit fee':>10}"
+        f"{'flow/s':>9}{'wait':>9}{'life':>8}{'cross$':>10}"
     )
 
     count = args.order_size * COUNT_SCALE
 
-    for c in sorted(reachable, key=lambda c: c.wait_seconds)[:20]:
+    # Ranked by the passive-exit paradigm: among reachable books (condition 1),
+    # cheapest forced-cross first (condition 2). A reachable, tail-priced book is
+    # the target; a reachable near-0.50 book is penalised because its unavoidable
+    # flattens are dear.
+    for c in sorted(reachable, key=lambda c: c.cross_cost_cents)[:20]:
+        flag = "  <- near 0.50, costly exits" if c.cross_cost_cents > 1.0 else ""
         print(
             f"{c.ticker[-29:]:<30}{c.mid / ONE_DOLLAR:>7.2f}"
             f"{c.spread_ticks / 100:>5.1f}c{c.depth:>9,.0f}"
             f"{c.flow_per_second:>9.1f}{c.wait_seconds:>8.0f}s"
-            f"{c.seconds_to_close / 60:>7.0f}m{c.taker_exit_cents(count):>9.2f}c"
+            f"{c.seconds_to_close / 60:>7.0f}m{c.cross_cost_cents:>9.2f}c{flag}"
         )
 
     print()

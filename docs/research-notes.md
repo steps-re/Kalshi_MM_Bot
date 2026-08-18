@@ -718,3 +718,71 @@ Mike's steer: "fine with small and middling but positive." So the target is not
 the best book, it is a clean positive run - BTC15M qualifies, the commodities are
 upside. The engineering goal is keeping exits free and inventory low, not chasing
 the top of the venue ranking.
+
+---
+
+# The passive-exit paradigm, applied to every market we considered
+
+The insight that turned the account positive - never cross to flatten - is not a
+tweak, it is a new screening criterion, and it re-ranks every venue.
+
+## The two conditions a resting-quote MM actually needs
+
+A maker keeps its edge only where BOTH hold:
+
+1. **You can rest an exit and it fills before you must be flat.** Needs
+   *continuous two-sided flow* (someone to trade your resting exit) and *time*
+   (the market does not resolve or gap before it fills).
+2. **When a cross is unavoidable, it is cheap.** The taker fee is
+   `0.07 x P(1-P)` - maximal at mid-price 0.50, near zero in the tails. A book
+   that lives near 0.50 makes every forced cross expensive.
+
+Measured cross-rate x cross-cost per venue (ledger):
+
+    BTC15M   9% crossed, 0.107c/fill  <- worst on BOTH: crosses most, near 0.50
+    ETH15M   5%,         0.036c/fill
+    commods  2-5%,       0.004-0.031c/fill  <- WTI 0.004c: near-free
+    WTI15M   2% crossed, 0.004c/fill  <- best: rarely crosses, tail-priced
+
+This is why the commodity windows win under the paradigm, and it is the SAME
+fact as their better markout, seen through cost instead of drift.
+
+## Full circle: the tail-price preference was right all along
+
+Day one concluded "quote near an end, where the fee is cheap." The maker-free
+discovery seemed to retire that - price does not matter for free resting fills.
+The passive-exit paradigm brings it back for a subtler reason: **price decides
+the cost of the unavoidable crosses.** Tail-priced books are good again, not
+because entries are cheap (free anywhere) but because forced exits are.
+
+## Re-scoring the markets we shelved
+
+- **Hourly strike ladders (KXBTCD etc.)** - RECONSIDER, with a catch. Deep
+  strikes are tail-priced (cheap forced crosses) but never trade (can't rest an
+  exit - condition 1 fails). The ATM strike trades but sits near 0.50 (expensive
+  crosses - condition 2 fails). The two conditions are anti-correlated across a
+  ladder, so a ladder is structurally worse than a single at-the-money window
+  that stays tradeable AND drifts to the tail as it resolves - which is exactly
+  what a 15M window does. This explains why 15M windows beat ladders.
+- **In-play sports / esports** - STILL OUT, now for a sharper reason. Flow is
+  directional and lumpy (a resting exit may never fill - condition 1), and a
+  close game sits near 0.50 (expensive forced crosses - condition 2). They fail
+  both conditions precisely when active.
+- **News / political (KXTRUMPSAY)** - OUT. News gaps the book; you cannot rest
+  an exit through a jump (condition 1 fails discontinuously).
+- **Temperature / weather hourly** - MARGINAL. Slow books give time to rest
+  exits (condition 1 ok) but thin flow means few round trips; tail-priced when
+  the outcome is near-decided (condition 2 ok late). A low-volume positive, if
+  positive at all.
+- **The 15M commodity family** - the sweet spot, confirmed twice over:
+  continuous flow (rest exits fill) + tail-drift as they resolve (cheap forced
+  crosses).
+
+## The new screen
+
+capacity_scan now reports mid-price so the fee-at-mid (forced-cross cost) is
+visible per candidate. The paradigm ranks a book by: continuous two-sided flow
+(condition 1, proxied by depth-relative-to-life reachability, already there) AND
+distance of the mid from 0.50 (condition 2, the cheap-cross screen). A book that
+is reachable AND tail-priced is the target; near-0.50 books are penalised even
+when reachable, because their unavoidable crosses are dear.
