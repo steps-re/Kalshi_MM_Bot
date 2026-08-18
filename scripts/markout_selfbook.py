@@ -78,7 +78,10 @@ def process(path: Path, markouts, by_arm, journal_markouts):
 
         kind = event.get("event")
 
-        if kind == "placed" and event.get("mid") is not None:
+        # "mid" = the fixed-cadence snapshot (dense, unbiased); "placed" is the
+        # older event-driven mid, kept as a fallback for journals recorded before
+        # the snapshot existed. New journals with "mid" events give a clean curve.
+        if kind in ("mid", "placed") and event.get("mid") is not None:
             timeline[event["market_ticker"]].append((at, event["mid"]))
         elif kind == "filled" and event.get("yes_price") is not None:
             fills.append(event | {"at": at})

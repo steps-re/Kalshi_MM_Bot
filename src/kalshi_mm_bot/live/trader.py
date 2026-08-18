@@ -627,6 +627,7 @@ async def run_live_strategy(
     stats = LiveRunStats(dry_run=dry_run)
     risk = RiskMonitor(limits=risk_limits or RiskLimits())
     started = time.monotonic()
+    mid_snapshot_at: dict[str, float] = {}  # per-ticker throttle for the mid log
 
     try:
         _emit(status, f"Connecting to {environment.name} ({'dry-run' if dry_run else 'LIVE'})")
@@ -695,6 +696,18 @@ async def run_live_strategy(
                 seconds_to_close=market_clock.seconds_to_close(update.updated_ticker),
             )
             external_book = order_manager.external_orderbook(book)
+
+            # Throttled (~1/s per ticker) snapshot of our own market mid, so a
+            # dense unbiased timeline exists for honest fill+N horizon markout.
+            if order_manager.journal is not None:
+                now_mono = time.monotonic()
+
+                if now_mono - mid_snapshot_at.get(update.updated_ticker, 0.0) >= 1.0:
+                    mid_snapshot_at[update.updated_ticker] = now_mono
+                    order_manager.journal.record_mid(
+                        market_ticker=update.updated_ticker, book=external_book
+                    )
+
             intents = strategy.on_orderbook(
                 context,
                 update.updated_ticker,

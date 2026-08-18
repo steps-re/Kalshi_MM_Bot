@@ -205,6 +205,18 @@ class OrderJournal:
             }
         )
 
+    def record_mid(self, *, market_ticker: str, book: Orderbook | None) -> None:
+        """A periodic snapshot of our own book's mid, for horizon markout.
+
+        placed/filled mids are event-driven and cluster right after fills (the
+        re-quote a fill triggers), which biased every post-hoc horizon markout and
+        made its control fail. A fixed-cadence snapshot from this one connection is
+        the dense, unbiased timeline that lets fill+5/30/60s markout be measured
+        honestly - the single thing two join-based attempts could not deliver.
+        """
+
+        self._write({"event": "mid", "market_ticker": market_ticker, "mid": book_mid(book)})
+
     def record_cancelled(
         self, *, order_id: str, market_ticker: str, reason: str = ""
     ) -> None:
