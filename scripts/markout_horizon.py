@@ -48,7 +48,13 @@ from kalshi_mm_bot.recording import (  # noqa: E402
 )
 
 TICKS_PER_CENT = ONE_DOLLAR // 100
-HORIZONS = (1.0, 5.0, 10.0, 30.0, 60.0)
+# Horizon 0 = the recorded mid at (or just after) the fill instant. It exists to
+# RECONCILE against the journal's own mid_at_fill: if the recorded t=0 markout
+# matches the journal markout, the join's convention and alignment are correct and
+# a negative curve at longer horizons is real adverse selection; if t=0 is already
+# the sign-flip of the journal's, the join is measuring the wrong book side and the
+# whole curve is an artifact, not a finding.
+HORIZONS = (0.0, 1.0, 5.0, 10.0, 30.0, 60.0)
 
 
 def parse_iso(stamp: str) -> float | None:
@@ -145,6 +151,7 @@ def load_fills(journal_dir: Path) -> list[dict]:
                     "at": at,
                     "yes_price": event["yes_price"],
                     "action": event.get("action"),
+                    "mid_at_fill": event.get("mid_at_fill"),
                 }
             )
 
@@ -169,6 +176,7 @@ async def main() -> None:
     # memory flat across the whole corpus (122 recordings would not fit at once).
     markouts: dict[float, list[float]] = defaultdict(list)
     by_arm: dict[str, dict[float, list[float]]] = defaultdict(lambda: defaultdict(list))
+    journal_markouts: list[float] = []  # the fill's own mid_at_fill, matched fills only
     matched: set[int] = set()
 
     for rec in recordings:
@@ -199,8 +207,32 @@ async def main() -> None:
                 if hit:
                     matched.add(id(fill))
 
+                    if fill["mid_at_fill"] is not None:
+                        journal_markouts.append(
+                            sign * (fill["mid_at_fill"] - fill["yes_price"]) / TICKS_PER_CENT
+                        )
+
     print(f"{len(fills)} fills, {len(matched)} matched to a recorded book; "
           f"{len(recordings)} recordings scanned\n")
+
+    if journal_markouts:
+        jm = st.mean(journal_markouts)
+        rec0 = st.mean(markouts[0.0]) if markouts.get(0.0) else None
+        print("RECONCILIATION (matched fills):")
+        print(f"  journal mid_at_fill markout : {jm:+.3f}c")
+        print(f"  recorded book t=0 markout   : "
+              f"{rec0:+.3f}c" if rec0 is not None else "  recorded t=0: none")
+
+        if rec0 is not None:
+            if abs(rec0 - jm) < 0.15:
+                print("  -> agree: join convention/alignment OK; longer-horizon curve is real.")
+            elif abs(rec0 + jm) < 0.15:
+                print("  -> SIGN-FLIPPED vs journal: the join reads the wrong book side. "
+                      "The curve is an ARTIFACT, not a finding. Fix before trusting it.")
+            else:
+                print("  -> disagree (not a clean flip): alignment/state mismatch. "
+                      "Treat the curve as unverified.")
+        print()
 
     print("markout vs horizon (all fills):")
     print(f"  {'horizon':>8}{'n':>8}{'mean':>10}")
