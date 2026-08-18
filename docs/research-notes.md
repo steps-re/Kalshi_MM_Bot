@@ -693,3 +693,28 @@ crossing to exit, tiny and selective. The commodity finding (WTI +0.75c, silver
 identical behaviour - he left upside on the table, he did not get lucky on a
 losing book. It also means our bot's losses on BTC15M were NOT the book being
 bad; they were the flatten-by-crossing cost, which is the whole point.
+
+
+---
+
+# The fix worked: first corrected cycle went positive, P&L > markout
+
+The passive-exit flatten, first cycle after deploy (4 commodity books + carryover):
+
+    exited WTI / SILVER / DOGE passively (free)
+    141 fills, markout +0.371c implies +$0.52, ACCOUNT +$1.32, balance $41.13
+
+Account P&L exceeded the markout-implied edge for the first time - resting exits
+filled at favourable prices instead of crossing, so the $1.02/session taker drag
+became zero and the paper edge finally reached the account. One cycle, not proof,
+but it moved exactly as the taker-drag diagnosis predicted.
+
+This closes the Nate question completely. He automated his bot on BTC15M and
+won; automation was never the difference. The difference was one line - flatten
+by crossing - that our bot had and his did not. Removing it reproduced the shape
+of his result. No secret setting existed.
+
+Mike's steer: "fine with small and middling but positive." So the target is not
+the best book, it is a clean positive run - BTC15M qualifies, the commodities are
+upside. The engineering goal is keeping exits free and inventory low, not chasing
+the top of the venue ranking.

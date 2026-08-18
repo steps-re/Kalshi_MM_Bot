@@ -40,13 +40,16 @@ He also traded selectively and tiny, so he could decline the bad fills an
 always-on bot takes automatically. He hit "fees ate everything" too - in the
 episodes where he *did* cross. His net is the free round-trips minus those.
 
-**He did this on BTC 15M only - and that confirms the mechanism rather than
-contradicting it.** BTC15M is a middling book by our ranking (+0.36c live markout,
-71% favourable) - not the best, but genuinely positive. A tiny, selective,
-maker-only trader captures that. The commodity finding below means Nate left
-better books on the table, not that his book was unprofitable: the same
-discipline on WTI (+0.75c) or silver (+0.53c) would have paid roughly double for
-the identical behaviour.
+**He did this on BTC 15M only, and he AUTOMATED it** - which removes the last
+hand-wave. It was never human-discretion vs bot. An automated bot can win on
+BTC15M (+0.36c live markout, 71% favourable - middling but genuinely positive).
+Ours lost on the same book for one concrete reason: it **flattened every cycle
+by crossing**, paying the taker fee plus half-spread to exit what Nate's bot let
+fill for free. Nate simply never wrote that line. When we removed it (exit
+passively, cross only the stub), our first corrected cycle went **+$1.32 on the
+account against +$0.52 of markout** - the drag inverted into a tailwind.
+
+There was no secret setting. There was one wrong line in our exit.
 
 **We over-automated.** Our bot quoted continuously and then flattened every
 cycle **by crossing** - mechanising the one action Nate's discretion avoided.
