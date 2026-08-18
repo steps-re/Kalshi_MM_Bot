@@ -12,18 +12,22 @@ st.caption(
 
 st.header("The one-sentence version")
 st.markdown(
-    "**The edge is real and small; the way you exit decides whether you keep it.** "
-    "Resting maker fills mark up ~0.3-0.5c and cost zero fees. Crossing the spread "
-    "to get flat costs a cent-plus every time. Collect the first, avoid the second, "
-    "and you make money. Do the reverse - which a naive always-on bot does by "
-    "flattening every cycle - and positive markout turns into a negative account."
+    r"""**Crossing the spread to flatten was a measured, provable loss; removing it
+stopped the bleed but has not yet proven a profit.** Over 9 cycles the
+flatten-by-crossing bot lost \$0.31 a cycle (t = -2.4, real, not noise).
+Switching to free passive exits moved that to +\$0.09 a cycle over the next
+4 cycles - but that is statistically indistinguishable from zero (t = +0.2), and
+a single lucky +\$1.32 cycle carries it: the other three corrected cycles sum
+-\$0.95 on still-positive markout. What remains after fees is adverse selection,
+and we have not shown it nets positive. The honest status is: we removed a proven
+loser, we have not yet proven a winner."""
 )
 
 st.header("How Nate made ~$1.50 (and why our bot didn't, at first)")
 st.markdown(
-    """
+    r"""
 The puzzle: Nate ran an **automated** bot on BTC 15-minute markets, tuned its
-settings, and ended up **+$1.50 on a few dollars**. Our automated version, with
+settings, and ended up **+\$1.50 on a few dollars**. Our automated version, with
 more infrastructure, bled money on the same book. There was no secret setting.
 
 The ledger reconciles it in one line:
@@ -40,18 +44,22 @@ every cycle to flatten. He hit "fees ate everything" too - in the episodes where
 his settings did cross. His net is the free round-trips minus those.
 
 **He did this on BTC 15M only, and he AUTOMATED it** - which removes the last
-hand-wave. It was never human-discretion vs bot. An automated bot can win on
-BTC15M (+0.36c live markout, 71% favourable - middling but genuinely positive).
-Ours lost on the same book for one concrete reason: it **flattened every cycle
-by crossing**, paying the taker fee plus half-spread to exit what Nate's bot let
-fill for free. Nate simply never wrote that line. When we removed it (exit
-passively, cross only the stub), our first corrected cycle went **+$1.32 on the
-account against +$0.52 of markout** - the drag inverted into a tailwind.
+hand-wave. It was never human-discretion vs bot. Ours lost on the same book for
+one concrete reason: it **flattened every cycle by crossing**, paying the taker
+fee plus half-spread to exit what Nate's bot let fill for free. Nate simply never
+wrote that line.
 
-There was no secret setting. There was one wrong line in our exit - a
-force-flatten that crossed the spread - that his bot's settings never triggered.
-The fix, now live, exits passively (rest the flatten, wait, cross only the stub
-that won't fill). First corrected cycle: **+$1.32 account vs +$0.52 markout.**
+Removing it was necessary but not sufficient. Passive exits stopped the *proven*
+bleed (the crossing bot lost at t = -2.4, real), but the account is still not
+demonstrably positive - see the live scoreboard. The residual leak after fees is
+**adverse selection**: we fill at roughly a 10% rate with 90% of quotes
+cancelled, so the fills we get are disproportionately the ones an informed trader
+crossed into, and a short-horizon markout only partly sees the move that follows.
+Nate's ~$1.50 is consistent with this - a small, real, variance-dominated edge a
+patient automated bot on one book can bank over enough cycles, and that a bot
+paying to cross cannot. We removed the reason we lost. Proving we win is a
+question of many more cycles, not one lucky one: distinguishing a \$0.15/cycle
+edge from zero takes ~250 cycles, because the per-cycle swing (~\$0.84) dwarfs it.
 """
 )
 

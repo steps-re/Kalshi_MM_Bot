@@ -48,15 +48,27 @@ if board is None:
         st.caption(f"(reader said: {err})")
     st.stop()
 
+st.warning(
+    r"""Status: we removed a **proven** loser (crossing to flatten lost at t = -2.4),
+but we have **not** yet proven a winner. The corrected strategy is +\$0.37 over
+4 cycles - indistinguishable from zero, carried by one lucky +\$1.32 cycle. The
+per-cycle swing (~\$0.84) dwarfs any edge, so it takes ~250 cycles to tell a
+\$0.15/cycle edge from luck. Read the number below as a measurement in progress,
+not a verdict.""",
+    icon="⚖️",
+)
+
 balance = board.get("balance")
 stake = board.get("original_stake", 50.0)
 target = board.get("target_balance", 85.0)
 earned = board.get("earned_since_fix", 0.0)
 
+# st.metric values render as plain text (not markdown), so a plain $ is correct
+# here - escaping it would show a literal backslash.
 col1, col2, col3 = st.columns(3)
-col1.metric("Account balance", f"\${balance:,.2f}" if balance is not None else "-",
-            f"{balance - stake:+.2f} vs \${stake:.0f} stake" if balance is not None else None)
-col2.metric("Earned since the fix", f"\${earned:+,.2f}",
+col1.metric("Account balance", f"${balance:,.2f}" if balance is not None else "-",
+            f"{balance - stake:+.2f} vs ${stake:.0f} stake" if balance is not None else None)
+col2.metric("Earned since the fix", f"${earned:+,.2f}",
             f"{board.get('cycles_won', 0)}/{board.get('cycles_total', 0)} cycles up")
 col3.metric("Total fills", f"{board.get('fills_total', 0):,}")
 
@@ -65,8 +77,9 @@ col3.metric("Total fills", f"{board.get('fills_total', 0):,}")
 if balance is not None:
     span = target - stake
     frac = max(0.0, min(1.0, (balance - stake) / span)) if span else 0.0
-    st.progress(frac, text=f"\${balance:,.2f} of the \${target:,.0f} coffee target "
-                           f"(\${stake:.0f} stake + \${board.get('coffee_goal', 35):.0f} of coffees)")
+    # progress text IS markdown, so $ must be escaped (raw f-string keeps \$ literal).
+    st.progress(frac, text=rf"\${balance:,.2f} of the \${target:,.0f} coffee target "
+                           rf"(\${stake:.0f} stake + \${board.get('coffee_goal', 35):.0f} of coffees)")
 
 cycles = board.get("cycles", [])
 
