@@ -683,3 +683,13 @@ sample size; it is consistent with the mechanism, not proof of a repeatable
 rate. And a human's selectivity - trading only good setups - is itself an edge a
 naive always-on bot does not have, which is a separate lever (quote only when
 the book/flow looks favourable) we have not yet built.
+
+**Refinement (Mike: Nate traded BTC15M only).** This confirms rather than
+complicates the reconciliation. BTC15M is middling by our per-venue ranking -
+live markout +0.36c, 71% favourable - positive but not the best. So Nate made
+money on a genuinely positive-markout book by capturing the maker edge without
+crossing to exit, tiny and selective. The commodity finding (WTI +0.75c, silver
++0.53c) means the *same discipline* on a better book would have paid ~2x for
+identical behaviour - he left upside on the table, he did not get lucky on a
+losing book. It also means our bot's losses on BTC15M were NOT the book being
+bad; they were the flatten-by-crossing cost, which is the whole point.

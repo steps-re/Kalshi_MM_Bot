@@ -40,6 +40,14 @@ He also traded selectively and tiny, so he could decline the bad fills an
 always-on bot takes automatically. He hit "fees ate everything" too - in the
 episodes where he *did* cross. His net is the free round-trips minus those.
 
+**He did this on BTC 15M only - and that confirms the mechanism rather than
+contradicting it.** BTC15M is a middling book by our ranking (+0.36c live markout,
+71% favourable) - not the best, but genuinely positive. A tiny, selective,
+maker-only trader captures that. The commodity finding below means Nate left
+better books on the table, not that his book was unprofitable: the same
+discipline on WTI (+0.75c) or silver (+0.53c) would have paid roughly double for
+the identical behaviour.
+
 **We over-automated.** Our bot quoted continuously and then flattened every
 cycle **by crossing** - mechanising the one action Nate's discretion avoided.
 The fix, now live, exits passively (rest the flatten, wait, cross only the stub
