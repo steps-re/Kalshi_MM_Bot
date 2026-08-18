@@ -46,8 +46,20 @@ START = re.compile(r"\[(\d{2}:\d{2}:\d{2})\] starting balance \$([\d,]+\.\d{2})"
 def parse(log_text: str) -> dict:
     cycles: list[dict] = []
     starts: list[float] = []
+    # The corrected (passive-exit) runner is the only one that prints "passively
+    # (free)". Everything before the first such line is the pre-fix experiment
+    # that crossed the spread to flatten and lost - already documented on the
+    # findings page, and not part of the coffee fund. Only count from that
+    # anchor, so a log spanning both eras reports the corrected strategy alone.
+    corrected = False
 
     for line in log_text.splitlines():
+        if "passively (free)" in line:
+            corrected = True
+
+        if not corrected:
+            continue
+
         start = START.search(line)
 
         if start:
