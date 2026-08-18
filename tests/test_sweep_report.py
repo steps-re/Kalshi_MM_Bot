@@ -357,3 +357,19 @@ def test_report_warns_that_simulated_capture_is_not_money() -> None:
 
     assert "never as money" in text
     assert "x live" in text
+
+
+def test_pinned_series_are_always_queried() -> None:
+    """A pinned series absent from DEFAULT_SERIES is silently never fetched.
+
+    The pin filter runs over the candidate list, and candidates come only from
+    DEFAULT_SERIES - after the first expansion the collector spent a night
+    'pinning' six new series it never once queried.
+    """
+
+    import collect_loop
+
+    missing = [s for s in collect_loop.PINNED_SERIES
+               if s not in collect_loop.DEFAULT_SERIES]
+
+    assert not missing, f"pinned but never queried: {missing}"

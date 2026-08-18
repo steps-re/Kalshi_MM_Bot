@@ -84,6 +84,17 @@ DEFAULT_SERIES = (
     # Measured viable.
     "KXBTC15M",
     "KXETH15M",
+    # The rest of the 15-minute family, found by the full-exchange census.
+    # These MUST appear here as well as in PINNED_SERIES: pinning filters the
+    # candidate list, and candidates are fetched from this tuple - a pinned
+    # series absent here is silently never queried, which is exactly what
+    # happened for a night after the first expansion.
+    "KXXRP15M",
+    "KXSOL15M",
+    "KXGOLD15M",
+    "KXWTI15M",
+    "KXSILVER15M",
+    "KXDOGE15M",
     # Same underlying, longer horizon - the control for "is it crypto, or is it
     # the 15-minute structure?"
     "KXBTCD",
