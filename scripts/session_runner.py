@@ -72,7 +72,13 @@ PERMANENT_SIGNS = (
     "error: argument",          # argparse rejected the command
     "error: unrecognized",
     "invalid choice",
-    "401 Unauthorized",
+    # 401 is permanent ONLY when it is actually about credentials. A
+    # header_timestamp_expired 401 is a clock artifact - the laptop slept
+    # mid-session and the first post-wake request carried a pre-sleep
+    # timestamp - and it self-heals on the next request. Matching bare "401"
+    # stopped a six-hour run three cycles in.
+    "invalid_api_key",
+    "api key not found",
     "403 Forbidden",
     "ModuleNotFoundError",
     "ImportError",
