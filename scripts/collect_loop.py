@@ -233,7 +233,22 @@ def rank_candidates(markets: list[dict], shortlist: int) -> list[str]:
 # Series whose markets are always worth a recording slot: rolling short-dated
 # windows, which are both the subject of the research and by far the most
 # active books on the exchange.
-PINNED_SERIES = ("KXBTC15M", "KXETH15M")
+# Expanded 2026-08-18 after a full series census found the 15-minute window
+# family extends far beyond BTC/ETH: gold (470 contracts in one Sunday-night
+# window, ETH-scale), WTI, silver, XRP, SOL, DOGE, BNB, HYPE. A live capacity
+# scan immediately found XRP15M and SOL15M with reachable queues, taking
+# simultaneous deployable books from 2 to 5. Record them all; trade only the
+# ones whose markout gets measured.
+PINNED_SERIES = (
+    "KXBTC15M",
+    "KXETH15M",
+    "KXXRP15M",
+    "KXSOL15M",
+    "KXGOLD15M",
+    "KXWTI15M",
+    "KXSILVER15M",
+    "KXDOGE15M",
+)
 
 
 # A pinned window must have enough life left to be worth recording. Without

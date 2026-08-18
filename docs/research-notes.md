@@ -537,3 +537,30 @@ approval. We do not route around geoblocks. Until that changes, Polymarket is
 a monitored option, not an executable one - worth re-checking the CFTC status
 periodically, because when it opens, the playbook and codebase port almost
 unchanged (same fee formula, same TWAP settlement, richer rewards).
+
+---
+
+# Full-exchange lifecycle census: the 15-minute family is bigger than we knew
+
+A one-pass census of every open market (31 series with median lifetime under
+two hours; an agent-run version of the same census reported zero, a reminder
+that agent output needs the same controls as any other instrument):
+
+    15-minute windows (one open at a time, volume = current window):
+      KXBTC15M 12,052   KXETH15M 480   KXGOLD15M 470   KXWTI15M 224
+      KXSILVER15M 174   KXXRP15M 125   KXSOL15M 114    KXHYPE15M 78
+      KXDOGE15M 59      KXBNB15M 36    KXNEAR15M 10    KXZEC15M 8
+
+    hourly ladders: KXBTCD 22,595 contracts/hr across 318 strikes; KXETHD,
+    KXSOLD, KXBTC, KXETH, KXSOLE similar structure
+    ~1-2h: hourly city temperatures, GOLDH/SILVERH/WTIH, KXEARTHQUAKEM (893)
+
+**Capacity re-measured immediately: 5 reachable queues, up from 2** - BTC15M,
+ETH15M, XRP15M, SOL15M and a near-expiry BTCD hourly strike, all at once.
+GOLD15M (ETH-scale volume on a Sunday night, a *non-crypto* underlying with
+different session dynamics) will qualify at busier hours.
+
+Collector now pins eight 15M series. Order of operations stands: record first,
+measure markout per venue, trade only what measures positive. The whole
+decay-curve/journal/session apparatus applies per-venue unchanged - which is
+the payoff of having built it venue-agnostic.
