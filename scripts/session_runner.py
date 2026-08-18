@@ -302,13 +302,35 @@ async def run(args: argparse.Namespace) -> None:
         log(f"starting balance ${start_balance:,.2f}; floor ${args.min_balance:,.2f}")
 
         while time.time() < deadline:
-            current = await balance(rest)
+            # The runner's own API calls (balance, window discovery, flatten)
+            # get the same transient treatment as the child process. The first
+            # version handled child failures carefully and then died itself on
+            # an httpx.ConnectTimeout raised from this very loop - the
+            # supervisor was the least supervised part of the system.
+            try:
+                current = await balance(rest)
 
-            if current < args.min_balance:
-                log(f"HALT: balance ${current:,.2f} below floor ${args.min_balance:,.2f}")
-                break
+                if current < args.min_balance:
+                    log(
+                        f"HALT: balance ${current:,.2f} below floor "
+                        f"${args.min_balance:,.2f}"
+                    )
+                    break
 
-            tickers = live_windows(args.stop_before + 60, args.stop_before + 660)
+                tickers = live_windows(args.stop_before + 60, args.stop_before + 660)
+            except Exception as error:
+                failures += 1
+
+                if failures >= MAX_CONSECUTIVE_FAILURES:
+                    log(f"  {failures} consecutive runner failures - stopping")
+                    break
+
+                log(
+                    f"  runner network error ({type(error).__name__}), "
+                    f"backing off {args.backoff_seconds:.0f}s"
+                )
+                await asyncio.sleep(args.backoff_seconds)
+                continue
 
             if not tickers:
                 await asyncio.sleep(20)
@@ -380,13 +402,20 @@ async def run(args: argparse.Namespace) -> None:
 
             failures = 0
 
-            closed = (
-                await flatten(rest, tickers, args.settle_band_ticks)
-                if args.execute
-                else 0
-            )
-            await asyncio.sleep(3)
-            after = await balance(rest)
+            try:
+                closed = (
+                    await flatten(rest, tickers, args.settle_band_ticks)
+                    if args.execute
+                    else 0
+                )
+                await asyncio.sleep(3)
+                after = await balance(rest)
+            except Exception as error:
+                # A failed post-cycle read must not kill the session; record the
+                # cycle with what we know and let the floor check next loop
+                # catch any real damage.
+                log(f"  post-cycle error ({type(error).__name__}) - recording cycle without balance")
+                closed, after = 0, current
             fills, mark = journal_markout(journal)
 
             session.cycles.append(
