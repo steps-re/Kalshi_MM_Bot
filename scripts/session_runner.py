@@ -154,6 +154,7 @@ async def flatten(
     rest: KalshiRestClient,
     tickers: tuple[str, ...],
     settle_band_ticks: int = 300,
+    settle_max_contracts: int = 2,
 ) -> int:
     """Close residual positions, choosing the cheaper of crossing and settling.
 
@@ -178,17 +179,43 @@ async def flatten(
         if not position:
             continue
 
-        top = rest_top(
-            pr.get(f"/markets/{ticker}/orderbook", {"depth": 1}).get(
-                "orderbook_fp", {}
+        # Everything per-ticker sits inside its own try: the book fetch used to
+        # sit outside it, so one 429 on ticker #1 abandoned ticker #2 entirely,
+        # with the failure logged as a balance-read problem. Rate limits are
+        # exactly what flattening at window close hits.
+        try:
+            top = rest_top(
+                pr.get(f"/markets/{ticker}/orderbook", {"depth": 3}).get(
+                    "orderbook_fp", {}
+                )
             )
-        )
-
-        if top is None:
-            log(f"  cannot flatten {ticker}: no two-sided book")
+        except Exception as error:
+            log(
+                f"  UNFLATTENED {ticker} ({position / COUNT_SCALE:+.0f}): "
+                f"book fetch failed ({type(error).__name__}) - position rides"
+            )
             continue
 
-        if top.mid <= settle_band_ticks or top.mid >= ONE_DOLLAR - settle_band_ticks:
+        if top is None:
+            # rest_top is None for one-sided/crossed books too, which is common
+            # in a window's last seconds - precisely when this runs. That is an
+            # unflattened position, not a benign skip, and it must read as one.
+            log(
+                f"  UNFLATTENED {ticker} ({position / COUNT_SCALE:+.0f}): "
+                "book empty/one-sided - will settle unchecked"
+            )
+            continue
+
+        near_certain = (
+            top.mid <= settle_band_ticks or top.mid >= ONE_DOLLAR - settle_band_ticks
+        )
+
+        # The band bounds VARIANCE only when size is small: at a 3c mid the
+        # per-contract settlement sd is sqrt(.03*.97) ~ 17c, an order of
+        # magnitude above the 1-2c crossing cost. Cheap per contract, ruinous
+        # per two hundred - so the settle path is size-capped and everything
+        # larger crosses regardless of price.
+        if near_certain and abs(position) <= settle_max_contracts * COUNT_SCALE:
             log(
                 f"  leaving {ticker} ({position / COUNT_SCALE:+.0f}) to settle: "
                 f"mid {top.mid / ONE_DOLLAR:.2f} is inside the certainty band, "

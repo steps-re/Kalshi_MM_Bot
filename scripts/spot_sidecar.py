@@ -71,10 +71,19 @@ def upload(path: Path, bucket: str) -> None:
         log(f"uploaded {path.name}")
         path.unlink()
     except Exception as error:
-        # Keep the file; the next rotation retries the upload implicitly by
-        # leaving it on disk for manual sweep. Losing data to a failed upload
-        # would be worse than using some disk.
+        # Keep the file on disk; sweep_stale retries it at every rotation. An
+        # earlier comment claimed the retry happened "implicitly" - nothing
+        # implicit retries anything, which is how an hour of data would have
+        # quietly never reached GCS after one transient gcloud failure.
         log(f"upload failed for {path.name}: {error}")
+
+
+def sweep_stale(workdir: Path, bucket: str, current_name: str) -> None:
+    """Retry any file a previous failed upload (or crash) left behind."""
+
+    for path in sorted(workdir.glob("spot_*.jsonl")):
+        if path.name != current_name:
+            upload(path, bucket)
 
 
 def main() -> None:
@@ -87,10 +96,21 @@ def main() -> None:
     workdir = Path(args.workdir)
     workdir.mkdir(parents=True, exist_ok=True)
     client = httpx.Client(timeout=5)
-    current_hour = None
-    handle = None
 
     log("spot sidecar starting")
+
+    try:
+        _loop(args, workdir, client)
+    finally:
+        # The partial current hour is the hour containing the windows just
+        # recorded; losing it to a SIGTERM would delete the freshest data.
+        for path in sorted(workdir.glob("spot_*.jsonl")):
+            upload(path, args.bucket)
+
+
+def _loop(args, workdir: Path, client: httpx.Client) -> None:
+    current_hour = None
+    handle = None
 
     while True:
         started = time.time()
@@ -102,6 +122,7 @@ def main() -> None:
                 upload(workdir / f"spot_{current_hour}.jsonl", args.bucket)
 
             current_hour = hour
+            sweep_stale(workdir, args.bucket, f"spot_{hour}.jsonl")
             handle = (workdir / f"spot_{hour}.jsonl").open("a")
             log(f"rotated to spot_{hour}.jsonl")
 
@@ -110,12 +131,23 @@ def main() -> None:
             eth = read_spot(client, "ETH-USD", "ETHUSD")
 
             if btc is not None or eth is not None:
+                # Stamped with the loop START, not time.time() after both
+                # fetches: stamping afterwards files every price up to a full
+                # round-trip late, and in a per-second lock-in study a
+                # systematic sub-second lag is indistinguishable from signal.
                 handle.write(
-                    json.dumps({"t": time.time(), "btc": btc, "eth": eth}) + "\n"
+                    json.dumps({"t": started, "btc": btc, "eth": eth}) + "\n"
                 )
                 handle.flush()
         except Exception as error:
             log(f"tick failed: {type(error).__name__} {error}")
+
+        overrun = time.time() - started - args.interval
+
+        if overrun > 0.5:
+            # A slow venue stretches the period past 1s and load_spot's
+            # per-second keying then drops whole seconds. Visible, not silent.
+            log(f"tick overran by {overrun:.1f}s - gaps will appear at these seconds")
 
         time.sleep(max(0.1, args.interval - (time.time() - started)))
 

@@ -3,61 +3,69 @@
     python scripts/settlement_lockin.py data/aligned data/spot
 
 Kalshi's 15-minute crypto windows settle on the **60-second average** of the
-underlying index before the close. That changes the character of the last
-minute completely: at t seconds into the averaging window, t/60 of the
-settlement value is already *observed and immutable*. The contract's value is
+underlying index before the close. At t seconds into that averaging window,
+t/60 of the settlement is already observed and immutable:
 
     S_hat(t) = (locked_sum + remaining * spot_now) / 60
+    Var      = sigma^2 * m(m+1)(2m+1) / 6 / 60^2      (m seconds remaining)
 
-with uncertainty only over the remaining seconds - and that uncertainty
-collapses to zero as the bell approaches, quadratically faster than the naive
-"time to expiry" a casual model would use.
+(The variance is the remaining Brownian partial sum - independently verified,
+Monte Carlo ratio 1.0018; the covariances carry ~95% of it, so the naive
+sum-of-marginals would understate the sd ~4.5x and manufacture fake edge.)
 
 Hypothesis: the book prices the final minute as if the question were still
-open, so a taker who computes the locked share holds an information advantage
-that grows every second - in exactly the regime where fees are near zero
-(0.04-0.18c round trip in the tails) and the maker edge is measured negative.
-This would be the only late-window idea that does not fight informed flow; it
-would BE the informed flow.
+open, so the locked share is an information advantage that grows every second,
+in the one regime where fees are near zero and the maker edge is measured
+negative. Alpha here is a **slope of (fair - mid) toward the close**; any
+constant offset is index basis (the strike is proxied by spot at window open)
+and proves nothing.
 
-## Method
+## Alignment is the whole game (adversarial review, round 2)
 
-Join the spot sidecar (1s BTC/ETH USD) with an aligned book recording covering
-the same window's final 90 seconds. At each second of the averaging minute:
+The first version of this script had three errors that compounded on the same
+axis - the seconds-remaining alignment - each the same order as the effect
+being measured:
 
-* fair = P(settlement > strike) with settlement mean S_hat(t) and the variance
-  of the remaining Brownian partial sum (sigma estimated from the same spot
-  file, so no external vol input)
-* edge = fair - book mid, when a two-sided book exists
+* mids were epoch-aligned via `created_at_utc`, which is stamped seconds
+  *after* the offset clock starts (connect + subscribe + close-time fetches),
+  shearing every mid a constant few seconds late;
+* `elapsed` counted spot *samples*, not wall seconds, so any gap in the spot
+  file shifted rows into the wrong bucket and overstated the remaining
+  variance (cubic in m);
+* it hand-rolled incremental book reconstruction - the exact bug
+  `market/bookio.py` exists to prevent - whose drift is monotone and
+  indistinguishable from the slope under test.
 
-Report the edge distribution by seconds-remaining, and what a taker paying the
-actual spread and tail fee would have kept.
-
-## Honesty
-
-The sidecar reads Coinbase/Kraken mid, not BRTI. The strike sits wherever it
-sits relative to the true index, so systematic basis shows up as a constant
-offset in `edge`; the *slope* of edge versus seconds-remaining is the part the
-basis cannot fake. n will be small for days - one window per 15 minutes, and
-only windows whose final minute both feeds covered.
+This version reuses the canonical replay (`run_replay_backtest` mid_series),
+aligns epochs with the manifest's `started_at_utc` (the same clock the offsets
+are measured from), computes elapsed from wall time, and **drops any window**
+with more than `MAX_MISSING_SECONDS` spot gaps in its averaging minute rather
+than absorbing gaps into the variance term. Dropped windows are reported as
+dropped; a window silently absorbed is a result silently wrong.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import math
 import re
 import statistics as st
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from kalshi_mm_bot.market.price import ONE_DOLLAR  # noqa: E402
+from kalshi_mm_bot.market.price import ONE_DOLLAR, parse_count_fp  # noqa: E402
+from kalshi_mm_bot.sim import fill_model_from_name, run_replay_backtest  # noqa: E402
+from kalshi_mm_bot.strategy import strategy_from_name  # noqa: E402
 
 AVERAGING_SECONDS = 60
+# More than this many missing spot seconds in the averaging minute and the
+# window is dropped, not patched.
+MAX_MISSING_SECONDS = 5
 
 
 def normal_cdf(x: float) -> float:
@@ -65,7 +73,7 @@ def normal_cdf(x: float) -> float:
 
 
 def load_spot(spot_dir: Path, asset: str) -> dict[int, float]:
-    """Per-second spot, keyed by unix second. Later files win on overlap."""
+    """Per-second spot keyed by unix second; later files win on overlap."""
 
     out: dict[int, float] = {}
 
@@ -84,7 +92,16 @@ def load_spot(spot_dir: Path, asset: str) -> dict[int, float]:
 
 
 def window_close_epoch(ticker: str) -> int | None:
-    """Close time from the ticker name, e.g. ...-26AUG180215-15 -> epoch."""
+    """Close time from the ticker, e.g. KXBTC15M-26AUG172245-45.
+
+    The HHMM is the CLOSE time in US Eastern (verified against live
+    close_time fields: 26AUG171245-45 closes 16:45Z), and the trailing two
+    digits repeat the close minute - they are not the open. Eastern-to-UTC via
+    timedelta, because `hour + 4` raises ValueError for every evening window
+    (ET hours 20-23) and a fixed offset is also an hour wrong in winter; the
+    +4 here is correct only because these are August recordings, and the
+    constant is named so a later reader questions it.
+    """
 
     match = re.search(r"-(\d{2})([A-Z]{3})(\d{2})(\d{2})(\d{2})-", ticker)
 
@@ -93,102 +110,65 @@ def window_close_epoch(ticker: str) -> int | None:
 
     months = {"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
               "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12}
-    year, mon = 2000 + int(match.group(1)), months.get(match.group(2))
-    day, hour, minute = int(match.group(3)), int(match.group(4)), int(match.group(5))
+    mon = months.get(match.group(2))
 
     if mon is None:
         return None
 
-    # Ticker times are US Eastern; August is EDT = UTC-4.
-    return int(datetime(year, mon, day, hour + 4, minute, tzinfo=UTC).timestamp())
+    edt_to_utc = timedelta(hours=4)
+    local = datetime(
+        2000 + int(match.group(1)), mon, int(match.group(3)),
+        int(match.group(4)), int(match.group(5)), tzinfo=UTC,
+    )
+    return int((local + edt_to_utc).timestamp())
 
 
-def book_mids(recording: Path, ticker: str, start_epoch: float) -> dict[int, int]:
-    """Mid per unix second for the ticker, built from snapshots + full replays.
+def recording_offset_epoch(recording: Path) -> float | None:
+    """Epoch of offset zero: the writer's start, NOT manifest creation.
 
-    Uses ws_top on reconstructed ladders per event would repeat the
-    incremental-book mistake; instead sample only SNAPSHOT messages plus a
-    conservative delta-application that resets on each snapshot. Snapshots are
-    rare, so this leans on the deltas - but any second where the implied book
-    is crossed is dropped rather than trusted.
+    `created_at_utc` is stamped after connect/subscribe/close-time fetches, a
+    run-dependent few seconds after the offset clock starts - a constant shear
+    of exactly the axis this study measures.
     """
 
-    bids: dict[int, float] = {}
-    asks: dict[int, float] = {}
-    out: dict[int, int] = {}
-
-    for line in (recording / "events.jsonl").open():
-        try:
-            row = json.loads(line)
-        except ValueError:
-            continue
-
-        message = row.get("msg") or {}
-        inner = message.get("msg") or {}
-
-        if inner.get("market_ticker") != ticker:
-            continue
-
-        kind = message.get("type")
-
-        if kind == "orderbook_snapshot":
-            bids = {int(float(p) * ONE_DOLLAR): float(s)
-                    for p, s in inner.get("yes_dollars_fp") or []}
-            asks = {int(float(p) * ONE_DOLLAR): float(s)
-                    for p, s in inner.get("no_dollars_fp") or []}
-        elif kind == "orderbook_delta":
-            try:
-                price = int(float(inner["price_dollars"]) * ONE_DOLLAR)
-                delta = float(inner["delta_fp"])
-            except (KeyError, TypeError, ValueError):
-                continue
-
-            ladder = bids if inner.get("side") == "yes" else asks
-            ladder[price] = ladder.get(price, 0.0) + delta
-
-            if ladder[price] <= 0:
-                ladder.pop(price, None)
-        else:
-            continue
-
-        offset = row.get("offset_seconds")
-
-        if not isinstance(offset, (int, float)) or not bids or not asks:
-            continue
-
-        bid, ask = max(bids), min(asks)
-
-        if bid < ask:
-            out[int(start_epoch + offset)] = (bid + ask) // 2
-
-    return out
-
-
-def recording_start_epoch(recording: Path) -> float | None:
     try:
         manifest = json.loads((recording / "manifest.json").read_text())
-        return datetime.fromisoformat(
-            manifest["created_at_utc"].replace("Z", "+00:00")
-        ).timestamp()
+        stamp = manifest.get("started_at_utc") or manifest.get("created_at_utc")
+        return datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
     except (OSError, ValueError, KeyError):
         return None
 
 
-def analyse(book_dir: Path, spot_dir: Path) -> str:
+async def mid_series_for(recording: Path):
+    """Canonical replay mid series - the tested reconstruction path."""
+
+    result = await run_replay_backtest(
+        recording,
+        strategy=strategy_from_name(
+            "dumb", count=parse_count_fp("1"), max_position=parse_count_fp("1")
+        ),
+        fill_model=fill_model_from_name("pessimistic"),
+        speed_multiplier=0,
+    )
+    return result.mid_series
+
+
+async def analyse(book_dir: Path, spot_dir: Path) -> str:
     spots = {"btc": load_spot(spot_dir, "btc"), "eth": load_spot(spot_dir, "eth")}
-    rows: list[tuple[int, float, float]] = []  # (secs_remaining, edge_cents, fair)
-    windows = 0
+    rows: list[tuple[int, float]] = []  # (secs_remaining, edge_cents)
+    windows = dropped_gaps = dropped_uncovered = 0
 
     for recording in sorted(book_dir.iterdir()):
-        start = recording_start_epoch(recording)
-
-        if start is None:
+        if not (recording / "manifest.json").exists():
             continue
 
-        try:
-            manifest = json.loads((recording / "manifest.json").read_text())
-        except (OSError, ValueError):
+        epoch0 = recording_offset_epoch(recording)
+
+        if epoch0 is None:
             continue
+
+        manifest = json.loads((recording / "manifest.json").read_text())
+        series_by_ticker = None  # lazy: replay only when a window qualifies
 
         for ticker in manifest.get("tickers", []):
             if "15M" not in ticker:
@@ -201,45 +181,68 @@ def analyse(book_dir: Path, spot_dir: Path) -> str:
             if close is None:
                 continue
 
-            # Strike: the window's open price rounded per Kalshi's rule is not
-            # in the ticker; the last two digits are the open minute. The
-            # strike equals the index price at window open, which we can only
-            # approximate by spot at open time. Skip windows where the sidecar
-            # was not yet running at open.
             open_epoch = close - 900
 
             if open_epoch not in spot:
+                dropped_uncovered += 1
+                continue
+
+            averaging_start = close - AVERAGING_SECONDS
+            missing = [t for t in range(averaging_start, close) if t not in spot]
+
+            if len(missing) > MAX_MISSING_SECONDS:
+                dropped_gaps += 1
+                continue
+
+            if series_by_ticker is None:
+                series_by_ticker = await mid_series_for(recording)
+
+            series = series_by_ticker.get(ticker)
+
+            if series is None or len(series.offsets) < 200:
+                dropped_uncovered += 1
                 continue
 
             strike = spot[open_epoch]
-            mids = book_mids(recording, ticker, start)
+            # Sigma from contiguous 1-second diffs only: a diff across a hole
+            # is not a 1-second diff, and treating it as one inflates vol.
+            path = [(t, spot[t]) for t in range(open_epoch, close) if t in spot]
+            diffs = [b - a for (t1, a), (t2, b) in zip(path, path[1:]) if t2 - t1 == 1]
 
-            # Estimate per-second sigma from this window's own spot path.
-            path = [spot[t] for t in range(open_epoch, close) if t in spot]
-
-            if len(path) < 300:
+            if len(diffs) < 300:
+                dropped_gaps += 1
                 continue
 
-            diffs = [b - a for a, b in zip(path, path[1:])]
             sigma = st.pstdev(diffs) or 1e-9
             windows += 1
-            averaging_start = close - AVERAGING_SECONDS
 
             for t in range(averaging_start, close):
-                if t not in spot or t not in mids:
+                if t in missing:
                     continue
 
-                observed = [spot[k] for k in range(averaging_start, t + 1) if k in spot]
-                locked = sum(observed)
-                elapsed = len(observed)
-                remaining = AVERAGING_SECONDS - elapsed
+                offset = t - epoch0
+
+                if not series.covers(offset):
+                    continue
+
+                mid = series.mid_at(offset)
+
+                if mid is None:
+                    continue
+
+                # Elapsed is WALL time inside the averaging minute; a missing
+                # second reduces the locked sum's sample but not the clock.
+                elapsed_seconds = t - averaging_start + 1
+                remaining = AVERAGING_SECONDS - elapsed_seconds
 
                 if remaining <= 0:
                     continue
 
+                observed = [spot[k] for k in range(averaging_start, t + 1) if k in spot]
+                # Impute the few permitted missing seconds at the mean of what
+                # was seen, never at the current spot.
+                locked = sum(observed) + (elapsed_seconds - len(observed)) * st.mean(observed)
                 mean_settle = (locked + remaining * spot[t]) / AVERAGING_SECONDS
-                # Variance of the remaining Brownian partial sum, scaled into
-                # the 60-second average.
                 var_sum = sigma * sigma * remaining * (remaining + 1) * (2 * remaining + 1) / 6
                 std_settle = math.sqrt(var_sum) / AVERAGING_SECONDS
 
@@ -247,17 +250,20 @@ def analyse(book_dir: Path, spot_dir: Path) -> str:
                     continue
 
                 fair = normal_cdf((mean_settle - strike) / std_settle)
-                mid_cents = mids[t] / (ONE_DOLLAR / 100)
-                rows.append((remaining, (fair * 100) - mid_cents, fair))
+                rows.append((remaining, fair * 100 - mid / (ONE_DOLLAR / 100)))
 
-    lines = [f"{windows} window(s) with joint spot+book coverage; {len(rows)} scored seconds"]
+    lines = [
+        f"{windows} window(s) scored; dropped {dropped_gaps} for spot gaps, "
+        f"{dropped_uncovered} uncovered; {len(rows)} scored seconds"
+    ]
 
     if not rows:
-        lines.append("no joint coverage yet - the sidecar needs to span a window open AND close")
+        lines.append("no joint coverage yet - sidecar must span a window's open AND close")
         return "\n".join(lines)
 
-    for label, lo, hi in (("45-60s", 45, 61), ("30-45s", 30, 45), ("15-30s", 15, 30), ("5-15s", 5, 15), ("<5s", 0, 5)):
-        bucket = [e for r, e, _ in rows if lo <= r < hi]
+    for label, lo, hi in (("45-60s", 45, 61), ("30-45s", 30, 45),
+                          ("15-30s", 15, 30), ("5-15s", 5, 15), ("<5s", 0, 5)):
+        bucket = [e for r, e in rows if lo <= r < hi]
 
         if bucket:
             lines.append(
@@ -266,15 +272,16 @@ def analyse(book_dir: Path, spot_dir: Path) -> str:
             )
 
     lines.append(
-        "A constant offset across buckets is index basis (the strike is proxied "
-        "by spot at open); alpha is a SLOPE toward the close that survives it."
+        "A constant offset across buckets is index basis (strike proxied by spot "
+        "at open); alpha is a SLOPE toward the close that survives it. Alignment "
+        "error compounds on this exact axis - treat sub-2c slopes as noise."
     )
     return "\n".join(lines)
 
 
 def main() -> None:
     book_dir, spot_dir = Path(sys.argv[1]), Path(sys.argv[2])
-    print(analyse(book_dir, spot_dir))
+    print(asyncio.run(analyse(book_dir, spot_dir)))
 
 
 if __name__ == "__main__":
