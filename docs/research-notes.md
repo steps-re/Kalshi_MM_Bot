@@ -564,3 +564,38 @@ Collector now pins eight 15M series. Order of operations stands: record first,
 measure markout per venue, trade only what measures positive. The whole
 decay-curve/journal/session apparatus applies per-venue unchanged - which is
 the payoff of having built it venue-agnostic.
+
+---
+
+# Settlement lock-in: tested, not exploitable at our measurement precision
+
+First harvest with the hardened pipeline (13 windows, 366 scored final-minute
+seconds, zero dropped for spot gaps):
+
+    45-60s remaining  n=178   mean -6.42c   median -0.15c
+    30-45s            n=104   mean -6.12c   median -0.22c
+    15-30s            n= 58   mean -2.81c   median -1.12c
+     5-15s            n= 24   mean -0.26c   median -0.23c
+      <5s             n=  2   mean -0.43c   median -0.43c
+
+The medians are the story: within ~1c of zero at every horizon, inside the
+stated noise floor. The large negative *means* early are a fat left tail in a
+few windows - the signature of strike-proxy error (our strike is spot at open,
+and near the money a $20 proxy error swings the model fair violently), not of
+market error: fair is the fragile quantity in this join, the mid is not.
+
+**Conclusion: the book prices the final minute correctly to within our ~1-2c
+precision.** No slope toward the close survives the noise floor.
+
+The unifying read, and it is worth keeping: this result and the late-window
+maker markout are the same fact seen from two ends. Late-window makers measure
+-0.11c/fill because someone informed is picking them off; the lock-in taker
+finds no free edge because *that someone is already doing this exact
+arithmetic*. The lock-in trade exists - it is just already crowded, and its
+profits are the losses our maker measured. Beating the incumbents would need
+the true settlement feed (BRTI) and the true strike, not proxies of both.
+
+That closes the late-window question from both directions, and closes the last
+untested item on the alpha queue that could be tested from here. Remaining:
+per-venue markout on the newly recorded 15M family (data accumulating), and
+Polymarket (gated on jurisdiction, not on research).
