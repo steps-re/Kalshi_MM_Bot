@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import subprocess
 import sys
 import time
@@ -127,6 +128,7 @@ class Cycle:
     fills: int
     markout_cents: float | None
     flattened: int
+    arm: str = ""
 
     @property
     def pnl(self) -> float:
@@ -434,6 +436,11 @@ async def run(args: argparse.Namespace) -> str:
     index = 0
     failures = 0
     stop_reason = "deadline"  # overwritten only by a floor halt or permanent stop
+    ab_edges = [int(x) for x in args.ab_edges.split(",") if x.strip()]
+    ab_ledger = journals / "ab_ledger.jsonl"
+
+    if ab_edges:
+        log(f"A/B on min_profit_edge {ab_edges}, round-robin per cycle -> {ab_ledger}")
 
     try:
         start_balance = await balance(rest)
@@ -484,7 +491,21 @@ async def run(args: argparse.Namespace) -> str:
             index += 1
             journal = journals / f"cycle{index:03d}.jsonl"
             duration = max(60, args.window_seconds)
-            log(f"cycle {index}: {', '.join(t[-18:] for t in tickers)} for {duration}s")
+
+            # Round-robin the A/B arm by cycle so each arm sees the same venue
+            # basket and differs only in regime, which the rotation balances.
+            if ab_edges:
+                edge = ab_edges[(index - 1) % len(ab_edges)]
+                arm_label = f"edge{edge}"
+                arm_params = ["--adaptive-param", f"min_profit_edge={edge}"]
+            else:
+                arm_label = "default"
+                arm_params = []
+
+            log(
+                f"cycle {index} [{arm_label}]: "
+                f"{', '.join(t[-18:] for t in tickers)} for {duration}s"
+            )
 
             command = [
                 sys.executable,
@@ -503,6 +524,7 @@ async def run(args: argparse.Namespace) -> str:
                 str(journal),
                 "--min-requote-sec",
                 str(args.min_requote_sec),
+                *arm_params,
             ]
 
             if args.execute:
@@ -574,6 +596,7 @@ async def run(args: argparse.Namespace) -> str:
                     fills=fills,
                     markout_cents=mark,
                     flattened=closed,
+                    arm=arm_label,
                 )
             )
             log(
@@ -581,6 +604,30 @@ async def run(args: argparse.Namespace) -> str:
                 f"{f'{mark:+.3f}c' if mark is not None else '-'}  "
                 f"P&L {after - current:+.2f}  balance ${after:,.2f}"
             )
+
+            # Durable A/B ledger: one row per cycle, appended so it survives the
+            # 12h restart. This, not the overwritten per-cycle journals, is what
+            # ab_report.py reads to compare arms across days.
+            try:
+                with ab_ledger.open("a") as handle:
+                    handle.write(
+                        json.dumps(
+                            {
+                                "at": datetime.now(UTC).isoformat(timespec="seconds"),
+                                "index": index,
+                                "arm": arm_label,
+                                "tickers": list(tickers),
+                                "fills": fills,
+                                "markout_cents": mark,
+                                "pnl": round(after - current, 4),
+                                "balance": round(after, 4),
+                            }
+                        )
+                        + "\n"
+                    )
+            except OSError as error:
+                log(f"  A/B ledger write failed ({type(error).__name__}) - cycle still recorded")
+
             print(session.report())
     finally:
         await rest.close()
@@ -593,6 +640,18 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hours", type=float, default=3.0)
     parser.add_argument("--strategy", default="phased:adaptive")
+    parser.add_argument(
+        "--ab-edges",
+        default="",
+        help=(
+            "Comma-separated min_profit_edge values to A/B, e.g. '25,75,150'. Each "
+            "cycle round-robins to the next value (all books that cycle share it), so "
+            "every arm sees the same venue basket and only the regime differs, which "
+            "round-robin balances. min_profit_edge is how far from mid we quote: wider "
+            "means fewer, less adversely-selected fills - the direct lever on the "
+            "residual leak. Empty = no A/B, use the strategy's own default."
+        ),
+    )
     parser.add_argument(
         "--series",
         nargs="+",
