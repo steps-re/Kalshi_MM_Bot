@@ -628,6 +628,23 @@ async def run(args: argparse.Namespace) -> str:
             except OSError as error:
                 log(f"  A/B ledger write failed ({type(error).__name__}) - cycle still recorded")
 
+            # Preserve the per-fill journal off-box before the next session
+            # overwrites cycle{index}.jsonl. This is the ONLY record of mid-at-fill
+            # and queue depth per fill - the data the markout slicer needs to find
+            # where adverse selection bites (by queue position, price, time-in-
+            # cycle). Losing it on every 12h restart was silently discarding the
+            # calibration set. Unique name = arm + timestamp so restarts accumulate.
+            if args.journal_bucket and journal.exists():
+                stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+                dest = f"gs://{args.journal_bucket}/journals/jrnl_{stamp}_{arm_label}.jsonl"
+                try:
+                    subprocess.run(
+                        ["gcloud", "storage", "cp", str(journal), dest],
+                        check=True, capture_output=True, timeout=60,
+                    )
+                except (subprocess.SubprocessError, OSError) as error:
+                    log(f"  journal upload failed ({type(error).__name__}) - kept on disk")
+
             print(session.report())
     finally:
         await rest.close()
@@ -640,6 +657,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hours", type=float, default=3.0)
     parser.add_argument("--strategy", default="phased:adaptive")
+    parser.add_argument(
+        "--journal-bucket",
+        default="",
+        help=(
+            "GCS bucket to preserve each cycle's per-fill journal to before the "
+            "next session overwrites it. Empty = keep on disk only. These journals "
+            "are the calibration set for markout_slices.py (queue/price/time toxicity)."
+        ),
+    )
     parser.add_argument(
         "--ab-edges",
         default="",
