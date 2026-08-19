@@ -176,6 +176,29 @@ surviving slices stop surviving, they were search artefacts.
 """
 )
 
+st.header("Reviewed by hostile reviewers, 2026-08-19")
+st.markdown(
+    """
+Four adversarial reviews were run on this analysis, paid nothing for agreeing
+and told to destroy it. Their findings and the tests that followed are in
+`docs/adversarial/` in the repo. Two attacks landed hard enough to be worth
+testing, and the results are on **Where the money might be**:
+
+- **"The dose-response is mechanical spread recovery, not a forecast."**
+  Refuted. Re-run on pure mid-to-mid returns, which contain no spread capture,
+  the gradient is unchanged: control +0.013c against +0.861c at extreme
+  imbalance. It also survives stratifying by spread, and 88% of 641 individual
+  markets are positive against 51% for the control.
+- **"The exit assumes a resting order fills."** Upheld, and it is the live
+  question. An exit that fills is break-even; an exit that has to cross loses
+  2.19c against a 0.861c forecast.
+
+The useful lesson is not that the reviews were right or wrong. It is that both
+attacks were answerable with data already in hand, and neither had been asked
+before something was published.
+"""
+)
+
 st.header("Where we are confident, and why")
 st.markdown(
     f"""

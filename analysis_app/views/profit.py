@@ -221,6 +221,62 @@ six shrugs.
 """
 )
 
+st.header("Adversarially attacked, then tested")
+st.markdown(
+    """
+Four hostile reviewers were paid nothing for agreeing and asked to destroy this.
+They converged on two attacks. Both were then tested against the data rather
+than argued about.
+
+**Attack: the gradient is mechanical, not a forecast.** At extreme imbalance the
+side you cross is thin, so buying the ask and marking the exit at the ask thirty
+seconds later profits when that thin level is consumed. No prediction required.
+The proposed test was to re-run on pure mid-to-mid returns, where the gradient
+was predicted to "flatten into noise".
+"""
+)
+st.dataframe(
+    [
+        {"imbalance": "control (<0.2)", "TOUCH (audited)": "-0.905c",
+         "MID-TO-MID (no spread capture)": "+0.013c", "CROSS out": "-3.089c"},
+        {"imbalance": "0.2 - 0.5", "TOUCH (audited)": "-0.725c",
+         "MID-TO-MID (no spread capture)": "+0.179c", "CROSS out": "-2.893c"},
+        {"imbalance": "0.5 - 0.7", "TOUCH (audited)": "-0.513c",
+         "MID-TO-MID (no spread capture)": "+0.376c", "CROSS out": "-2.681c"},
+        {"imbalance": "0.7 - 0.9", "TOUCH (audited)": "-0.335c",
+         "MID-TO-MID (no spread capture)": "+0.546c", "CROSS out": "-2.506c"},
+        {"imbalance": "above 0.9", "TOUCH (audited)": "-0.014c",
+         "MID-TO-MID (no spread capture)": "+0.861c", "CROSS out": "-2.193c"},
+    ],
+    hide_index=True,
+)
+st.markdown(
+    """
+It does not flatten. The middle column contains no spread capture whatsoever,
+and the control sits at zero while extreme imbalance forecasts **+0.861c**. Two
+follow-up checks, also the reviewers' own:
+
+- **Not a volatility regime.** Stratified by spread the gradient is the same at
+  1c (-0.005c to +1.067c) and at 2c (-0.035c to +0.887c).
+- **Not a few trending markets.** The share of individual markets with a
+  positive forecast runs 51%, 63%, 72%, 78%, **88%** across the bands, and the
+  median tracks the mean. A control at 51% is a coin flip, which is exactly what
+  no signal should look like.
+
+A signed mean cannot come from volatility, which is symmetric, and 88% of 641
+independent markets is not book geometry. **The signal is real.**
+"""
+)
+st.warning(
+    "**The other attack stands, and it is the one that matters.** The audited "
+    "number assumes a resting exit fills. Read the table again: at the strongest "
+    "imbalance, an exit that fills is break-even (-0.014c) and an exit that has "
+    "to cross loses 2.19c. Everything depends on that fill, and pooled across "
+    "the whole exchange the forecast does not cover the round trip. It only pays "
+    "where the fee is near zero, which is the 2-5c near-expiry cell.",
+    icon="⚠️",
+)
+
 st.header("Live, with real money")
 st.markdown(
     r"""
@@ -240,9 +296,21 @@ Worst case per trade is the entry price, two to five cents, because there is no
 leverage and a sell at 97c is a buy of NO at 3c. Thirty trades all losing the
 maximum is about a dollar and a half.
 
-**What is still unknown is size.** One contract was never going to move a book
-showing 74. Ten and twenty-five contracts are the tests that decide whether this
-is worth running, and they are the next thing to do.
+**The exits are the problem.** The first completed trade rested its exit at the
+touch for forty seconds, did not fill, and had to cross - which is exactly the
+CROSS column above, and it cost 2c. That is one trade and proves nothing on its
+own, but it is the number to watch, and it is the number the adversarial review
+said would decide this.
+
+Two things are still unknown, in this order:
+
+1. **The passive-exit fill rate.** If a resting exit fills most of the time the
+   strategy is roughly break-even overall and positive in the cheap cell. If it
+   rarely fills, the round trip costs 2.19c against a 0.861c forecast and the
+   answer is a clean no.
+2. **Size.** One contract was never going to move a book showing 74. Ten and
+   twenty-five contracts come after the exit question is settled, because there
+   is no point measuring capacity for a strategy that cannot exit.
 """
 )
 
