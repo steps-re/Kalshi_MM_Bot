@@ -36,7 +36,10 @@ _BPS_PARAMS = frozenset(
         "liquidity_fraction_bps",
     }
 )
-_INT_PARAMS = frozenset({"trend_lookback", "obi_skew"})
+# obi_gate is consumed by the obigate: wrapper in the factory, never by this
+# strategy - it lives here only so the shared key=value parser accepts it.
+# Zero disables the gate (the control arm), so like obi_skew it takes no floor.
+_INT_PARAMS = frozenset({"trend_lookback", "obi_skew", "obi_gate"})
 ADAPTIVE_PARAMETER_NAMES = tuple(
     sorted(_COUNT_PARAMS | _PRICE_PARAMS | _BPS_PARAMS | _INT_PARAMS)
 )

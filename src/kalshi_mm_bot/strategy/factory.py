@@ -15,6 +15,7 @@ STRATEGY_NAMES: tuple[str, ...] = ("horizon", "adaptive", "dumb")
 
 from kalshi_mm_bot.strategy.defended import MomentumDefendedStrategy
 from kalshi_mm_bot.strategy.momentum_taker import MomentumTakerStrategy
+from kalshi_mm_bot.strategy.obi_gate import OBIGatedStrategy
 from kalshi_mm_bot.strategy.phase import WindowPhaseStrategy
 
 
@@ -54,6 +55,24 @@ def strategy_from_name(
                 max_position=max_position,
                 adaptive_params=adaptive_params,
             )
+        )
+
+    # "obigate:<name>" pulls the endangered quote when |OBI| clears the
+    # threshold. The threshold rides in as the adaptive param `obi_gate`
+    # (hundredths; 0 disables), which is POPPED here so the inner strategy
+    # never sees a parameter it does not own. This is what lets one strategy
+    # string serve both A/B arms: `--ab-arms 'obi_gate=0;obi_gate=90'`.
+    if normalized.startswith("obigate:"):
+        params = dict(adaptive_params or ())
+        threshold = int(params.pop("obi_gate", 90))
+        return OBIGatedStrategy(
+            inner=strategy_from_name(
+                normalized.split(":", 1)[1],
+                count=count,
+                max_position=max_position,
+                adaptive_params=params,
+            ),
+            threshold_hundredths=threshold,
         )
 
     if normalized.startswith(("defended:", "symmetric:")):
