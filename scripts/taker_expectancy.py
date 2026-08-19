@@ -58,6 +58,14 @@ TICKS_PER_CENT = ONE_DOLLAR // 100
 PRICE_BANDS = (("tail<.15", 0.0, 0.15), (".15-.35", 0.15, 0.35),
                ("mid.35-.65", 0.35, 0.65), (".65-.85", 0.65, 0.85),
                ("tail>.85", 0.85, 1.01))
+# The fee is 7*P*(1-P), so it collapses faster than linearly into the tail:
+# 0.89c at P=.15, 0.33c at .05, 0.14c at .02. The original bands bottomed out at
+# "<.15", which averages a 0.5c fee and hides everything below it. These split
+# the cheap end, where any surviving edge has to be.
+PRICE_BANDS_FINE = ((" <.02", 0.0, 0.02), (".02-.05", 0.02, 0.05),
+                    (".05-.10", 0.05, 0.10), (".10-.20", 0.10, 0.20),
+                    (".20-.35", 0.20, 0.35), (".35-.65", 0.35, 0.65),
+                    (" >.65", 0.65, 1.01))
 EXITS = ("touch", "mid", "cross")
 MIN_TRIGGERS = 30
 MIN_WINDOWS = 3          # a slice living in one or two windows is one price path
@@ -198,7 +206,8 @@ class Slice:
 
 
 def load(path: Path, start: float | None, end: float | None,
-         min_size: float = 0.0, phase: tuple[float, float] | None = None):
+         min_size: float = 0.0, phase: tuple[float, float] | None = None,
+         side: str | None = None, bands=PRICE_BANDS):
     """Stream the cache into per-slice accumulators. Flat memory in the corpus.
 
     `min_size` is a floor on the contracts resting on the side being crossed. The
@@ -236,6 +245,9 @@ def load(path: Path, start: float | None, end: float | None,
             if min_size and row["crossable"] < min_size:
                 continue
 
+            if side and row["side"] != side:
+                continue
+
             if phase is not None:
                 to_close = row.get("to_close")
 
@@ -255,7 +267,7 @@ def load(path: Path, start: float | None, end: float | None,
             # those two opposite positions in one bucket, where any
             # price-conditional structure cancels in the mean.
             long_equiv = entry if buy else ONE_DOLLAR - entry
-            price_band = band_of(PRICE_BANDS, long_equiv / ONE_DOLLAR)
+            price_band = band_of(bands, long_equiv / ONE_DOLLAR)
 
             if price_band is None:
                 continue
@@ -755,6 +767,10 @@ def main() -> None:
     parser.add_argument("--phase", nargs=2, type=float, metavar=("LO", "HI"),
                         help="seconds-to-close window, e.g. --phase 360 900 for the "
                              "first half of a 15-minute market")
+    parser.add_argument("--side", choices=("buy", "sell"),
+                        help="the signal is one-sided; test each half separately")
+    parser.add_argument("--fine-bands", action="store_true",
+                        help="split the cheap tail where the fee collapses")
     args = parser.parse_args()
 
     if args.census:
@@ -773,7 +789,8 @@ def main() -> None:
 
     slices, _venue_windows, hours, tickers, by_lead, kept, total = load(
         args.cache, start, end, args.min_size,
-        tuple(args.phase) if args.phase else None,
+        tuple(args.phase) if args.phase else None, args.side,
+        PRICE_BANDS_FINE if args.fine_bands else PRICE_BANDS,
     )
 
     if not kept:

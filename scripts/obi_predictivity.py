@@ -25,6 +25,7 @@ microstructure, and it has to be asked separately.
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import statistics as st
 import sys
@@ -186,21 +187,23 @@ def clustered_slope(by_ticker: dict, column: int = 1) -> tuple[float, float, int
     return (mean, se, len(per_market))
 
 
-def report(pairs_by_venue: dict, by_ticker: dict, horizon: float) -> None:
+def report(pairs_by_venue: dict, by_ticker: dict, horizon: float) -> dict:
     print(f"\n=== horizon {horizon:.0f}s ===")
     allpairs = [p for v in pairs_by_venue.values() for p in v]
 
     if not allpairs:
         print("  no pairs")
-        return
+        return {}
 
     print("  forward mid move (cents) by OBI bucket, pooled:")
+    buckets = []
 
     for label, lo, hi in OBI_BUCKETS:
         vals = [row[1] for row in allpairs if lo <= row[0] < hi]
 
         if vals:
             print(f"    {label:<24}n={len(vals):>7}  mean {st.mean(vals):+.3f}c")
+            buckets.append({"label": label, "n": len(vals), "mean": st.mean(vals)})
 
     mean, se, markets = clustered_slope(by_ticker)
     biased_mean, _, _ = clustered_slope(by_ticker, column=2)
@@ -214,17 +217,45 @@ def report(pairs_by_venue: dict, by_ticker: dict, horizon: float) -> None:
     print("  The pooled n counts book updates. Overlapping samples inside one market")
     print("  are one price path, so the market count is the real sample size.")
     print("  per-venue slope (per-market mean +/- SE):")
+    venues = []
 
     for venue in sorted(pairs_by_venue):
         tickers = {t: p for t, p in by_ticker.items() if series_of(t) == venue}
         v_mean, v_se, v_markets = clustered_slope(tickers)
-        flag = "" if v_se and abs(v_mean) > 1.96 * v_se else "   (not distinguishable from 0)"
+        real = bool(v_se) and abs(v_mean) > 1.96 * v_se
+        flag = "" if real else "   (not distinguishable from 0)"
         print(f"    {venue:<14}{v_mean:+.3f}c +/- {v_se:.3f}  "
               f"({v_markets} markets){flag}")
+        venues.append({
+            "venue": venue, "slope": v_mean,
+            "se": v_se if math.isfinite(v_se) else None,
+            "markets": v_markets, "significant": real,
+        })
+
+    return {
+        "horizon": horizon,
+        "pooled_slope": pooled,
+        "book_updates": len(allpairs),
+        "per_market": mean,
+        "se": se,
+        "t": mean / se if se else 0.0,
+        "markets": markets,
+        "with_old_lookahead": biased_mean,
+        "lookahead_delta": biased_mean - mean,
+        "buckets": buckets,
+        "venues": venues,
+    }
 
 
 async def main() -> None:
-    root = Path(sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/kalshi-recordings")
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    json_out = None
+
+    for i, a in enumerate(sys.argv):
+        if a == "--json" and i + 1 < len(sys.argv):
+            json_out = Path(sys.argv[i + 1])
+
+    root = Path(args[0] if args else "/var/tmp/kalshi-recordings")
     recordings = sorted(p for p in root.iterdir() if (p / "manifest.json").exists())
 
     if not recordings:
@@ -243,6 +274,13 @@ async def main() -> None:
     print(f"{len(recordings)} recording(s), {len(per_ticker)} ticker(s), "
           f"{sum(len(v) for v in per_ticker.values())} book updates")
 
+    payload = {
+        "recordings": len(recordings),
+        "tickers": len(per_ticker),
+        "book_updates": sum(len(v) for v in per_ticker.values()),
+        "horizons": [],
+    }
+
     for horizon in HORIZONS:
         by_venue: dict[str, list] = defaultdict(list)
         by_ticker: dict[str, list] = {}
@@ -253,7 +291,14 @@ async def main() -> None:
             by_ticker[ticker] = pairs
             by_venue[series_of(ticker)].extend(pairs)
 
-        report(by_venue, by_ticker, horizon)
+        result = report(by_venue, by_ticker, horizon)
+
+        if result:
+            payload["horizons"].append(result)
+
+    if json_out:
+        json_out.write_text(json.dumps(payload, indent=2))
+        print(f"\nwrote {json_out}")
 
     print("\nA materially positive slope => the mid is biased and OBI is the skew "
           "signal (center on microprice). Flat => the leak is not a biased center.")

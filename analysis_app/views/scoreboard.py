@@ -51,9 +51,10 @@ if board is None:
 st.warning(
     r"""**Final: trading is stopped, by choice, with the account above its \$35
 floor.** The measured verdict came in - maker edge indistinguishable from zero,
-and every taker slice that looked profitable failed replication on unseen data
-(full story on the "What we found" page). The numbers below are the historical
-record of the corrected strategy's run, frozen where it ended.""",
+and no taker slice clears costs when prices and market phase are pooled together
+(full story on "What we found", corrections on "The audit"). The numbers below
+are the historical record of the corrected strategy's run, frozen where it
+ended.""",
     icon="🏁",
 )
 

@@ -6,24 +6,37 @@ import streamlit as st
 
 st.title("Kalshi market-making: what we actually found")
 st.caption(
-    "Two days, one $50 account, ~$9 spent buying the map. Everything below is "
+    "Two days, one \\$50 account, ~\\$9 spent buying the map. Everything below is "
     "measured against the exchange's own ledger, not a backtest. For Nate."
+)
+
+st.warning(
+    "**Re-audited 2026-08-19 against the full 62-hour archive.** The verdict below "
+    "held and is better supported than when it was written. Several numbers on "
+    "this page did not survive, and are corrected on **The audit**. The one "
+    "condition that changes the answer is on **Where the money might be**.",
+    icon="🔬",
 )
 
 st.header("The one-sentence version")
 st.markdown(
-    r"""**On this exchange's fee schedule, nobody small keeps money: not a resting
-maker, not a selective taker.** We proved each piece in turn. Crossing to flatten
+    r"""**On this exchange's fee schedule, nobody small keeps money by quoting or
+by taking across the board.** We proved each piece in turn. Crossing to flatten
 was a provable loss (-\$0.31/cycle, t = -2.4) - removed. Passive exits took the
 strategy to +\$0.09/cycle - indistinguishable from zero over any horizon we could
-afford. The order book's imbalance genuinely predicts the next move (~0.85c per
-unit, n = 1.36M updates), but every attempt to harvest it - recentered quotes,
-selective taking - lost the edge to fees and noise, and every "winning slice"
-failed replication on unseen data. The full verdict is at the bottom; the journey
-to it is everything in between."""
+afford. The order book's imbalance genuinely predicts the next move, and the move
+is smaller than the fee to act on it: gross runs +0.06c to +0.65c per trade
+against a taker fee of 0.36c to 0.56c in the price bands originally tested.
+
+The re-audit changed two things worth knowing up front. The predictive slope is
+**+0.224c per unit imbalance** once standard errors are clustered on the market
+rather than the book update, not the +0.85c first published, and it is one-sided.
+And the "no edge anywhere" result is a consequence of *pooling*: entries below 5
+cents in the final quarter hour of a market clear costs, and one such slice
+survived a pre-registered holdout. That is a lead, not a business."""
 )
 
-st.header("How Nate made ~$1.50 (and why our bot didn't, at first)")
+st.header("How Nate made ~\\$1.50 (and why our bot didn't, at first)")
 st.markdown(
     r"""
 The puzzle: Nate ran an **automated** bot on BTC 15-minute markets, tuned its
@@ -34,8 +47,8 @@ The ledger reconciles it in one line:
 
 | fills | count | fees paid |
 |---|---:|---:|
-| **maker** (resting) | 1,621 | **$0.01** |
-| **taker** (crossing) | 107 | **$1.02** |
+| **maker** (resting) | 1,621 | **\$0.01** |
+| **taker** (crossing) | 107 | **\$1.02** |
 
 Every taker fill is a cross - a fee **plus** the half-spread paid to get out.
 The profitable behaviour is to **not cross**: rest a buy, rest a sell, let both
@@ -55,7 +68,7 @@ demonstrably positive - see the live scoreboard. The residual leak after fees is
 **adverse selection**: we fill at roughly a 10% rate with 90% of quotes
 cancelled, so the fills we get are disproportionately the ones an informed trader
 crossed into, and a short-horizon markout only partly sees the move that follows.
-Nate's ~$1.50 is consistent with this - a small, real, variance-dominated edge a
+Nate's ~\$1.50 is consistent with this - a small, real, variance-dominated edge a
 patient automated bot on one book can bank over enough cycles, and that a bot
 paying to cross cannot. We removed the reason we lost. Proving we win is a
 question of many more cycles, not one lucky one: distinguishing a \$0.15/cycle
@@ -165,32 +178,37 @@ an independent source; a small sample always flatters.**
 """
 )
 
-st.header("The ending: three periods, no survivor")
+st.header("The ending: the sniper, and what the re-audit did to it")
 st.markdown(
     r"""
 The last live hypothesis was the **sniper**: don't quote at all, just cross the
-spread on extreme order-book imbalance (a signal proven predictive over 1.36M
-book updates) and exit passively for free. Taker fills are deterministic on
-recorded books, so unlike every maker backtest this one is trustworthy - and it
-found slices clearing all costs: GOLD at +1.39c/trade (t=2.0), SOL, DOGE, BTC.
+spread on extreme order-book imbalance and exit passively for free. The taker
+entry is deterministic on recorded books, so the entry half of that backtest is
+exact in a way no maker backtest can be.
 
-Then the only test that matters: the same frozen slices on data they had never
-seen. **GOLD went to zero positive slices. SOL's winner vanished. BTC's flipped
-negative.** And each new day crowned different winners (WTI, XRP) that had shown
-nothing the day before. Three independent periods, three disjoint winner lists,
-no slice ever repeating - the exact signature of searching hundreds of noisy
-slices rather than of an edge.
+This was originally reported as closed by replication failure: winning slices on
+one day, different winning slices the next, no slice ever repeating. **That
+reasoning does not hold.** Re-run with the holdout's statistical power computed
+before the verdict, five of eight pre-registered slices were *absent* from the
+holdout entirely, and most of the rest could not have detected their own effect.
+A backward control - freeze the holdout's own winners, test them on the original
+period - comes back underpowered on every one. The periods were never able to
+judge each other.
 
-**Final verdict, measured:** on Kalshi's fee schedule, neither a resting maker
-nor a selective taker keeps money on any venue we can record. The imbalance
-signal is real, but the move it predicts (~0.85c) is smaller than the cost of
-acting on it. The market gives the signal away for free because it isn't worth
-the fee to harvest.
+**The verdict survived anyway, and for a better reason.** Across the full
+archive, no slice clears costs and a calibrated placebo never beats the best
+observed one. What the original scan had was the right answer supported by the
+wrong argument, and one important thing it never looked at: it pooled the cheap
+tail into the expensive middle, and the final minutes of a market into its whole
+life. Split both ways, slices do clear costs, and one survived a pre-registered
+holdout. That is on **Where the money might be**, with the reasons it might still
+be nothing.
 
-And that completes the Nate reconciliation: his bot's real achievement was **zero
-expected cost** (maker-only, one book, never a forced cross). From there, +\$1.50
-over a limited run is about a one-in-three draw - preserved by stopping. The
-skill was the zero-cost build and the good sense to pocket the draw.
+The Nate reconciliation is unchanged and is the most durable thing here: his
+bot's real achievement was **zero expected cost** (maker-only, one book, never a
+forced cross). From there, +\$1.50 over a limited run is about a one-in-three
+draw, preserved by stopping. The skill was the zero-cost build and the good sense
+to pocket the draw.
 """
 )
 
