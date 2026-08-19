@@ -1024,6 +1024,49 @@ convention. The mid moves about 1.6c across a single fill (pre-fill sample
 wider than the entire markout curve. The script now says so rather than failing
 silently.
 
+### Live: the displayed touch is real
+
+The audit's one untested assumption was that an order gets the price that was
+showing when the signal fired. `scripts/taker_live_test.py` trades exactly the
+audited cell at one contract, with a hard \$25 balance floor checked against the
+exchange before every entry. It was validated against the recorded corpus first:
+the live selector agrees with the audited cell on **629 of 630** recorded rows.
+
+First five live orders, real money, 2026-08-19:
+
+    sell 96c -> filled 96c   0.00c slippage   MAKER, $0.0000 fee
+    buy   4c -> filled  4c   0.00c slippage   MAKER, $0.0000 fee
+    sell 95c -> filled 95c   0.00c slippage   taker, $0.0034
+    buy   4c -> filled  4c   0.00c slippage   taker, $0.0027
+    sell 97c -> filled 97c   0.00c slippage   taker, $0.0021
+
+**Five sent, five filled, zero slippage on every one.** The three taker fees
+match `0.07 * P * (1-P)` to the cent, which re-validates the fee model on fresh
+fills.
+
+Two of the five filled as **makers at zero fees**. Pricing at the touch sometimes
+rests and gets hit rather than crossing, and Kalshi charges makers nothing. That
+is upside the model never assumed, and it is the same fact that made Nate's bot
+work: the cheapest fill on this exchange is the one you did not have to cross for.
+
+What this settles: a one-contract order gets the displayed price. What it does
+not settle: **size**. Median depth on the crossing side is 74 contracts, so one
+contract was never going to walk the book. Ten and twenty-five contracts are the
+tests that decide whether this is worth running.
+
+Three bugs surfaced on the first live run and are worth recording because each
+would have produced a confident wrong answer:
+
+1. The order fields were guessed (`filled_count`, `average_fill_price`). The real
+   ones are `fill_count_fp`, `yes_price_dollars`, `maker_fill_cost_dollars`. The
+   guessed version fell back to our own limit price, which would have reported
+   **zero slippage on every trade by construction** - the exact answer we were
+   trying to measure, arrived at without measuring anything.
+2. The exit only ran when the measurement succeeded, so bug 1 stranded five
+   contracts across three markets. Exiting must never depend on the analytics.
+3. The 30-second hold ran in the same loop that pumped the websocket, so the
+   book used to price the exit was 30 seconds stale.
+
 ### Where this leaves the verdict
 
 Split three ways, the verdict is now specific rather than sweeping.
