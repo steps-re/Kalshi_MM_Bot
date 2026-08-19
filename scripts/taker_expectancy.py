@@ -196,13 +196,18 @@ async def main() -> None:
         if len(vals) < 30:
             continue
 
-        rows.append((st.mean(vals), venue, ob, pb, hz, len(vals)))
+        se = st.stdev(vals) / len(vals) ** 0.5
+        # t is OPTIMISTIC: overlapping horizons within an episode are correlated,
+        # so effective n is smaller than n. Treat t < ~3.5 as noise given the
+        # 482-slice search, and validate out-of-sample regardless.
+        rows.append((st.mean(vals), venue, ob, pb, hz, len(vals), se))
 
     rows.sort(reverse=True)
-    print(f"{'net/trade':>10}{'n':>7}{'per-hr':>8}  venue / obi / price / horizon")
+    print(f"{'net/trade':>10}{'SE':>7}{'t':>6}{'n':>7}{'per-hr':>8}  venue / obi / price / horizon")
 
-    for mean, venue, ob, pb, hz, n in rows[:25]:
-        print(f"{mean:>+9.3f}c{n:>7}{n / max(hours, 0.1):>8.1f}  "
+    for mean, venue, ob, pb, hz, n, se in rows[:25]:
+        t = mean / se if se else 0.0
+        print(f"{mean:>+9.3f}c{se:>6.2f}c{t:>+6.1f}{n:>7}{n / max(hours, 0.1):>8.1f}  "
               f"{venue} / {ob} / {pb} / {hz:.0f}s")
 
     positive = [r for r in rows if r[0] > 0]
