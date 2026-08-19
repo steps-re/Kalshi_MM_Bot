@@ -74,17 +74,29 @@ def summarise(label: str, rows: list[dict]) -> None:
           f"${sum(fees) / len(filled):.4f} per fill")
 
     if slips:
-        worst = max(slips, key=abs)
+        # Sign convention: slippage is what the fill cost US relative to the
+        # displayed touch. POSITIVE is against us, NEGATIVE is price
+        # improvement. Treating a negative mean as bad would report a favourable
+        # fill as a problem, which is how a good result gets thrown away.
+        against = [s for s in slips if s > 0]
+        better = [s for s in slips if s < 0]
         print(f"  SLIPPAGE           mean {st.mean(slips):+.3f}c   "
-              f"worst {worst:+.3f}c   "
-              f"{sum(1 for s in slips if s == 0)}/{len(slips)} exact")
+              f"{sum(1 for s in slips if s == 0)}/{len(slips)} exact, "
+              f"{len(better)} improved, {len(against)} worse")
 
-        if abs(st.mean(slips)) < 0.05:
-            print("    -> fills land on the displayed touch. The audit's entry "
-                  "assumption holds.")
+        if against:
+            print(f"    worst against us   {max(against):+.3f}c")
+
+        mean_slip = st.mean(slips)
+
+        if mean_slip <= 0.05:
+            note = ("fills land on the displayed touch or better. The audit's "
+                    "entry assumption holds.")
         else:
-            print("    -> fills are drifting off the touch. The measured edge "
-                  "shrinks by this much.")
+            note = (f"fills run {mean_slip:.3f}c against us on average. Subtract "
+                    f"that from every measured edge.")
+
+        print(f"    -> {note}")
 
     if pnl:
         print(f"  balance change     {sum(pnl):+d}c over {len(pnl)} completed trades "
