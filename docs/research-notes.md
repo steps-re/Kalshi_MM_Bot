@@ -836,3 +836,141 @@ complete map. All services stopped, VM stopped. The toolchain - ledger-truth
 fees, the biased-mid test, deterministic taker scanning, frozen-slice
 replication - re-asks this question of any venue with a public book in an
 evening.
+
+---
+
+## Audit of the final chapter (2026-08-19, after close)
+
+The chapter above was re-run against the full archived corpus - 187 recordings,
+9.8GB, 62.3 hours of real elapsed coverage, 398,736 triggers - with the scan's
+measurement defects fixed. **The verdict survives. Almost none of the evidence
+given for it does.**
+
+Corrected headline: **0 of 141 testable slices positive net of costs** across the
+whole corpus, and a whole-window sign-flip placebo never beats the observed best
+in 400 draws. That is a stronger negative than the chapter had, on six times the
+data. What follows is what was wrong with how it got there.
+
+### The exit was marked at the mid while the model claimed a rested exit
+
+`net = signed mid move - fee` assumed the exit "rests as a maker (measured
+free)". A resting exit fills at the **touch**, not the mid. On books filtered to
+<=2c that is half a spread given away on every trade, and it is not small:
+
+    mid convention cost, vs an exit rested at the touch
+      whole corpus  +0.671c per trade
+      8/18          +0.665c
+      8/19 holdout  +0.699c
+
+The largest corrected effect anywhere in the corpus is +0.111c. The exit
+assumption alone was worth six times that, in the direction that manufactures
+negatives. Three conventions are now priced side by side (touch / mid / forced
+cross) plus a blend at the ledger's own per-venue cross rates.
+
+### The t-statistics counted triggers, not price paths
+
+Every trigger inside one market rides one price path, and slices average ~57
+triggers per market. Clustering the standard error on the market ticker moves
+the median SE by 1.6x, and it moves the venue conclusions much further than that,
+because the old numbers combined an inflated effect with an understated error:
+
+    venue          old net   old t     new net   new t   markets
+    KXETHD        -0.980c   -44.4     -0.231c    -2.5      127
+    KXBTCD        -0.754c    -5.7     -0.199c    -1.2       82
+    KXMLBGAME     -0.634c   -11.9     -0.087c    -1.2       56
+    KXNFLGAME     -2.160c  -199.6     -1.270c   -15.1        3
+
+The chapter's "ETH-daily -0.79c t=-22.6", cited as a decisively replicated
+rejection, reproduces here under the old conventions as -0.98c t=-21.7 on 8/18,
+which confirms the reimplementation is faithful. Corrected, that same venue is
+-0.231c at t=-2.5. On 8/18 alone it is t=-1.6, indistinguishable from zero. The
+"decisive" rejections were mostly the exit convention and the missing clustering.
+In-play sports, called "all negative - replicated rejections worth having", give
+the corpus's single best corrected slice: KXMLBGAME obi>.9 / tail<.15 / 30s at
+**+0.111c**, which is a sign flip from the number the chapter rejected it on.
+
+### "Three periods, no survivor" was mostly absence and low power
+
+Eight slices were pre-registered from 8/18 and put to the holdouts, with the
+minimum detectable effect computed before the verdict:
+
+    to the 8/19 holdout : 4 SMALLER, 4 NO POWER. 5 of 8 have under 50% power.
+                          The best slice has 32% power against its own effect.
+    to the untouched
+    8/19 afternoon      : 5 of 8 ABSENT (those markets do not trade 07-14Z),
+                          3 NO POWER, 0 testable with adequate power.
+    backward control    : freeze the holdout's own winners, test them on 8/18.
+                          8 of 8 NO POWER. Neither direction can confirm or
+                          refute the other, which is the symmetry you would
+                          expect if the periods were never comparable.
+
+A holdout at 32% power that returns a null has not refuted anything. The periods
+also sample different regimes under the same slice labels: median seconds-to-
+close runs 76,884s (pre), 251,325s (8/18), 251,305s (8/19 early), 47,718s (8/19
+afternoon), and the per-slice phase drift reaches 18x. A frozen slice label pins
+venue, OBI band, price band and horizon. It does not pin the regime.
+
+### The premise was overstated by 4x and is not present on every venue
+
+"+0.85c per unit OBI at 5s, n=1.36M updates, monotonic on every major venue"
+becomes, with the same estimator clustered on the market:
+
+    pooled slope    +0.378c per unit OBI   (n=27.6M book updates)
+    per-market      +0.224c +/- 0.058      (t=+3.9, 484 markets)
+      KXBTCD        +0.280c +/- 0.073
+      KXNFLGAME     +0.610c +/- 0.274
+      KXMLBGAME     +0.448c +/- 0.236      not distinguishable from zero
+      KXETHD        +0.010c +/- 0.096      not distinguishable from zero
+
+The signal is real and it survives clustering. It is about a quarter of the
+advertised size, and it is flatly absent on ETH-daily. "Monotonic on every major
+venue" is not supported.
+
+**And it is one-sided.** Forward move by OBI bucket at 5s: ask-heavy -0.294c,
+mildly ask-heavy -0.335c, balanced -0.310c, mildly bid-heavy +0.155c, bid-heavy
++0.373c. Relative to the balanced baseline, bid-heavy predicts +0.68c and
+ask-heavy predicts +0.02c. These are strike ladders that mostly decay toward
+zero, so the common negative drift is expected, but the asymmetry is not: the
+scan's rule takes `sign = +1 if obi > 0 else -1`, so roughly half its trades were
+taken on the side where the signal does not exist.
+
+### What the scan could not distinguish, and now can
+
+The old scan printed net only. Its verdict sentence - the signal is real and
+worth less than the cost of acting on it - was not identifiable from anything it
+reported. With gross and fee separated, it is now measured, and it is true:
+gross is positive in essentially every slice (+0.06c to +0.65c) and the fee runs
+0.36c to 0.56c. The signal clears zero and does not clear the fee.
+
+### Reproducibility gap
+
+**The archived corpus contains no 15-minute-window recordings at all.** All 187
+manifests hold KXBTCD and KXETHD strike ladders, MLB, NFL, and two weather
+markets. Every venue in the chapter's in-sample table (GOLD15M +1.39c, BTC15M
++1.00c, SOL15M +0.99c, DOGE15M +0.28c) and both 8/19 "new winners" (WTI, XRP)
+are 15M series. Those markets were certainly traded live, since the cross-rate
+table comes from the ledger, but the recorded books the scan consumed were never
+uploaded. `/tmp/recs_pm` was local to the collector VM, which is stopped.
+
+So the chapter's headline in-sample table cannot be reproduced, checked, or
+corrected from surviving data. Only its ladder and sports claims can be, and
+those are the ones that did not hold up.
+
+### One thing the audit got wrong
+
+The lookahead defect is real - the scan read the book at the first update at or
+*after* each horizon rather than the last one at or before it, which peeks at the
+move being predicted - but it is worth **+0.001c per trade**, including on the
+quietest books where the next update landed more than 10s past the horizon
+(+0.004c). It was predicted to matter and it does not. Fixed anyway, in the scan
+and in `obi_predictivity`, `markout_horizon` and `markout_selfbook`.
+
+### Where this leaves the verdict
+
+"No deployable taker edge on this fee schedule" is better supported now than when
+it was written: zero positive slices in 141, on 62 hours, with a calibrated
+placebo null. What is not supported is the certainty attached to it. "Final for
+this venue class" rests on one signal, one entry rule, three horizons, one exit
+model, and two instrument families, on a corpus whose headline venues are
+missing. The honest statement is a null result with stated power on the venues
+that survive, and no result at all on the venues the chapter actually named.

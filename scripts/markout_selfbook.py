@@ -26,7 +26,8 @@ from __future__ import annotations
 import json
 import statistics as st
 import sys
-from bisect import bisect_left
+import math
+from bisect import bisect_right
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -49,8 +50,17 @@ def arm_of(path: Path) -> str:
 
 
 def mid_at(series: list[tuple[float, int]], when: float) -> int | None:
-    i = bisect_left(series, (when, -1))
-    return series[i][1] if i < len(series) else None
+    """Mid at `when`: the LAST sample at or before it, not the first one after.
+
+    See markout_horizon.mid_at - taking the next update reads part of the move
+    the markout is trying to measure.
+    """
+
+    if not series or when > series[-1][0]:
+        return None
+
+    i = bisect_right(series, (when, math.inf)) - 1
+    return series[i][1] if i >= 0 else None
 
 
 def process(path: Path, markouts, by_arm, journal_markouts):

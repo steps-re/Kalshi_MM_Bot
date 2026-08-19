@@ -9,11 +9,30 @@ This is the Steps Ventures fork of
 ## How it ended (project closed 2026-08-19)
 
 Two days of live measurement against the exchange's own ledger, ~$13 of a $50
-account spent buying the answers. The final verdict, replicated across three
-independent data periods: **on Kalshi's fee schedule, neither a resting maker
-nor a selective taker keeps money on any venue we could record.** The order
-book's imbalance genuinely predicts the next mid move (+0.85c per unit, 1.36M
-updates) - and the move is worth less than the cost of acting on it.
+account spent buying the answers. The verdict: **on Kalshi's fee schedule,
+neither a resting maker nor a selective taker keeps money on any venue we could
+record.** The order book's imbalance genuinely predicts the next mid move, and
+the move is worth less than the cost of acting on it. Gross runs +0.06c to
++0.65c per trade across slices; the taker fee runs 0.36c to 0.56c.
+
+Re-audited after close against the full 62-hour archive with the scan's
+measurement defects fixed: **0 of 141 testable slices clear costs**, and a
+whole-window sign-flip placebo never beats the best observed slice in 400 draws.
+That is a stronger negative than the original run produced, on six times the
+data. Three corrections to what was first published:
+
+- The imbalance slope is **+0.224c +/- 0.058 per unit OBI** (clustered on the
+  market), not the +0.85c first reported, and it is absent on ETH-daily. It is
+  also one-sided: bid-heavy books predict, ask-heavy books do not.
+- "Replicated across three independent periods" does not hold. Of eight
+  pre-registered slices, five were absent from the true holdout and five of the
+  eight tested had under 50% power. A null at 32% power refutes nothing.
+- The archive contains **no 15-minute-window recordings**, so the original
+  in-sample table (GOLD15M, BTC15M, SOL15M, DOGE15M) cannot be reproduced from
+  surviving data. The claims that can be checked are the ladder and sports ones.
+
+Full detail in [the audit section of
+docs/research-notes.md](docs/research-notes.md).
 
 - **The story, interactive:** https://kalshi-findings-737705633649.us-central1.run.app
   (start on "What we found" - includes how Nate's +$1.50 reconciles)

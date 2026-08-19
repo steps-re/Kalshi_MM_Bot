@@ -28,7 +28,8 @@ import asyncio
 import json
 import statistics as st
 import sys
-from bisect import bisect_left
+import math
+from bisect import bisect_right
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -113,10 +114,21 @@ async def mid_timeline(recording: Path) -> dict[str, list[tuple[float, float]]]:
 
 
 def mid_at(series: list[tuple[float, float]], when: float) -> float | None:
-    """Mid at the first sample at or after `when`; None past the record's end."""
+    """Mid at `when`; None past the record's end.
 
-    i = bisect_left(series, (when, -1.0))
-    return series[i][1] if i < len(series) else None
+    A book is a step function, so its state at `when` is the LAST sample at or
+    before it. This used to take the FIRST sample at or AFTER `when`, which on a
+    quiet book skips ahead to whenever the next update lands - and that update
+    tends to be the move being measured, so the markout read part of its own
+    answer. The `None` past the end is deliberate: an unobserved horizon must be
+    censored rather than filled with a stale price.
+    """
+
+    if not series or when > series[-1][0]:
+        return None
+
+    i = bisect_right(series, (when, math.inf)) - 1
+    return series[i][1] if i >= 0 else None
 
 
 def load_fills(journal_dir: Path) -> list[dict]:
