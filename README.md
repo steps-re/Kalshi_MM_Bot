@@ -27,9 +27,18 @@ data. Three corrections to what was first published:
 - "Replicated across three independent periods" does not hold. Of eight
   pre-registered slices, five were absent from the true holdout and five of the
   eight tested had under 50% power. A null at 32% power refutes nothing.
-- The archive contains **no 15-minute-window recordings**, so the original
-  in-sample table (GOLD15M, BTC15M, SOL15M, DOGE15M) cannot be reproduced from
-  surviving data. The claims that can be checked are the ladder and sports ones.
+- The original in-sample table rested on **two markets per venue**. `KXGOLD15M`
+  had exactly two 15-minute windows in the data the scan read, and its published
+  "+1.39c, t=2.0" treated 931 ticks inside two price paths as 931 independent
+  draws. The recordings were recovered (they were in a second bucket that 403s on
+  one of two accounts), and those venues now have 46-54 markets each.
+- With a **control band** added (books with no imbalance, which carry no signal
+  by construction), the picture sharpens: the imbalance signal is worth
+  **+0.6c to +0.9c per trade** over a balanced book, monotone across 441 and 642
+  markets. Taking starts about 0.9c under water, so the lift alone does not pay.
+  One cell clears it and replicates on independent data - `KXBTCD`, 2-5c entries,
+  last quarter hour before expiry - and it does **not** generalise to the
+  15-minute family.
 
 Full detail in [the audit section of
 docs/research-notes.md](docs/research-notes.md).

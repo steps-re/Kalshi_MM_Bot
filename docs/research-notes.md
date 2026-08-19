@@ -965,12 +965,86 @@ quietest books where the next update landed more than 10s past the horizon
 (+0.004c). It was predicted to matter and it does not. Fixed anyway, in the scan
 and in `obi_predictivity`, `markout_horizon` and `markout_selfbook`.
 
+### Addendum, same day: the data was never lost, and there is a control band now
+
+**The 15-minute recordings were recovered.** They had been uploading to
+`gs://steps-kalshi-book/recordings/`, which returns 403 for
+mike@stepsventures.com and resolves for mike@airloom.energy. The 403 was read as
+absence. 159 recordings, 16.6GB, plus 21 fill journals. A further 10 recordings
+survived on the stopped VM at `/var/tmp/kalshi-recordings` (`/tmp/recs_pm` was
+cleared, as expected). All of it is now mirrored to
+`gs://steps-nate-backtest-data/vm-rescue-15m/`.
+
+**With that data the headline claim resolves, and the explanation is simpler than
+the one the chapter gave itself.** `KXGOLD15M` had exactly **two windows** in the
+data the scan read: 11:30 and 16:15 on 18 August. Thirty minutes of one market's
+life. The published "+1.39c, t=2.0" came from treating 931 ticks inside two price
+paths as 931 independent draws. SOL, DOGE, WTI, XRP and SILVER were all two
+markets as well. That is not hundreds of slices mined for a winner. It is a
+standard error computed across two markets, and it explains the replication
+failure without any appeal to search noise.
+
+Recovered, those venues have 46 to 54 markets each.
+
+**The control band.** `taker_extract` now keeps books with `|OBI| < 0.2`. They
+carry no signal by construction, so whatever they earn in the same price band and
+the same part of a market's life is what the structure pays. This is the test the
+original scan could never run, because every trigger it kept already had extreme
+imbalance and there was nothing to compare against.
+
+Nothing selected, one number per market, 30s horizon, both corpora independently:
+
+    recovered corpus (642 markets)   control -0.905c -> obi>.9 -0.014c   lift +0.891c
+    original archive (441 markets)   control -0.724c -> obi>.9 -0.142c   lift +0.581c
+
+Perfectly monotone in both, with standard errors around 0.04c. **The imbalance
+signal is real and far better established than the +0.85c originally published.**
+It is also not sufficient on its own: it lifts about 0.6c to 0.9c from a baseline
+that taking starts roughly 0.9c under water.
+
+**One cell clears it, and it replicates on independent data.** `KXBTCD`, entry
+2-5c, 30s, inside the last quarter hour before expiry:
+
+    archive    control +0.025c -> obi>.9 +0.927c  (95 markets, clears zero)
+    recovered  control -0.184c -> obi>.9 +0.551c  (24 markets, clears zero)
+
+Monotone in both, control flat or negative in both, and the two estimates are not
+statistically different (z = 1.15). That answers the decay confound directly:
+drift does not care how imbalanced the book is, so a monotone response to
+imbalance with a negative control cannot be decay.
+
+**It does not generalise.** The same cheap-entry condition on the 15-minute
+family lifts about 0.2c and stays negative throughout. This is a KXBTCD result,
+not a Kalshi result, and anyone sizing it off the exchange as a whole is
+overreading it by an order of magnitude.
+
+Also fixed: `markout_selfbook`'s t=0 control cannot pass under any lookup
+convention. The mid moves about 1.6c across a single fill (pre-fill sample
++1.34c, post-fill -0.24c, the journal's own stamp +0.37c between them), which is
+wider than the entire markout curve. The script now says so rather than failing
+silently.
+
 ### Where this leaves the verdict
 
-"No deployable taker edge on this fee schedule" is better supported now than when
-it was written: zero positive slices in 141, on 62 hours, with a calibrated
-placebo null. What is not supported is the certainty attached to it. "Final for
-this venue class" rests on one signal, one entry rule, three horizons, one exit
-model, and two instrument families, on a corpus whose headline venues are
-missing. The honest statement is a null result with stated power on the venues
-that survive, and no result at all on the venues the chapter actually named.
+Split three ways, the verdict is now specific rather than sweeping.
+
+**Right:** there is no general taker edge on this fee schedule. Pooled across
+everything, even the strongest imbalance averages -0.014c to -0.142c per trade.
+A strategy that takes on imbalance without conditioning on price and phase loses.
+
+**Wrong:** that the imbalance signal is worth less than the fee everywhere. It is
+worth +0.6c to +0.9c per trade over a balanced book, monotone across 441 and 642
+markets, and on `KXBTCD` at 2-5c entries near expiry that lift clears costs and
+replicates on independent data with a negative control.
+
+**Unresolved and now the only thing that matters:** whether a live order gets the
+displayed touch. Extreme imbalance means the side you must cross is thin by
+construction, so signal strength and available size are anti-correlated. No
+amount of recorded book data settles it. Real orders at minimum size do, and
+that test costs a few dollars.
+
+The honest closing line is not "the market gives the signal away because it is
+not worth the fee to harvest." It is: the signal is real, it is worth about
+0.9c, taking costs about 0.9c, and whether you clear that depends entirely on
+picking an entry price where the fee is a fifth of a cent instead of one and a
+half.
