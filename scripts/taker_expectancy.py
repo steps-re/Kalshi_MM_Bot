@@ -140,6 +140,7 @@ async def main() -> None:
     # nets[(venue, obi_band, price_band, horizon)] = list of net cents
     nets: dict[tuple, list[float]] = defaultdict(list)
     hours = 0.0
+    venue_hours: dict[str, float] = defaultdict(float)
     MIN_GAP = 5.0  # per-ticker cooldown so one episode isn't counted 50 times
 
     for rec in recordings:
@@ -155,6 +156,10 @@ async def main() -> None:
             series.sort()
             offsets = [s[0] for s in series]
             venue = series_of(ticker)
+
+            if len(offsets) > 1:
+                venue_hours[venue] += (offsets[-1] - offsets[0]) / 3600.0
+
             last_trigger = -1e9
 
             for i, (offset, mid, obi, best_bid, best_ask) in enumerate(series):
@@ -221,6 +226,31 @@ async def main() -> None:
     else:
         print("No slice clears taker costs: the fee schedule eats the signal. "
               "That is a final negative for taker strategies on these books.")
+
+    # ---- per-venue sniper map: can a sniper live on each venue, and how well ----
+    print("\nSNIPER MAP (per venue: its own recorded hours, its positive slices, its best):")
+    print(f"{'venue':<14}{'bk-hrs':>7}{'+slices':>8}{'best net':>10}{'t':>6}{'trig/hr':>9}  best slice")
+    venues = sorted(venue_hours, key=lambda v: -venue_hours[v])
+
+    for venue in venues:
+        vh = venue_hours[venue]
+        mine = [r for r in rows if r[1] == venue]
+        pos = [r for r in mine if r[0] > 0]
+
+        if not mine:
+            print(f"{venue:<14}{vh:>7.1f}{'0':>8}{'-':>10}{'-':>6}{'-':>9}  (no slice reached n>=30)")
+            continue
+
+        best = max(mine, key=lambda r: r[0])
+        mean, _, ob, pb, hz, n, se = best
+        t = mean / se if se else 0.0
+        rate = n / vh if vh else 0.0
+        print(f"{venue:<14}{vh:>7.1f}{len(pos):>8}{mean:>+9.3f}c{t:>+6.1f}{rate:>9.1f}  "
+              f"{ob} / {pb} / {hz:.0f}s")
+
+    print("\nA venue with 0 positive slices offers a sniper nothing at these triggers; "
+          "a venue whose best slice is positive but t<2 is a candidate only until "
+          "out-of-sample data votes. trig/hr uses the venue's own recorded hours.")
 
 
 if __name__ == "__main__":
