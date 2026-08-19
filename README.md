@@ -6,23 +6,45 @@ backtest, screen the exchange, and run live tests.
 This is the Steps Ventures fork of
 [nathanonderko/Kalshi_MM_Bot](https://github.com/nathanonderko/Kalshi_MM_Bot).
 
-## Start here
+## How it ended (project closed 2026-08-19)
 
-- **[LESSONS.md](LESSONS.md)** — the full write-up: what we found, why the
-  backtest could not have caught it, and what to do next.
-- **Interactive version:** https://kalshi-lessons-163098203985.us-central1.run.app
-  (live fee calculator, the exchange scan, the capacity analysis)
+Two days of live measurement against the exchange's own ledger, ~$13 of a $50
+account spent buying the answers. The final verdict, replicated across three
+independent data periods: **on Kalshi's fee schedule, neither a resting maker
+nor a selective taker keeps money on any venue we could record.** The order
+book's imbalance genuinely predicts the next mid move (+0.85c per unit, 1.36M
+updates) - and the move is worth less than the cost of acting on it.
 
-## The fee arithmetic
+- **The story, interactive:** https://kalshi-findings-737705633649.us-central1.run.app
+  (start on "What we found" - includes how Nate's +$1.50 reconciles)
+- **[docs/research-notes.md](docs/research-notes.md)** - the full research log,
+  finding by finding, through the final chapter
+- **[docs/playbook.md](docs/playbook.md)** - the venue-agnostic method: how to
+  evaluate any order-book venue for market making in an evening
+- **[LESSONS.md](LESSONS.md)** - the earlier long-form write-up (instrument
+  bugs, backtest limits), kept as the record of the middle of the journey
 
-Kalshi's trading fee is
+## The fee arithmetic (measured, not the docs)
 
-    fee = round_up_to_next_cent(0.07 * contracts * P * (1 - P))
+What the ledger actually charges - calibrated against every real fill
+(`market/fees.py`, `calibrate_from_fills`):
 
-applied **per order**. At $0.50 that is **1.75c per side, 3.5c per round trip**,
-against a **1c tick**. A market maker who captures an entire 2c spread at the
-midpoint still loses 1.5c per contract per round trip. That is not a tuning
-problem and no parameter fixes it.
+    maker (resting order fills):  $0.00, always
+    taker (crossing the spread):  0.07 * contracts * P * (1-P),
+                                  rounded UP to the next $0.0001
+
+Not the whole-cent rounding the docs describe, and makers trade free - the two
+facts that decided everything. The taker fee peaks at P=$0.50 (1.75c/contract)
+and collapses in the tails, so *where* a book trades sets the price of every
+forced exit.
+
+---
+
+**Everything below this line is the project's earlier analysis, kept for the
+record.** Parts of it were superseded by live measurement - notably, the fee
+wall below assumed takers-pay-both-sides before maker-free was proven.
+
+## The early fee-wall analysis
 
 Because the fee is proportional to `P * (1 - P)`, it collapses in the tails.
 Improving the touch where the spread leaves room for it, here is where the

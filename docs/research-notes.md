@@ -786,3 +786,53 @@ visible per candidate. The paradigm ranks a book by: continuous two-sided flow
 distance of the mid from 0.50 (condition 2, the cheap-cross screen). A book that
 is reachable AND tail-priced is the target; near-0.50 books are penalised even
 when reachable, because their unavoidable crosses are dear.
+
+---
+
+## The final chapter: the sniper, and three periods with no survivor (2026-08-19)
+
+The maker verdict (edge indistinguishable from zero after passive exits) left one
+hypothesis: stop quoting entirely and TAKE, selectively. The case for it was
+strong. The book's own imbalance provably predicts the next mid move (+0.85c per
+unit OBI at 5s, n=1.36M updates, monotonic on every major venue), and a taker
+backtest on recorded books is trustworthy in a way no maker backtest can be: the
+fill is deterministic (you pay the displayed touch) and the fee is ledger-exact.
+`scripts/taker_expectancy.py` scans every (OBI extremity x entry price x horizon)
+slice for net expectancy after the half-spread and the exact fee, with a per-venue
+sniper map.
+
+In-sample (8/18, ~11 book-hours, 482 slices searched): 4 of 16 recorded venues
+had cost-clearing slices. GOLD15M +1.39c/trade (t=2.0, 43 triggers/hr), BTC15M
++1.00c, SOL15M +0.99c, DOGE15M +0.28c. Twelve venues offered nothing, several
+decisively (ETH-daily -0.79c t=-22.6, in-play sports and esports all negative -
+replicated rejections worth having).
+
+Then the only test that matters: the same frozen slices on data they had never
+seen.
+
+* Pre-8/18 data (BTC/ETH/BTCD coverage only): BTC's winners shrank to noise or
+  flipped sign (tail>.85 went -0.25 to -0.28c at t~-2.5). Different slices
+  "won" than in-sample.
+* 8/19 data (the commodities' true out-of-sample): GOLD fell to ZERO positive
+  slices (best -0.07c). SOL's winner vanished. DOGE +0.16c at t=0.2. And the
+  scan crowned brand-new winners (WTI +1.05c, XRP +1.24c) that had shown
+  nothing the day before.
+
+Three independent periods, three disjoint winner lists, no slice ever repeating.
+That is the signature of searching hundreds of noisy slices, not of an edge.
+
+**Final verdict, measured:** on Kalshi's fee schedule, neither a resting maker
+nor a selective taker keeps money on any venue we can record. The imbalance
+signal is real, and it is worth less than the cost of acting on it. The market
+gives the signal away because harvesting it does not pay the fee.
+
+This also completes the Nate reconciliation. His bot's real achievement was zero
+expected cost: maker-only, one book, never a forced cross. From there, +$1.50
+over a short run is roughly a one-in-three draw, preserved by stopping. The
+skill was the zero-cost build and pocketing the draw.
+
+Project closed 2026-08-19. Account $36.66 of the original $50; ~$13 bought the
+complete map. All services stopped, VM stopped. The toolchain - ledger-truth
+fees, the biased-mid test, deterministic taker scanning, frozen-slice
+replication - re-asks this question of any venue with a public book in an
+evening.
