@@ -59,7 +59,11 @@ from kalshi_mm_bot.api.feed_controller import (  # noqa: E402
     FeedController,
     ORDERBOOK_CHANNEL,
 )
-from kalshi_mm_bot.api.rest import CreateOrderRequest, KalshiRestClient  # noqa: E402
+from kalshi_mm_bot.api.rest import (  # noqa: E402
+    CancelOrderRequest,
+    CreateOrderRequest,
+    KalshiRestClient,
+)
 from kalshi_mm_bot.api.websocket import KalshiWebSocketClient  # noqa: E402
 from kalshi_mm_bot.config import load_settings  # noqa: E402
 from kalshi_mm_bot.market.price import COUNT_SCALE, ONE_DOLLAR  # noqa: E402
@@ -79,9 +83,7 @@ PHASE_MAX = 900.0                       # last 15 minutes
 PHASE_MIN = 150.0
 MIN_CROSSABLE = 10                      # contracts showing on the side we cross
 HOLD_SECONDS = 30.0                     # the horizon the audit measured
-# The exit crosses immediately rather than resting. This test measures ENTRY
-# fill quality; a resting exit would confound that with queue luck, and the
-# audit already brackets the exit assumption separately.
+EXIT_REST_SECONDS = 40.0   # rest the exit before crossing whatever is left
 
 # --- hard limits --------------------------------------------------------------
 SIZE = 1                                # contracts. Not configurable on purpose.
@@ -322,6 +324,63 @@ async def realised_fill(rest, ticker: str, since: float) -> dict:
     }
 
 
+async def passive_exit(rest, controller, ticker: str, position: int) -> dict:
+    """Rest the exit at the touch, cross only what is left. The audited model.
+
+    Crossing straight out pays the spread AND a second fee, which is about 0.67c
+    a trade - larger than the edge being measured. The whole project turned
+    positive the day it stopped flattening by crossing, so the live test has to
+    exit the way the model assumes or it is measuring a worse strategy.
+
+    post_only guarantees the resting order cannot accidentally cross and pay a
+    taker fee while trying to avoid one.
+    """
+
+    book = controller.orderbooks.get(ticker)
+
+    if book is None or book.best_bid is None or book.best_ask is None:
+        return {"exit": "no book"}
+
+    long_position = position > 0
+    # A long exits by SELLING at the ask; a short exits by BUYING at the bid.
+    price = book.best_ask if long_position else book.best_bid
+
+    try:
+        await rest.batch_create_orders([CreateOrderRequest(
+            ticker=ticker,
+            side="ask" if long_position else "bid",
+            price=price,
+            count=abs(position),
+            client_order_id=f"tlt-rest-{int(now() * 1000)}",
+            post_only=True,
+        )])
+    except Exception as error:  # noqa: BLE001
+        log(f"  resting exit rejected ({type(error).__name__}), crossing instead")
+        return {"exit": "rest rejected"}
+
+    await asyncio.sleep(EXIT_REST_SECONDS)
+    left = (await rest.get_positions((ticker,))).get(ticker, 0)
+
+    if left == 0:
+        log(f"  exited passively at {price / 100:.0f}c, no fee")
+        return {"exit": "rested", "exit_price": price, "crossed": 0}
+
+    # Cancel whatever is still resting before crossing, or the stub cross and
+    # the resting order can both fill and leave us the opposite way round.
+    try:
+        orders = await rest.get_orders(ticker=ticker, status="resting", limit=50)
+
+        for order in orders:
+            if str(order.get("client_order_id", "")).startswith("tlt-rest-"):
+                await rest.batch_cancel_orders(
+                    [CancelOrderRequest(order_id=str(order["order_id"]))])
+    except Exception as error:  # noqa: BLE001
+        log(f"  cancel of resting exit failed: {type(error).__name__} {error}")
+
+    return {"exit": "partial", "exit_price": price,
+            "crossed": abs(left) // COUNT_SCALE}
+
+
 async def flatten(rest, controller, ticker: str, log_prefix: str = "  ") -> int:
     """Close any position on this ticker. Called unconditionally after a trade.
 
@@ -389,8 +448,7 @@ async def run(args) -> None:
     controller = FeedController(rest=rest, ws=ws)
     await controller.connect()
 
-    if markets:
-        await controller.subscribe(tuple(markets), channels=(ORDERBOOK_CHANNEL,))
+    initial = tuple(markets)
 
     last_trigger: dict[str, float] = {}
     tally: dict[str, int] = {}
@@ -398,8 +456,16 @@ async def run(args) -> None:
     pending: asyncio.Queue = asyncio.Queue(maxsize=1)
     signals = 0
 
+    subscribe_queue: asyncio.Queue = asyncio.Queue()
+
     async def pump() -> None:
-        """Keep draining the feed forever.
+        """Keep draining the feed forever, and own every socket operation.
+
+        Subscribing reads the socket to await its confirmation, so a second
+        coroutine calling subscribe() while this one sits in recv() raises
+        ConcurrencyError and the subscription is silently lost. The first
+        version did exactly that: the refresh task failed every time and the
+        run watched zero markets for half an hour without trading.
 
         This has to run concurrently with trading. The first version awaited the
         30-second hold inside the same loop that pumped the websocket, so the
@@ -408,6 +474,19 @@ async def run(args) -> None:
         """
 
         while not stats["stop"]:
+            # Drain pending subscriptions here, where nothing else is reading.
+            while not subscribe_queue.empty():
+                batch = await subscribe_queue.get()
+
+                try:
+                    await controller.subscribe(
+                        batch, channels=(ORDERBOOK_CHANNEL,))
+                    stats["last_event"] = now()
+                    log(f"  subscribed {len(batch)} market(s), watching "
+                        f"{len(markets)}")
+                except Exception as error:  # noqa: BLE001
+                    log(f"  subscribe FAILED: {type(error).__name__} {error}")
+
             try:
                 ticker = await asyncio.wait_for(controller.recv(), timeout=5.0)
             except asyncio.TimeoutError:
@@ -469,13 +548,10 @@ async def run(args) -> None:
             markets.update(fresh)
 
             if added:
-                try:
-                    await controller.subscribe(
-                        tuple(added), channels=(ORDERBOOK_CHANNEL,))
-                    stats["last_event"] = now()
-                    log(f"  now watching {len(markets)} markets (+{len(added)})")
-                except Exception as error:  # noqa: BLE001
-                    log(f"  subscribe failed: {type(error).__name__} {error}")
+                await subscribe_queue.put(tuple(added))
+
+    if initial:
+        await subscribe_queue.put(initial)
 
     pump_task = asyncio.create_task(pump())
     refresh_task = asyncio.create_task(refresh())
@@ -546,10 +622,16 @@ async def run(args) -> None:
         else:
             log("  order sent but nothing filled yet")
 
-        # Hold the measured horizon, then leave. This runs whatever the
+        # Hold the measured horizon, then leave the way the audit assumed:
+        # rest at the touch, cross only the stub. Both steps run whatever the
         # measurement did, because a stranded position is the one outcome that
         # actually costs money.
         await asyncio.sleep(HOLD_SECONDS)
+        held = (await rest.get_positions((ticker,))).get(ticker, 0)
+
+        if held:
+            record.update(await passive_exit(rest, controller, ticker, held))
+
         left = await flatten(rest, controller, ticker)
         record["left_open"] = left
 

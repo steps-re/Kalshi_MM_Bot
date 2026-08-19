@@ -1,0 +1,50 @@
+### 1. Exit Model Treats Passive Resting Fill as Guaranteed (Overstates PnL by ~0.5–1.0¢/trade)
+* **Target:** Claim C2 ("Exit convention error worth +0.671c/trade") & Method Notes (`exit_touch = ask at horizon for buy`).
+* **Mechanism:** Marking exit at the touch assumes a resting limit order fills with 100% probability at $t+h$ without crossing the spread. In reality, a resting limit order at the touch suffers from **adverse selection**: it fills only when the market trades through it (adverse price move) and remains unfilled when the market moves in your favor.
+* **Bias:** Strongly **positive / optimistic**. It credits half-to-full spread capture on trades that would never execute passively in live trading.
+* **Test:** Compute PnL under immediate taker exit (cross the spread at $t+h$: sell at `bid`, buy at `ask`). If expectancy drops below zero or fees, the edge is purely an artifact of phantom passive fills.
+
+---
+
+### 2. Microstructure Bid-Ask Bounce / Mechanical Control Confound (Manufactures the Dose-Response)
+* **Target:** Claim C4 ("Dose-response with a no-signal control rules out drift/decay").
+* **Mechanism:** 
+  $$\text{OBI} = \frac{\text{bid\_sz} - \text{ask\_sz}}{\text{bid\_sz} + \text{ask\_sz}}$$
+  When a taker trade hits the ask, the ask depletes, mechanical imbalance immediately spikes to $\text{OBI} > 0.9$, and the mid-price is elevated. Marking forward returns from this state measures post-trade mean reversion and standard bid-ask bounce, not predictive order-flow alpha. The control $|\text{OBI}| < 0.2$ occurs when both sides are wide/untouched, making negative returns the baseline due to spread/fees.
+* **Bias:** Strongly **positive** for extreme bands relative to control; manufactures artificial monotonicity.
+* **Test:** Condition OBI calculation on samples where **no trade occurred** in the prior 1.0s, or measure price changes from $t + \delta$ (e.g., $100\text{ms}$ latency buffer) rather than the instantaneous arrival tick.
+
+---
+
+### 3. Queue Priority & Capacity Fallacy on the Thin Side
+* **Target:** Claim C6, C7 ("Live fills land on displayed touch; 74 contracts available").
+* **Mechanism:** Extreme OBI ($>0.9$) means the side you must cross (`crossable`) is near depletion ($1-10$ contracts). At 25 contracts per trade, your order walks the book, eating depth into worse price levels, or you arrive after another taker has wiped the touch (fill failure / race condition).
+* **Bias:** Strongly **positive**. Assumes infinite top-of-book liquidity at the displayed touch.
+* **Test:** Evaluate markouts strictly requiring `crossable >= target_contracts` (e.g., $\ge 25$) and simulate book walking across price levels using full order book depth instead of top-of-book touch.
+
+---
+
+### 4. Asymmetric Horizon Censoring Drops Large Moves
+* **Target:** `extract()` lines:
+  ```python
+  if offset + MAX_HORIZON > series_end:
+      censored += 1
+      continue
+  ```
+* **Mechanism:** In 15M/hourly binary contracts, order-book recording sessions frequently terminate upon settlement or early market suspension when a contract hits $0$ or $100$. Triggers fired in the final 30 seconds before a binary resolution are systematically discarded if the stream cuts at settlement.
+* **Bias:** **Biased / Uncontrolled** depending on direction, removing high-volatility termination events.
+* **Test:** Check the distribution of `to_close` on censored records. If censored entries cluster near expiration, rerun with variable horizon truncated at `min(horizon, to_close)`.
+
+---
+
+### 5. Data Dredging on KXBTCD 2-5¢ Sub-slice (Overfitting)
+* **Target:** Claim C5 ("KXBTCD, entry price 2-5c long-equivalent, last 15 min before close").
+* **Mechanism:** This slice is a 4-way conditional subset: venue (`KXBTCD`) $\times$ deep OTM/ITM price (`2-5c`) $\times$ expiry window (`last 15m`) $\times$ signal strength (`obi > .9`). With 24–95 markets, this is classic multi-hypothesis dredging. When tested on the identical 15M contract family, the signal collapses (+0.2¢, negative net).
+* **Bias:** Heavily **positive / overfit**.
+* **Test:** Apply standard Bonferroni or White's Reality Check across the Cartesian product of all tested slices (price bands $\times$ time-to-close windows $\times$ venues). The $z=1.15$ difference between sets confirms low statistical power, not true replication.
+
+---
+
+### Summary of Sound Claims
+* **Claim C1 & C3:** Sound. Standard SEs on tick data severely underestimate variance due to autocorrelation; market-level clustering is statistically mandatory.
+* **Lookahead fix (book_at):** Sound. Replacing forward-looking bisect with backwards step-function evaluation is correct.

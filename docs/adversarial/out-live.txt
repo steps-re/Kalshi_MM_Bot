@@ -1,0 +1,51 @@
+### Fatal / High Severity
+
+#### 1. Passive Exit Backtest Artifact: Simultaneous Maker Fills Are Look-Ahead / Counterparty-Adverse
+* **Target:** Claim C2, `passive_exit()` (lines 305–347), and audited backtest exit metric.
+* **Mechanism:** In the backtest, Net PnL assumes an exit fills at the touch as a maker after 30s. In reality, posting at the touch into a 2–5¢ deep out-of-the-money market that is 150–900s from expiry creates severe adverse selection:
+  1. If the underlying price continues moving against the position (towards 0¢), nobody crosses to fill your resting exit at 4¢/5¢; you get stranded, time out after 40s, and cross out at 1¢/0¢ (or expire worthless).
+  2. You *only* fill passively when the market rebounds violently through your ask/bid—meaning you cap your winners while realizing 100% of your catastrophic drift losses.
+  3. C6 notes "2 of 5 filled as MAKER at entry." Filling as a maker when sending a marketable taker order occurs *only* when the touch moved away during transit.
+* **Bias:** Massive **positive bias** (+0.671¢/trade reported in C2 is purely phantom).
+* **Test:** Compare passive fill rates on losing trades vs. winning trades in live execution. If resting exit fill rate is $<35\%$ on expiring OTM strikes without immediate crossing, the backtest assumption is dead.
+
+---
+
+#### 2. Structural Microstructure Drift Confound in the OBI Control Band
+* **Target:** Claim C4 ("rules out drift because drift does not care how imbalanced the book is").
+* **Mechanism:** The monotonicity across OBI bands does *not* prove edge; it is an artifact of queue positioning and strike pinning. In binary options near expiry (2–5¢):
+  - When $|OBI| > 0.9$ (e.g., Bid 100 @ 3¢ vs Ask 5000 @ 4¢), the massive ask wall represents market-maker delta hedges and probability pinning.
+  - Squeezing or absorbing that 3¢ level requires deterministic spot moves.
+  - The control band ($|OBI| < 0.2$) in a 1¢–2¢ wide book represents an unstable, evaporating book immediately prior to a tick down. Conditioning on $|OBI| > 0.9$ selects for periods of high liquidity resistance, not directional alpha.
+* **Bias:** False positive validation of alpha; underestimates structural barrier decay.
+* **Test:** Run the OBI dose-response sorting on randomized/shuffled time-series of books where price changes are permuted. If OBI still shows monotonicity due to the static bid/ask geometry of 1–5¢ contract ticks, the signal is a mechanical artifact of the ladder discrete tick structure.
+
+---
+
+#### 3. Execution Race Condition: Double Fill Risk on Timeout
+* **Target:** `passive_exit()` lines 332–347 & `flatten()` lines 350–378.
+* **Mechanism:**
+  ```python
+  left = (await rest.get_positions((ticker,))).get(ticker, 0)
+  # ... cancels resting order ...
+  # ... calls flatten() which sends a MARKET cross ...
+  ```
+  REST API latency to Kalshi is 50–200ms. If the resting order fills on the exchange *while* `get_orders` / `batch_cancel_orders` is in flight, `left` was computed prior to cancellation. `flatten()` is immediately invoked and sends a crossing order for `abs(position)`. This opens an unintended **opposite-direction naked position** right at close into an illiquid book.
+* **Bias:** Asymmetric tail risk (loss of 95¢–98¢ per unhedged inverted contract).
+* **Test:** Assert that `get_positions` is re-queried *after* order cancellation confirms before passing count to `flatten()`.
+
+---
+
+#### 4. Selection Bias & Multiple Testing via Cell Cherry-Picking
+* **Target:** Claim C5 ("One cell clears costs... KXBTCD, 2–5¢, 30s horizon, last 15m").
+* **Mechanism:** Slicing by (Instrument $\times$ Price Band $\times$ Horizon $\times$ Time-to-Expiry) creates at least $3 \times 5 \times 4 \times 3 = 180$ cells. Finding exactly one cell where $z = 1.15$ consistency between 95 and 24 markets is expected under pure noise ($p \approx 1 - (1-0.05)^{180} > 0.999$).
+  - Admitting it "does NOT generalise to 15M family (stays negative)" confirms it is an overfitted residual, not a structural property of Kalshi OBI.
+* **Bias:** Overstates expected value (+0.55¢ to +0.92¢ vs true expectation $\le 0$).
+* **Test:** Bonferroni/Benjamini-Hochberg correction across the entire tested grid. At $N=180$, the critical $t$-stat for $p < 0.05$ is $t > 3.65$. The audited cell fails.
+
+---
+
+### Low Severity / Sound Claims
+
+* **C1 Sound:** Accurate. Treating 931 ticks across 2 price paths as independent samples is an invalid degrees-of-freedom error.
+* **C3 Sound:** Clustered standard errors by market ticker is mathematically correct for intra-market auto-correlated ticks.

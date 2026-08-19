@@ -1,0 +1,127 @@
+"""What the live test actually measured.
+
+    python scripts/taker_live_report.py /var/tmp/taker_live_test.jsonl
+
+The question the recorded-book audit could not answer was whether a live order
+gets the price that was showing when the signal fired. This reads the live
+journal and answers it, plus the two things that decide whether the cell is
+worth trading at size: how often we fill at all, and how often we fill as a
+maker (which is free) rather than a taker.
+
+Reports by order size, because one contract proves the price and says nothing
+about depth. A clean result at 1 and a degraded one at 25 is the expected shape
+if the edge is real but thin, and that is the distinction that matters.
+"""
+
+from __future__ import annotations
+
+import json
+import statistics as st
+import sys
+from collections import defaultdict
+from pathlib import Path
+
+
+def load(path: Path) -> list[dict]:
+    rows = []
+
+    for line in path.read_text().splitlines():
+        line = line.strip()
+
+        if not line:
+            continue
+
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            continue
+
+    return rows
+
+
+def summarise(label: str, rows: list[dict]) -> None:
+    sent = [r for r in rows if r.get("executed") or r.get("filled") is not None]
+    filled = [r for r in rows if (r.get("filled") or 0) > 0]
+    slips = [r["slippage_cents"] for r in filled if "slippage_cents" in r]
+    makers = [r for r in filled if r.get("was_maker")]
+    fees = [r.get("fees_dollars", 0.0) for r in filled]
+    pnl = [r["pnl_cents"] for r in rows if "pnl_cents" in r]
+
+    print(f"\n{label}")
+    print(f"  signals            {len(rows)}")
+    print(f"  orders sent        {len(sent)}")
+
+    if not sent:
+        print("  (nothing was sent - dry run, or no window)")
+        return
+
+    print(f"  filled             {len(filled)}  ({len(filled) / len(sent):.0%} of sent)")
+
+    if not filled:
+        return
+
+    print(f"  filled as MAKER    {len(makers)}  ({len(makers) / len(filled):.0%}, "
+          f"zero fee)")
+    print(f"  fees paid          ${sum(fees):.4f} total, "
+          f"${sum(fees) / len(filled):.4f} per fill")
+
+    if slips:
+        worst = max(slips, key=abs)
+        print(f"  SLIPPAGE           mean {st.mean(slips):+.3f}c   "
+              f"worst {worst:+.3f}c   "
+              f"{sum(1 for s in slips if s == 0)}/{len(slips)} exact")
+
+        if abs(st.mean(slips)) < 0.05:
+            print("    -> fills land on the displayed touch. The audit's entry "
+                  "assumption holds.")
+        else:
+            print("    -> fills are drifting off the touch. The measured edge "
+                  "shrinks by this much.")
+
+    if pnl:
+        print(f"  balance change     {sum(pnl):+d}c over {len(pnl)} completed trades "
+              f"({st.mean(pnl):+.2f}c each)")
+        print("    Note: this is realised cash including settlement, not the "
+              "30-second markout the audit measured.")
+
+    exits = defaultdict(int)
+
+    for row in filled:
+        exits[row.get("exit", "none")] += 1
+
+    if exits:
+        print(f"  exits              {dict(exits)}")
+
+
+def main() -> None:
+    path = Path(sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/taker_live_test.jsonl")
+
+    if not path.exists():
+        sys.exit(f"no journal at {path}")
+
+    rows = load(path)
+
+    if not rows:
+        sys.exit("journal is empty")
+
+    print(f"{len(rows)} journal rows from {path}")
+    summarise("ALL", rows)
+    by_size: dict[int, list[dict]] = defaultdict(list)
+
+    for row in rows:
+        by_size[int(row.get("size", 1))].append(row)
+
+    if len(by_size) > 1:
+        for size in sorted(by_size):
+            summarise(f"AT {size} CONTRACT(S)", by_size[size])
+
+    buys = [r for r in rows if r.get("buying")]
+    sells = [r for r in rows if r.get("buying") is False]
+
+    if buys and sells:
+        summarise("BUY side", buys)
+        summarise("SELL side", sells)
+
+
+if __name__ == "__main__":
+    main()

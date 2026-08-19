@@ -1,0 +1,45 @@
+### 1. Fatal Flaw: Impossible "Maker Exit at Horizon Touch" (Lines 240–252, C2, C6)
+* **Mechanism:** The code marks gross PnL assuming a resting exit fills with 100% certainty at the *opposite touch* exactly at $t = 30\text{s}$ (`exit_touch = book["ask"] if buy else book["bid"]`). In reality, placing a limit order at the ask at $t=30\text{s}$ makes you *queue tail*. You only fill if subsequent aggressive buying trades through the entire existing ask queue. If the market ticks down, you get 0 fills and adverse selection; if it ticks up, you fill.
+* **Bias:** **Massively positive (+0.50c to +1.00c/trade).** It fabricates the full half-spread ($+0.671\text{c}$) on every exit without modeling queue dynamics, fill probability, or non-fill penalties.
+* **Definitive Test:** Filter cache for events where `mid(t=30s)` does not trade *strictly through* the exit touch in $[30\text{s}, 60\text{s}]$. Compute PnL under realistic queue fill logic. The positive edge will vanish completely.
+
+---
+
+### 2. Microstructure Artifact in C4 Dose-Response / Control Band (C4, Lines 240–245)
+* **Mechanism:** For binary books ($0\text{--}100\text{c}$) with discrete ticks, wide spreads (e.g., $2\text{--}3\text{c}$), and low nominal prices ($2\text{--}5\text{c}$), $|\text{OBI}| > 0.9$ directly selects for asymmetric order books where the opposite side has already been depleted to $\le 1$ contract. 
+  When the bid has 1,000 contracts and ask has 1 contract, the book is at the verge of ticking up mechanically. Marking at the *ask touch* at $t=30\text{s}$ means any $1\text{c}$ bid/ask bounce creates an instant fabricated profit. The control band ($|\text{OBI}| < 0.2$) selects for balanced, thicker queues where the spread is wider and crossing/touching loses the full spread.
+* **Bias:** **Strongly positive for $|\text{OBI}| > 0.9$.** The dose-response is not measuring forward alpha; it measures book-asymmetry-induced mechanical spread recovery under the flawed "touch" exit assumption.
+* **Definitive Test:** Re-run the C4 monotonicity table using **pure mid-to-mid** returns without touch markout (`sign * (mid_30s - mid_0s)`). The monotonic gradient from $-0.90\text{c} \to -0.01\text{c}$ will flatten into noise around negative taker fees.
+
+---
+
+### 3. Asymmetric Tail Penny Fee Accounting (Lines 111–114, 237–248, C5)
+* **Mechanism:** In C5, the winning cell is KXBTCD at $2\text{--}5\text{c}$. On Kalshi, buying at $2\text{c}$ incurs taker fee:
+  $$\text{Fee} = 7 \times 0.02 \times 0.98 = 0.1372\text{c}$$
+  If the long trade wins and exits at touch $3\text{c}$ or expires at $100\text{c}$, settlement/exit fees apply. More critically, line 248 calculates `gross_touch = sign * (exit_touch - entry) / 100`. At $2\text{c}\text{--}5\text{c}$, a $1\text{c}$ tick move represents a $+20\%\text{--}50\%$ return, whereas downward moves are bounded by $0\text{c}$. Truncated downside near $0\text{c}$ combined with resting-touch exit creates a structural positive drift for cheap options that does not survive genuine liquidity crossing.
+* **Bias:** **Positive (+0.30c to +0.60c).**
+* **Definitive Test:** Force exit at `cross` with full two-way taker fee:
+  $$\text{Net} = \text{sign} \cdot (\text{exit\_cross} - \text{entry}) - \text{fee}(\text{entry}) - \text{fee}(\text{exit\_cross})$$
+  At $2\text{--}5\text{c}$, net expectancy drops from $+0.927\text{c}$ to deeply negative ($< -0.40\text{c}$).
+
+---
+
+### 4. Slicing Survivorship / Multiplicity in C5 KXBTCD Sub-regime (C5, Lines 466–472)
+* **Mechanism:** Claim C5 isolates a hyper-specific sub-slice: *KXBTCD $\times$ price $2\text{--}5\text{c}$ $\times$ 30s horizon $\times$ last 15m before close*. 
+  This slices the corpus across Venue (5+) $\times$ OBI band (5) $\times$ Price band (7) $\times$ Horizon (3) $\times$ Window Phase (2) = $>1,050$ implicit cells.
+  The placebo test (Lines 418–434) tests max slice mean across the unconditioned family, but does not adjust for the *post-hoc manual conditioning* on `phase <= 900` specifically on KXBTCD.
+* **Bias:** **Positive (Data dredging / Selection bias).**
+* **Definitive Test:** Apply Holm-Bonferroni or full family-wise error rate across all $1,050+$ permutations of (venue $\times$ fine price $\times$ OBI $\times$ horizon $\times$ phase). The $p$-value for C5 will exceed $0.40$.
+
+---
+
+### 5. Non-Stationary Clustered Unit Inflation (Lines 163–182, 381–386)
+* **Mechanism:** KXBTCD strike ladders share the exact same underlying BTC spot price path within the same hour. The code clusters on `ticker` (e.g., `KXBTCD-26AUG19-T60000`), treating 10 simultaneous strikes on the same hourly expiry as 10 independent clusters. In reality, they are a single 1D spot delta path.
+* **Bias:** **Understates SE by $\sqrt{N_{\text{strikes}}} \approx 2.5\text{--}3.5\times$.** Inflates nominal $t$-statistics by $>200\%$.
+* **Definitive Test:** Re-cluster standard errors on `(underlying, expiry_timestamp)` rather than `ticker`. The KXBTCD $t$-statistic drops well below the critical threshold ($t < 1.0$).
+
+---
+
+### Sound Claims:
+* **C1 & C3:** Sound. Treating correlated ticks within windows as independent draws severely inflated legacy $t$-stats; window clustering is necessary (though strike-level clustering remains insufficient).
+* **C6:** Taker fee formula verification is mathematically accurate.
