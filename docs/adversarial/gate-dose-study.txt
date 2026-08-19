@@ -1,0 +1,58 @@
+2208 real fills with a 30s self-book markout
+joining OBI from recordings for 120 tickers...
+  /Users/mike/kalshi-audit/recs2: 120/159
+765 fills matched to a fresh OBI sample (35%)
+
+
+REAL-FILL MARKOUT BY IMBALANCE AGAINST THE FILL (the direct evidence)
+bucket                  fills   mean markout  % losing
+0against .50-.70           62       -1.190c       40%
+0against .70-.90          104       -0.309c       49%
+0against .90-.95           49       -0.320c       71%
+0against >= .95           142       -1.435c       60%
+1against .20-.50           82       +0.311c       48%
+4 balanced                143       +0.092c       45%
+5 WITH the fill >= .5     183       -0.244c       48%
+
+BY PRICE DECILE (ticks/1000)
+bucket                  fills   mean markout  % losing
+price 0x                   22       -1.318c       64%
+price 1x                  121       +0.088c       50%
+price 2x                  130       -0.631c       52%
+price 3x                   48       -0.927c       58%
+price 4x                   48       +0.292c       40%
+price 5x                   28       -5.179c       61%
+price 6x                   49       -2.286c       57%
+price 7x                   85       +1.053c       44%
+price 8x                  158       -0.113c       48%
+price 9x                   76       -0.201c       51%
+
+BY VENUE
+bucket                  fills   mean markout  % losing
+KXBTC15M                   29       -1.005c       62%
+KXDOGE15M                 250       -1.354c       55%
+KXGOLD15M                 133       +0.365c       47%
+KXSILVER15M                41       -0.122c       51%
+KXSOL15M                  102       +0.217c       44%
+KXWTI15M                  103       +0.102c       51%
+KXXRP15M                   99       -0.422c       44%
+
+BY FILL ROLE
+bucket                  fills   mean markout  % losing
+maker                     765       -0.433c       50%
+
+==========================================================================
+GATE SWEEP over 765 passive fills (takers are our own crosses - the gate never sees them)
+
+ thresh  blocked  % fills  blocked markout  kept markout  saved/cycle*
+    50%      131      17%         -0.534c      -0.412c        +5.00c
+    60%      117      15%         -0.077c      -0.498c        +0.64c
+    70%      103      13%         -0.117c      -0.483c        +0.86c
+    80%       85      11%         -0.376c      -0.440c        +2.29c
+    90%       60       8%         -0.963c      -0.388c        +4.13c
+    95%       43       6%         -1.251c      -0.385c        +3.84c
+
+baseline mean markout, all passive fills: -0.433c
+* 'saved/cycle' = the blocked fills' total markout, negated, per journal
+  (a journal is one cycle). Positive means the gate removes net losers.
+  A good threshold blocks strongly-negative fills and few of the rest.
