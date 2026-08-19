@@ -54,3 +54,63 @@ Monetising it is a separate question, and on current evidence the round trip
 costs more than the forecast is worth except where fees are near zero. That is
 the 2-5c near-expiry cell, and whether even that pays depends on the passive
 exit filling.
+
+
+---
+
+# Round 2, 2026-08-19
+
+Two more attacks on the surviving claims. One refuted, one was a real error in
+my own arithmetic and it flipped the verdict.
+
+## Refuted: "mid-to-mid is the thin side widening away"
+
+The argument: at extreme imbalance you consume the thin side, market makers pull
+back, the spread widens, the mid rises - and none of that is sellable because
+the bid never moved. Test: decompose the signed 30s move into the side we cross
+(thin) and the side that must come to us (thick).
+
+    band       thin side   THICK side
+    control      +0.046c      -0.020c
+    obi>.9       +0.943c      +0.779c
+
+The thick side lifts +0.800c from control to extreme. Spread widening accounts
+for about 0.16c of the 0.86c. The bid genuinely rises after a bid-heavy signal,
+which is exactly what has to happen for the trade to be sellable.
+
+## Upheld, and it flipped the answer: the fills are adversely selected
+
+The break-even framing multiplied the passive fill rate by the average P&L of
+ALL trades. That assumes the trades that fill are a random sample of them. They
+are not: **you fill precisely when the market comes to you**, so fills are
+concentrated in the trades that went wrong.
+
+`scripts/exit_fill_study.py` replays every qualifying trigger against the book
+that followed it and lets each take the path it would really have taken:
+
+    ORIGINAL ARCHIVE, 1,022 triggers
+    hold  rest   exits   filled passively   realised
+     15s   90s     726          57%          -0.412c
+     30s   90s     678          51%          -0.405c
+     60s   45s     722          40%          -0.247c
+     60s   90s     586          49%          -0.017c
+
+    RECOVERED CORPUS, 212 triggers: -0.52c to -0.77c throughout
+
+Fill rates do rise with a longer rest window, and several configurations clear
+the 42% threshold. **The realised expectancy is negative anyway.** A 57% fill
+rate still loses 0.412c, because the 57% that fill are the wrong 57%.
+
+These are also the optimistic bound - a fill is counted whenever a counterparty
+reached our price, ignoring the queue ahead of us - so the truth is worse.
+
+## Verdict
+
+The signal is real: +0.86c of directional forecast at extreme imbalance against
+a control of +0.013c, monotone across 640 markets, with the thick side carrying
++0.78c of it. The round trip is not tradeable: every hold and rest combination
+realises a loss once fills are priced conditionally.
+
+Live confirmation, 13 real orders and 33 cents: entries filled at the displayed
+touch every time, and realised cash ran -1.09c per completed trade, in the same
+negative territory the study predicts.

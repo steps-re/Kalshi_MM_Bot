@@ -296,24 +296,69 @@ Worst case per trade is the entry price, two to five cents, because there is no
 leverage and a sell at 97c is a buy of NO at 3c. Thirty trades all losing the
 maximum is about a dollar and a half.
 
-**The whole thing reduces to one number.** For the candidate cell, both recorded
-corpora agree independently on what the two exits are worth:
+"""
+)
 
-| exit | archive (69 markets) | recovered (16 markets) |
-|---|---:|---:|
-| rests at the touch and fills | +0.694c | +0.695c |
-| has to cross out | -0.509c | -0.502c |
+st.error(
+    "**Answered, and the answer is no.** The break-even arithmetic below was "
+    "wrong, a hostile reviewer caught it, and correcting it turns the candidate "
+    "negative. Simulating the resting exit against the book that actually "
+    "followed each of 1,234 triggers gives a realised expectancy of -0.02c to "
+    "-0.77c per trade, in every combination of hold and rest window, on both "
+    "corpora independently.",
+    icon="🛑",
+)
 
-So the strategy pays if, and only if, a resting exit fills often enough:
+st.subheader("The arithmetic that was wrong")
+st.markdown(
+    """
+For the candidate cell both corpora agreed on what the two exits are worth:
++0.694c if the resting exit fills, -0.509c if it has to cross. That gives a
+break-even passive fill rate of `0.509 / (0.694 + 0.509)` = **42%**, and the
+first live exits were coming in around there.
 
-    break-even passive fill rate = 0.509 / (0.694 + 0.509) = 42%
+The error is in the blend. It multiplies the fill rate by the average P&L of
+**all** trades, which assumes the trades that fill are a random sample of them.
+They are not. **You fill precisely when the market comes to you** - that is, when
+the price moved against your position. The fills are adversely selected, so
+`E[touch | filled]` is far worse than `E[touch | all]`.
+"""
+)
 
-Both corpora give 42%. That is the entire question, and it is measurable live
-in an afternoon. The run so far is sitting almost exactly on the line, on a
-sample far too small to call.
+st.subheader("What the books say when you simulate the actual path")
+st.markdown(
+    "Each trigger takes the one outcome it would really have had, rather than a "
+    "blend. Fill rates do rise with a longer rest window, exactly as hoped, and "
+    "several configurations clear 42%. The realised expectancy is negative "
+    "anyway."
+)
+st.dataframe(
+    [
+        {"hold": "15s", "rest": "20s", "exits": 919, "filled passively": "33%",
+         "realised": "-0.384c"},
+        {"hold": "15s", "rest": "45s", "exits": 834, "filled passively": "47%",
+         "realised": "-0.478c"},
+        {"hold": "15s", "rest": "90s", "exits": 726, "filled passively": "57%",
+         "realised": "-0.412c"},
+        {"hold": "30s", "rest": "90s", "exits": 678, "filled passively": "51%",
+         "realised": "-0.405c"},
+        {"hold": "60s", "rest": "45s", "exits": 722, "filled passively": "40%",
+         "realised": "-0.247c"},
+        {"hold": "60s", "rest": "90s", "exits": 586, "filled passively": "49%",
+         "realised": "-0.017c"},
+    ],
+    hide_index=True,
+)
+st.markdown(
+    """
+That is the original archive, 1,022 triggers. The recovered corpus agrees on 212
+triggers and is worse throughout, between -0.52c and -0.77c. A 57% fill rate,
+comfortably above the 42% threshold, still realises -0.412c, because the 57% that
+filled are the wrong 57%.
 
-Size is the question *after* this one. There is no point measuring how many
-contracts you can get filled for a strategy that cannot get out.
+These are also the **optimistic** bound: they count a fill whenever a
+counterparty reached our price, ignoring the queue ahead of us. The true numbers
+are worse.
 """
 )
 
