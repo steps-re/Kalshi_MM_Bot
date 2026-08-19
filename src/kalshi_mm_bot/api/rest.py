@@ -127,17 +127,25 @@ class KalshiRestClient:
         status: str = "open",
         limit: int = 1000,
         cursor: str | None = None,
+        series_ticker: str | None = None,
     ) -> tuple[list[dict[str, Any]], str | None]:
         """One page of markets, with the cursor for the next page.
 
         Returns `(markets, next_cursor)`; `next_cursor` is None on the last
         page. Used by the screener, which walks the whole exchange.
+
+        `series_ticker` narrows to one family server-side. Without it, finding
+        the handful of markets in one series means paging all ~84k open markets,
+        which takes minutes - too slow for anything that has to react to a book.
         """
 
         params: dict[str, Any] = {"status": status, "limit": limit}
 
         if cursor:
             params["cursor"] = cursor
+
+        if series_ticker:
+            params["series_ticker"] = series_ticker
 
         data = await self._request("GET", "/markets", params=params)
         return list(data.get("markets") or ()), data.get("cursor") or None

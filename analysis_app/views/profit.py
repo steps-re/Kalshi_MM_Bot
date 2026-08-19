@@ -221,6 +221,31 @@ six shrugs.
 """
 )
 
+st.header("Live, with real money")
+st.markdown(
+    r"""
+The strategy is being tested on the account now, one contract at a time, with a
+hard \$25 floor checked against the exchange's own balance before every entry.
+The first five orders are in:
+
+- **five sent, five filled, zero slippage on every one.** Every fill came at
+  exactly the price that was showing when the signal fired.
+- **two of five filled as makers, at zero fees.** Pricing at the touch sometimes
+  rests and gets hit rather than crossing, and Kalshi charges makers nothing.
+  That is upside the model did not assume.
+- the three taker fees came in at 0.34c, 0.27c and 0.21c on 5c, 4c and 3c
+  entries, matching `0.07 x P(1-P)` exactly.
+
+Worst case per trade is the entry price, two to five cents, because there is no
+leverage and a sell at 97c is a buy of NO at 3c. Thirty trades all losing the
+maximum is about a dollar and a half.
+
+**What is still unknown is size.** One contract was never going to move a book
+showing 74. Ten and twenty-five contracts are the tests that decide whether this
+is worth running, and they are the next thing to do.
+"""
+)
+
 st.header("What I would actually do next, in order")
 st.markdown(
     """

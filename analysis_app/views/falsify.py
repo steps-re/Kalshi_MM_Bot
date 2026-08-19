@@ -110,19 +110,33 @@ in-sample table is now testable, and it does not survive: see **The audit**.
 """
 )
 
-st.subheader("4. Live is not replay")
+st.subheader("4. Live is not replay - TESTED, first result in")
 st.markdown(
     """
-**The claim at risk:** the entry price.
+**The attack:** every net number here assumes you take the displayed touch at
+the instant the signal fires. Extreme imbalance means that touch is the thin
+side, and the thin side is the first thing consumed. This was the largest
+untested risk and no amount of book data could rule it out.
 
-**The attack:** the scan assumes you take the displayed touch at the instant the
-signal appears. Extreme imbalance means that touch is thin, and the thin side is
-the first thing consumed. By the time an order arrives the price is worse, or
-there is nothing there. This is the classic way a backtested taker edge
-evaporates, and no amount of book data can rule it out.
+**Tested live on 2026-08-19**, one contract per order, real money:
 
-**How to break it:** send real orders at minimum size and compare fills to the
-displayed touch. This is the only test that settles it, and it is cheap.
+| order | limit sent | filled | slippage | how it filled | fee |
+|---|---:|---:|---:|---|---:|
+| sell | 96c | 96c | 0.00c | maker | \\$0.0000 |
+| buy | 4c | 4c | 0.00c | maker | \\$0.0000 |
+| sell | 95c | 95c | 0.00c | taker | \\$0.0034 |
+| buy | 4c | 4c | 0.00c | taker | \\$0.0027 |
+| sell | 97c | 97c | 0.00c | taker | \\$0.0021 |
+
+**Five orders, five fills, zero slippage on every one.** Two filled as makers at
+zero fees, which is better than the model assumed. The three taker fees match
+`0.07 x P(1-P)` to the cent.
+
+**What this does and does not settle.** It settles that a one-contract order gets
+the price that was showing. It does not settle size: the median displayed depth
+on the crossing side is 74 contracts, so one contract was never going to walk the
+book. Ten or twenty-five contracts is the next test, and it is the one that
+decides whether this is worth running.
 """
 )
 
