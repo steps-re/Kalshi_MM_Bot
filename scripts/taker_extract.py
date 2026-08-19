@@ -66,7 +66,18 @@ from kalshi_mm_bot.recording import (  # noqa: E402
 TICKS_PER_CENT = ONE_DOLLAR // 100
 HORIZONS = (5.0, 15.0, 30.0)
 MAX_HORIZON = max(HORIZONS)
-OBI_BANDS = (("obi.5-.7", 0.5, 0.7), ("obi.7-.9", 0.7, 0.9), ("obi>.9", 0.9, 1.01))
+OBI_BANDS = (
+    # CONTROL: books with no meaningful imbalance. These carry no signal by
+    # construction, so whatever they earn in a given price band and market phase
+    # is what the STRUCTURE pays - decay, drift, spread dynamics - and not what
+    # the imbalance predicts. Without this band a positive slice cannot be told
+    # apart from a market that simply drifts one way near expiry.
+    ("obi<.2 CTRL", 0.0, 0.2),
+    ("obi.2-.5", 0.2, 0.5),
+    ("obi.5-.7", 0.5, 0.7),
+    ("obi.7-.9", 0.7, 0.9),
+    ("obi>.9", 0.9, 1.01),
+)
 MAX_SPREAD_TICKS = 200
 MIN_GAP = 5.0
 

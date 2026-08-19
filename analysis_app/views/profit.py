@@ -94,7 +94,100 @@ st.dataframe(
     hide_index=True,
 )
 
-st.header("The one that survived a pre-registered holdout")
+dose = data.get("dose")
+
+if dose:
+    st.header("The control band, and why it changes everything")
+    st.markdown(
+        """
+The original scan could not tell a signal from a drift, because every trigger it
+kept already had extreme imbalance. There was nothing to compare against. The
+re-run adds a **control band**: books with imbalance under 0.2, which carry no
+signal by construction. Whatever they earn in the same price band and the same
+part of a market's life is what the *structure* pays. Anything above that is what
+the imbalance is worth.
+
+Nothing is selected below. Every price band and both directions are pooled, and
+each market contributes one number.
+"""
+    )
+    for label, key in (("The recovered corpus: 15-minute family plus ladders",
+                        "recovered"),
+                       ("The original archive: ladders plus sports", "archive")):
+        rows = dose.get(key, [])
+
+        if not rows or "mean" not in rows[0]:
+            continue
+
+        st.subheader(label)
+        st.dataframe(
+            [
+                {"order-book imbalance": r["band"] + ("   <- no signal" if r.get("control") else ""),
+                 "mean net/trade": cents(r["mean"]),
+                 "+/-": f"{r['se']:.3f}",
+                 "markets": r["markets"]}
+                for r in rows if "mean" in r
+            ],
+            hide_index=True,
+        )
+        lift = rows[-1]["mean"] - rows[0]["mean"]
+        st.markdown(
+            f"Monotone, and the imbalance is worth **{cents(lift)} per trade** over a "
+            f"balanced book. But the level at the strongest imbalance is still "
+            f"{cents(rows[-1]['mean'])}, so the lift alone does not pay."
+        )
+
+    st.info(
+        "This is the cleanest result in the project. The imbalance signal is real, "
+        "monotone, and much better established than the +0.85c originally "
+        "published. It is also not, on its own, enough to trade: it lifts you "
+        "roughly 0.6c to 0.9c, from a baseline that taking starts about 0.9c below "
+        "water. You need a cell where the starting point is high enough that the "
+        "lift clears it."
+    )
+
+    st.header("One cell does clear it, and it replicates")
+    st.markdown(
+        """
+`KXBTCD`, entry 2 to 5 cents, 30-second horizon, inside the last quarter hour
+before expiry. Tested on two corpora that were collected by different runs into
+different buckets, and never analysed together until now.
+"""
+    )
+    for label, key in (("Original archive", "lead_archive"),
+                       ("Recovered corpus, never analysed before", "lead_recovered")):
+        rows = dose.get(key, [])
+
+        if not rows:
+            continue
+
+        st.subheader(label)
+        st.dataframe(
+            [
+                {"order-book imbalance": r["band"] + ("   <- no signal" if r.get("control") else ""),
+                 "net/trade": cents(r.get("mean")),
+                 "+/-": f"{r['se']:.3f}" if "se" in r else "-",
+                 "markets": r["markets"],
+                 "clears zero": "yes" if r.get("significant") else ""}
+                for r in rows
+            ],
+            hide_index=True,
+        )
+
+    st.success(
+        "Monotone in both. The no-signal control is flat or negative in both. The "
+        "top band clears zero in both, and the two estimates are not statistically "
+        "different from each other. This is the first result in the project that "
+        "survives a control, a holdout, and clustered standard errors at once."
+    )
+    st.warning(
+        "It is also one instrument. On the 15-minute family the same cheap-entry "
+        "condition lifts only about 0.2c and never gets above water, so this is a "
+        "KXBTCD result, not a Kalshi result.",
+        icon="⚠️",
+    )
+
+st.header("The earlier holdout, kept for the record")
 if held:
     row = held[0]
     st.success(
@@ -130,13 +223,12 @@ six shrugs.
 
 st.header("What I would actually do next, in order")
 st.markdown(
-    f"""
-**1. Do not deploy anything yet. Record the missing data first.**
-The one surviving candidate rests on {held[0]['windows'] if held else 0} markets
-of holdout. That is a lead, not an edge. The collector already knows how to
-capture this; it needs to run on the strike ladders through their final quarter
-hour, for a week, and upload. The single cheapest thing that would settle this
-costs nothing but time.
+    """
+**1. Trade one instrument, or none.**
+The replicated cell is `KXBTCD` at 2-5 cent entries in the final quarter hour.
+On the 15-minute family the same condition lifts about 0.2c and stays under
+water, so there is no general Kalshi strategy here. Anything that sizes off the
+whole exchange is sizing off a result that only exists on the BTC hourly ladder.
 
 **2. Trade only the side that predicts.**
 Imbalance forecasts up-moves on bid-heavy books and forecasts essentially nothing
@@ -191,18 +283,18 @@ anti-correlated, so the edge does not scale by simply pressing harder.
 st.header("Why this might still be nothing")
 st.markdown(
     """
-- **It came out of a search.** Splitting price and phase created new slices, and
-  the best of many slices is biased upward. The placebo null and the FDR
-  correction account for that, and one slice cleared a real holdout, but one is
-  one.
-- **Near expiry, these contracts decay toward zero.** A rule that ends up short
-  the expensive side wins on drift alone, with no forecasting involved. The
-  whole-window sign-flip placebo is designed to catch exactly that and does not
-  flag it, but a decay confound is the first thing to attack here.
-- **The instrument is one family.** BTC and ETH strike ladders. The venue that
-  held and the venue that was refuted are the two halves of the same idea.
+- **It is one instrument.** The cell replicates on KXBTCD twice, and does not
+  generalise to the 15-minute family at all. Calling it an edge on Kalshi would
+  be overreading it by an order of magnitude.
 - **Live is not recorded.** Entry assumes you take the displayed touch at the
-  instant you see it. In practice the thin side is the first thing consumed, so
-  live fills will be worse than these.
+  instant you see it. Extreme imbalance means that touch is thin, and the thin
+  side is the first thing consumed, so live fills will be worse than these. This
+  is the largest untested risk and only real orders settle it.
+- **Capacity is small and anti-correlated with signal.** A few dollars an hour at
+  50 contracts, on a condition that exists for fifteen minutes at a time.
+- **The decay confound is answered, not dismissed.** The control band is flat or
+  negative wherever the edge appears, and the response rises monotonically with
+  imbalance, which drift cannot produce. That was the strongest objection and it
+  did not survive contact with the control.
 """
 )

@@ -126,6 +126,74 @@ def scan_period(cache: Path, meta: dict, name: str, **filters) -> dict:
     }
 
 
+OBI_ORDER = ["obi<.2 CTRL", "obi.2-.5", "obi.5-.7", "obi.7-.9", "obi>.9"]
+
+
+def dose_response(cache: Path, **filters) -> list[dict]:
+    """Mean net by imbalance band with NO slice selected, one number per market.
+
+    This is the test the original scan could not run, because it had no control
+    band: every trigger it kept already had extreme imbalance, so a positive
+    slice could not be told apart from a market that simply drifts. Pooling all
+    price bands and both directions removes the selection, and the balanced
+    band shows what the structure pays when the signal says nothing.
+    """
+
+    slices, *_ = load(cache, None, None, **filters)
+    per: dict[str, dict[str, list]] = {ob: {} for ob in OBI_ORDER}
+
+    for (_venue, ob, _price, horizon), cell in slices.items():
+        if horizon != "30" or ob not in per:
+            continue
+
+        for ticker, total in cell.cl_net.items():
+            slot = per[ob].setdefault(ticker, [0.0, 0])
+            slot[0] += total
+            slot[1] += cell.cl_n[ticker]
+
+    out = []
+
+    for ob in OBI_ORDER:
+        means = [s / n for s, n in per[ob].values() if n >= 20]
+
+        if len(means) < 5:
+            out.append({"band": ob, "markets": len(means)})
+            continue
+
+        out.append({
+            "band": ob,
+            "mean": st.mean(means),
+            "se": st.stdev(means) / math.sqrt(len(means)),
+            "markets": len(means),
+            "control": "CTRL" in ob,
+        })
+
+    return out
+
+
+def named_cell(cache: Path, venue: str, price: str, **filters) -> list[dict]:
+    """The dose-response inside one pre-registered cell, band by band."""
+
+    slices, *_ = load(cache, None, None, **filters)
+    out = []
+
+    for ob in OBI_ORDER:
+        cell = slices.get((venue, ob, price, "30"))
+
+        if cell is None or not eligible(cell):
+            out.append({"band": ob, "markets": cell.n if cell else 0})
+            continue
+
+        mean = cell.mean("touch")
+        se = cell.clustered_se("touch")
+        out.append({
+            "band": ob, "mean": mean, "se": se, "markets": len(cell.cl_n),
+            "significant": bool(mean - 1.96 * se > 0), "control": "CTRL" in ob,
+        })
+
+    return out
+
+
 def census(cache: Path) -> list[dict]:
     bounds = {n: tuple(parse_utc(t) for t in s) for n, s in PERIODS.items()}
     stats = {n: {"n": 0, "venues": set(), "markets": set(), "hours": set(),
@@ -228,6 +296,8 @@ def main() -> None:
     parser.add_argument("--frozen-in", type=Path)
     parser.add_argument("--frozen-virgin", type=Path)
     parser.add_argument("--frozen-expiry", type=Path)
+    parser.add_argument("--recovered", type=Path,
+                        help="second, independent trigger cache for replication")
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
 
@@ -280,6 +350,22 @@ def main() -> None:
         payload["profit"]["replication"] = replication(
             args.cache, args.frozen_expiry, "in",
             bands=PRICE_BANDS_FINE, phase=(0.0, 900.0))
+
+    # --- the control band: is a positive slice signal, or just structure? ---
+    if args.recovered:
+        print("  dose-response with control band, both corpora", flush=True)
+        payload["dose"] = {
+            "archive": dose_response(args.cache),
+            "recovered": dose_response(args.recovered),
+            "cheap_recovered": dose_response(
+                args.recovered, bands=PRICE_BANDS_FINE, phase=(0.0, 900.0)),
+            "lead_archive": named_cell(
+                args.cache, "KXBTCD", ".02-.05",
+                bands=PRICE_BANDS_FINE, phase=(0.0, 900.0)),
+            "lead_recovered": named_cell(
+                args.recovered, "KXBTCD", ".02-.05",
+                bands=PRICE_BANDS_FINE, phase=(0.0, 900.0)),
+        }
 
     if args.obi and args.obi.exists():
         payload["obi"] = json.loads(args.obi.read_text())

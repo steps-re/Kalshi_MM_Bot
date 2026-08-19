@@ -143,10 +143,26 @@ def main() -> None:
     if journal_markouts and markouts.get(0.0):
         jm, rec0 = st.mean(journal_markouts), st.mean(markouts[0.0])
         print("CONTROL (same book, must agree):")
-        print(f"  journal mid_at_fill : {jm:+.3f}c")
+        print(f"  journal mid_at_fill : {jm:+.3f}c   <- ground truth for t=0")
         print(f"  self-book t=0       : {rec0:+.3f}c")
         ok = abs(rec0 - jm) < 0.10
-        print(f"  -> {'AGREE, curve is trustworthy' if ok else 'DISAGREE, investigate before trusting'}\n")
+        print(f"  -> {'AGREE, curve is trustworthy' if ok else 'DISAGREE'}")
+
+        if not ok:
+            # Measured 2026-08-19 on the 21 archived journals: the mid moves
+            # about 1.6c ACROSS a single fill, so the sample before the fill
+            # reads +1.34c, the sample after reads -0.24c, and the journal's own
+            # stamp sits between them at +0.37c. No lookup convention on a
+            # ~4/sec timeline can land on the fill instant, so this control
+            # cannot pass by choosing a different one. Treat t=0 as the
+            # journal's number and read the curve from 1s onward, where the
+            # fill event has passed and the sampling gap no longer dominates.
+            print("  The timeline cannot resolve the fill instant: the mid moves")
+            print("  ~1.6c across one fill, which is larger than the whole curve.")
+            print("  Trust mid_at_fill for t=0 and the shape from 1s onward, not")
+            print("  the level at t=0.\n")
+        else:
+            print()
 
     print("markout vs horizon (all fills, bot's own book):")
     print(f"  {'horizon':>8}{'n':>8}{'mean':>10}")

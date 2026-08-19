@@ -29,11 +29,14 @@ that would overturn the conclusion, and the data to try them on.
 
 st.header("Everything you need to reproduce it")
 st.code(
-    """# 9.8GB, 187 recordings, 8/16 to 8/19
+    """# BOTH buckets. The second one 403s on one account and not the other,
+# which is how 159 recordings looked like data loss for a day.
 gcloud storage rsync -r gs://steps-nate-backtest-data/recordings/ ./recs
+gcloud storage rsync -r gs://steps-kalshi-book/recordings/ ./recs2
 
 # one pass, builds the trigger cache everything else reads
-python scripts/taker_extract.py ./recs --out triggers.jsonl
+python scripts/taker_extract.py ./recs  --out triggers.jsonl
+python scripts/taker_extract.py ./recs2 --out t2.jsonl
 
 # the published baseline
 python scripts/taker_expectancy.py triggers.jsonl --period all
@@ -52,47 +55,43 @@ python scripts/taker_expectancy.py triggers.jsonl --period in \\
 
 st.header("The attacks, strongest first")
 
-st.subheader("1. The decay confound")
-st.markdown(
-    f"""
-**The claim at risk:** the near-expiry cheap-tail edge
-({cents(expiry['best'])} best slice, {expiry['bh_positive']} slices surviving
-FDR).
-
-**The attack:** in the last quarter hour, a deep out-of-the-money strike is
-mostly going to expire worthless. Any rule that systematically ends up short the
-expensive side earns that decay without forecasting anything. If the "edge" is
-drift rather than prediction, it is real money but it is not a signal, and it
-will reverse the moment the strike is on the other side of the underlying.
-
-**Why we think it survives:** the placebo flips the traded direction for whole
-markets at a time and re-scores. Decay is direction-symmetric under that flip, so
-it should wash out, and the observed best still beats
-{100 - expiry['placebo_beat_rate'] * 100:.0f}% of placebo draws.
-
-**How to break it:** split the near-expiry slices by whether the strike finished
-in or out of the money, and by buy versus sell. If the edge lives entirely in
-one cell, it is decay. This is the first thing to run and it has not been run.
-"""
-)
-
-st.subheader("2. One family, two halves, one of each result")
+st.subheader("1. The decay confound - ANSWERED")
 st.markdown(
     """
-**The claim at risk:** that the surviving slice generalises.
+**The attack:** in the last quarter hour a deep out-of-the-money strike mostly
+expires worthless. Any rule that systematically ends up short the expensive side
+earns that decay without forecasting anything. This was ranked first because it
+was the most likely way the whole thing was nothing.
 
-**The attack:** the candidate that held its holdout and the candidate that was
-flatly refuted are the BTC and ETH versions of the same strike-ladder idea, on
-the same exchange, in the same week. That is not two independent confirmations,
-it is one idea that worked once and failed once.
+**What settles it:** a control band. The re-extraction added books with imbalance
+under 0.2, which carry no signal by construction. Decay does not care how
+imbalanced the book is, so if the edge were drift, the control would pay the
+same as the extreme band. It does not. The response rises monotonically with
+imbalance and the control sits at or below zero, on both corpora and on every
+venue where the edge appears. See **Where the money might be**.
 
-**How to break it:** find any third instrument family where the same conditioned
-slice is testable. If it is absent or negative there, the surviving slice is
-almost certainly the lucky half of a coin flip.
+**What is still open:** the control answers the confound, not the size. On the
+15-minute family the imbalance lift is only about 0.2c and never gets above
+water, so the surviving cell is one instrument, not a strategy.
 """
 )
 
-st.subheader("3. The missing 15-minute recordings")
+st.subheader("2. One family, one instrument - CONFIRMED, and it stings")
+st.markdown(
+    """
+**The attack:** that the surviving cell generalises.
+
+**Verdict: it does not.** The cell replicates on KXBTCD across two independently
+collected corpora, and the same cheap-entry condition on the 15-minute family
+(GOLD, SOL, DOGE, WTI, XRP, BTC, ETH) lifts about 0.2c and stays negative
+throughout. So there is a real, replicated, controlled effect on the BTC hourly
+strike ladder, and no general Kalshi edge behind it.
+
+Anyone sizing this off the whole exchange is sizing off one instrument.
+"""
+)
+
+st.subheader("3. The missing 15-minute recordings - RECOVERED")
 st.markdown(
     f"""
 **The claim at risk:** everything the original chapter said about GOLD15M,
@@ -103,9 +102,11 @@ manifests hold strike ladders, MLB, NFL and two weather markets. Zero 15-minute
 series. The scan that produced those numbers read a temporary directory on a VM
 that has since been stopped.
 
-**How to break it:** if anyone still has that directory, or can re-record the
-15M family for a few days, the original claims become testable again. Until
-then, treat every 15M number ever published by this project as unverified.
+**Resolved 2026-08-19.** The recordings were never lost. The collector had been
+writing to a second bucket that returns 403 for one of the two accounts, and the
+403 was read as absence. 159 recordings and 16.6GB were recovered, giving 53
+GOLD15M markets where the published claim rested on **two**. The original
+in-sample table is now testable, and it does not survive: see **The audit**.
 """
 )
 

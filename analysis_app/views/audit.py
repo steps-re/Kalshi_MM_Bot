@@ -197,21 +197,44 @@ where the signal does not exist.
 else:
     st.info("OBI predictivity numbers pending the next data export.")
 
-st.header("5. What could not be checked at all")
+st.header("5. The headline table rested on two markets")
 st.markdown(
     f"""
-The archive holds **no 15-minute-window recordings**. All
-{corpus['recordings']} manifests contain only the BTC and ETH strike ladders,
-MLB, NFL and two weather markets. Every venue in the original in-sample table -
-GOLD15M at +1.39c, BTC15M, SOL15M, DOGE15M - and both later "new winners" are
-15M series. Those markets were certainly traded live, since the fee and
-cross-rate tables come from the account ledger, but the recorded books the scan
-consumed were staged in a temporary directory on the collector VM and never
-uploaded.
+The {corpus['recordings']}-recording archive contains no 15-minute-window data at
+all, so for a while none of the original in-sample table could be checked. The
+recordings turned out never to have been lost: the collector had been writing to
+a **second bucket** that returns 403 for one of the two accounts on this project,
+and that 403 was read as absence. Switching accounts recovered 159 recordings and
+16.6GB.
 
-So the headline table cannot be reproduced, checked or corrected from surviving
-data. The claims that can be checked are the ladder and sports ones, and those
-are the ones that did not hold up.
+With that data in hand the headline claim resolves, and not in its favour.
+"""
+)
+st.dataframe(
+    [
+        {"venue": "KXGOLD15M", "markets behind the published +1.39c (t=2.0)": 2,
+         "markets available once recovered": 53},
+        {"venue": "KXSOL15M", "markets behind the published +1.39c (t=2.0)": 2,
+         "markets available once recovered": 46},
+        {"venue": "KXDOGE15M", "markets behind the published +1.39c (t=2.0)": 2,
+         "markets available once recovered": 50},
+        {"venue": "KXWTI15M", "markets behind the published +1.39c (t=2.0)": 2,
+         "markets available once recovered": 51},
+    ],
+    hide_index=True,
+)
+st.markdown(
+    """
+`KXGOLD15M` had exactly two windows in the data the scan read: 11:30 and 16:15 on
+18 August. **Thirty minutes of one market's life.** The reported t of 2.0 came
+from treating 931 ticks inside those two price paths as 931 independent draws.
+That is the whole explanation for the original chapter, and it is simpler than
+the search-noise story it told about itself: not hundreds of slices mined for a
+winner, but a standard error computed across two markets.
+
+It also explains the replication failure directly. An estimate built on two
+windows is a draw from a very wide distribution. Of course a different day
+produced different winners.
 """
 )
 
