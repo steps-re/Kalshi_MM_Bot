@@ -1,0 +1,51 @@
+### 1. Artifacts in Mid-to-Mid: Micro-Price Stutter & Directional Asymmetry
+
+**The Flaw:** Mid-to-mid is *not* invariant to book geometry. When $|OBI| > 0.9$, the heavy side is deep (e.g., bid depth = 3,817) and the light side is paper-thin (e.g., ask depth = 1). 
+
+In binary/penny-increment markets, a single micro-fill or cancellation on the thin side flips the mid-quote up by 0.5¢ or 1.0¢ without *any* genuine price discovery occurring in the underlying asset (BTC). Furthermore, the mid-quote cannot drop without clearing 3,800+ contracts, but it jumps upward if 1 contract cancels. This creates purely mechanical **directional bounce bias** in mid-quote paths.
+
+* **Test:** Compute BTC spot (or perp) return over the same $t_0 \to t+30$ window conditioned on $|OBI| > 0.9$. If the underlying moves $0.00\sigma$ while mid-to-mid drifts $+0.86¢$, the mid drift is an intra-spread liquidity illusion, not an alpha forecast.
+
+---
+
+### 2. The 42% Break-Even Decomposition is Fallacious (Adverse Selection on Fills)
+
+**The Flaw:** The formula $p^* = \frac{\text{Loss}_{\text{cross}}}{\text{Gain}_{\text{rest}} + \text{Loss}_{\text{cross}}} = 42\%$ assumes the payoffs $\text{Gain}_{\text{rest}} (+0.695¢)$ and $\text{Loss}_{\text{cross}} (-0.502¢)$ are independent of whether a fill actually happens. **They are strictly conditional.**
+
+In passive execution, fills are conditionally biased toward toxic flow:
+$$\mathbb{E}[\text{PnL} \mid \text{Filled}] \ll \mathbb{E}[\text{PnL} \mid \text{Hypothetical Rest}]$$
+When the market moves in your favor, your resting exit order **does not get filled** (price runs away from your limit, forcing a scratch or stale cross). When the market crashes against you, your resting exit gets **filled instantly by informed sweeps**. 
+
+Your realized $+0.695¢$ gain is measured over states where the market drifted up; in reality, those are precisely the states where you *miss* the passive fill.
+
+* **Test:** Calculate Fill-or-Kill post-fill trajectory: For every limit order that *actually* fills passively, measure mid-quote at $t+60\text{s}$. If it continues to drift against you, passive fill EV is deeply negative.
+
+---
+
+### 3. Selection Bias in Exit Horizon ($t+30$ in Expiring Markets)
+
+**The Flaw:** Filter specifies "last 15 min" on KXBTCD with a fixed 30-second hold. As $t \to T_{\text{expiry}}$, binary delta goes to $\infty$ or $0$. 
+
+If you filter out expired markets, you induce survivorship bias. If you enter at 2–5¢ (deep out-of-the-money), the unconditional probability of delta collapsing to absolute zero within 30s is massive. A price moving from 2¢ to 1¢ or 0¢ provides no linear exit—the bid disappears entirely ($0$ bid), meaning the "CROSS exit" isn't $-0.502¢$; it is an untradable, total loss of $-100\%$ (-2.0¢ to -5.0¢).
+
+* **Test:** Report the **censored rate**: percentage of trades where opposite-side touch depth at $t+30$ is exactly 0 (unexecutable cross).
+
+---
+
+### 4. Control Band $|OBI| < 0.2$ Invalidity
+
+**The Flaw:** $|OBI| < 0.2$ is not a neutral state—it is high-entropy regime (tight spread, two-sided continuous quoting). $|OBI| > 0.9$ predominantly occurs **during discrete step-repricings or high underlying volatility**. 
+
+Conditioning on $|OBI| > 0.9$ selects for periods with high trade arrival rates ($\lambda$). You are not comparing the same market under different balances; you are comparing an active auction to an inactive book.
+
+* **Test:** Match pairs. Compare $|OBI| > 0.9$ triggers only against control triggers that share the exact same 1-minute historical volume, realized volatility, and time-to-expiry.
+
+---
+
+### 5. Capacity Failure: Moving from 1 to 25 Contracts
+
+**N3 is sound for $N=1$:**displayed touch fill matches the 1-contract reality.
+
+**What breaks at $N=25$:**
+1. **Spread clearance:** Displayed thin side is often only 5–15 contracts. A 25-contract market order will walk the book into the next tick, instantly adding a 1¢ penalty (-100 bps) to entry.
+2. **Queue Position Degradation:** At $N=25$, your passive exit joins the back of the queue. If total queue depth is 74, you must wait for the front 74 to clear. By the time 74 contracts hit your level, it is a regime shift, guaranteeing 100% adverse fill toxicity.

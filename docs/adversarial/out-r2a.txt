@@ -1,0 +1,56 @@
+The N1 mid-to-mid test refutes the simplest "book geometry" argument (that the OBI signal was just measuring the immediate cost to cross), but it is not a clean proof of directional forecasting skill. The break-even arithmetic in N2 is mathematically valid for an infinite-liquidity environment but highly brittle in practice. The live trading results (N3, N4) are too small to be meaningful.
+
+Here is the attack on the updated claims.
+
+### 1. Mid-to-Mid Artifacts: The "Drift" vs. "Bounce" Confound (Attacking N1)
+
+The mid-to-mid calculation controls for the bid-ask spread at $t=0$, but it does *not* control for asymmetric spread widening or liquidity withdrawal during the 30-second window, which is heavily correlated with high OBI.
+
+**The Mechanism:**
+At $|OBI| > 0.9$, the book is highly imbalanced (e.g., bid size 3817, ask size 74). If you buy the ask, you are consuming the thin side.
+In the next 30 seconds, what happens to the mid?
+1.  **Liquidity Withdrawal:** Market makers on the thin side often pull their quotes or widen the spread. If the ask moves from 97c to 98c (while the bid stays at 96c), the mid moves from 96.5c to 97c.
+2.  **No True Price Discovery:** This widening is *not* a directional price move; it is a mechanical reaction to the depletion of the thin side. The thick side (the bid) hasn't moved.
+3.  **The Artifact:** Mid-to-mid records this as a +0.5c profit. However, you cannot realize this profit unless you can sell at 97c (the new mid), which is impossible since the bid is still 96c.
+
+**The Test:**
+Decompose the mid-to-mid return into its bid and ask components. If the "profit" is driven entirely by the thin side moving further away (spread widening) while the thick side remains anchored, the forecast is an artifact of liquidity withdrawal, not true price discovery. Calculate:
+*   `Thin_side_t30 - Thin_side_t0`
+*   `Thick_side_t30 - Thick_side_t0`
+
+If the thick side doesn't move in the direction of the trade, the signal is economically useless.
+
+### 2. The Flawed Break-Even Arithmetic (Attacking N2)
+
+Claim N2 asserts that a 42% passive fill rate guarantees break-even. This is a dangerous oversimplification that assumes infinite liquidity at the touch and ignores the conditional probability of execution.
+
+**The Mechanism (Adverse Selection):**
+The passive exit strategy assumes you can rest an order at the touch and wait for a fill. But when do you get filled?
+*   You get filled when the market moves *against* you (someone crosses the spread to take your resting order).
+*   You *don't* get filled when the market moves *in your favor* (the price runs away, and your resting order is left behind).
+
+A 42% fill rate is only meaningful if the *distribution of returns for the filled trades* matches the distribution of returns for the unfilled trades. It almost certainly does not. The 42% of trades that fill will be heavily biased toward the trades that went wrong.
+
+**The Test:**
+Do not look at the average passive fill rate. Look at the *conditional PnL* of the trades that would have filled. Filter the historical data: only count a "passive fill" if the opposite touch actually traded at or through your target price within the 30-second window. Calculate the PnL of *only those trades*. It will be significantly worse than +0.694c.
+
+### 3. Selection Bias in the 30-Second Window (Attacking N1 & N2)
+
+The 30-second window is arbitrary and introduces a truncation bias.
+
+**The Mechanism:**
+If the market is highly volatile, 30 seconds might be enough time for the price to revert. If the market is slow, 30 seconds might capture the temporary spread widening (the artifact described in #1) before market makers replenish the thin side. The +0.861c mid-to-mid return at $|OBI| > 0.9$ might just be the temporary "dent" left in the book by the triggering trade.
+
+**The Test:**
+Extend the horizon. Calculate mid-to-mid returns at $t+60$, $t+300$, and $t+600$. If the OBI signal represents genuine directional information, the return should persist or grow. If it's a transient microstructure effect (like a temporary spread widening), the return will decay back to zero.
+
+### 4. Scaling: The 25-Contract Wall (Attacking N5)
+
+N5 notes a median depth of 74 contracts on the thin side. Moving from 1 contract to 25 completely changes the execution dynamics.
+
+**The Mechanism:**
+1.  **Market Impact:** Crossing 25 contracts into a 74-contract depth consumes ~34% of the available liquidity at that level. This significantly increases the probability of moving the price (slippage) or triggering a cascade of quote withdrawals.
+2.  **Queue Position:** When resting a 25-contract order for the passive exit, you are now a significant portion of the queue. The adverse selection (described in #2) becomes much worse because it takes a larger adverse move to fill your entire size.
+
+**The Test:**
+Calculate the volume-weighted average price (VWAP) to cross 25 contracts in the historical data, assuming you eat into the book. Compare the VWAP entry to the simple touch entry. The slippage will likely consume the entire expected edge.
