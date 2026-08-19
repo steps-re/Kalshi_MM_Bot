@@ -9,17 +9,16 @@ This is the Steps Ventures fork of
 ## How it ended (project closed 2026-08-19)
 
 Two days of live measurement against the exchange's own ledger, ~$13 of a $50
-account spent buying the answers. The verdict: **on Kalshi's fee schedule,
-neither a resting maker nor a selective taker keeps money on any venue we could
-record.** The order book's imbalance genuinely predicts the next mid move, and
-the move is worth less than the cost of acting on it. Gross runs +0.06c to
-+0.65c per trade across slices; the taker fee runs 0.36c to 0.56c.
+account spent buying the answers. The verdict: **on Kalshi's fee schedule there
+is no general edge, for a resting maker or a selective taker.** Pooled across
+everything, even the strongest order-book imbalance averages -0.014c per trade.
+A strategy that takes on imbalance without conditioning on entry price and market
+phase loses.
 
-Re-audited after close against the full 62-hour archive with the scan's
-measurement defects fixed: **0 of 141 testable slices clear costs**, and a
-whole-window sign-flip placebo never beats the best observed slice in 400 draws.
-That is a stronger negative than the original run produced, on six times the
-data. Three corrections to what was first published:
+Re-audited after close against 100+ hours of recorded books, with the scan's six
+measurement defects fixed and a no-signal control band added. The sweeping
+version of the verdict does not survive contact with the control, and the narrow
+version is stronger than what was first published. Four corrections:
 
 - The imbalance slope is **+0.224c +/- 0.058 per unit OBI** (clustered on the
   market), not the +0.85c first reported, and it is absent on ETH-daily. It is
