@@ -1091,3 +1091,53 @@ not worth the fee to harvest." It is: the signal is real, it is worth about
 0.9c, taking costs about 0.9c, and whether you clear that depends entirely on
 picking an entry price where the fee is a fifth of a cent instead of one and a
 half.
+
+
+---
+
+# The gate, dosed on real fills before the live A/B decides (2026-08-19 evening)
+
+The OBI-gated maker is running live as an A/B (obi_gate=0 vs 90, round-robin
+per cycle, $25 floor). Rather than wait a night to learn whether 90 was the
+right level, the 2,208 journaled fills were used as the treatment group of
+every threshold at once: each real fill joined to the collector book for the
+imbalance just before it, markout from the journal's own timeline, veto
+simulated at six levels. 765 fills matched a fresh OBI sample.
+
+**The mechanism, on real fills.** 30s markout by imbalance against the fill:
+
+    balanced              +0.092c   45% losing
+    against .20-.50       +0.311c   48%
+    against .90-.95       -0.320c   71% losing
+    against >= .95        -1.435c   60% losing
+
+The fills the signal says not to take are the fills that lost. This is the same
+dose-response as the recorded-book study, now on fills that carry real adverse
+selection.
+
+**The sweep.** Blocked-vs-kept markout by threshold:
+
+    thresh   blocked   %fills   blocked mkt   kept mkt   saved/cycle
+      50%       131      17%      -0.534c     -0.412c      +5.00c
+      60%       117      15%      -0.077c     -0.498c      +0.64c
+      70%       103      13%      -0.117c     -0.483c      +0.86c
+      90%        60       8%      -0.963c     -0.388c      +4.13c
+      95%        43       6%      -1.251c     -0.385c      +3.84c
+
+90 and 95 are the selective levels: what they block is 2.5-3x worse than what
+they keep. 60-70 block fills no worse than average (nothing gained), and 50's
+apparent savings ride on a noisy mid bucket without selectivity. **The live arm
+at 90 sits on the efficient frontier**, so the A/B stands unchanged - about
++4c/cycle of avoided losses against the maker's ~9c/cycle historical edge, if
+live agrees.
+
+Caveats: 35% OBI match rate (collector coverage), and saved/cycle ignores
+forgone spread capture on blocked fills, so it is an upper bound.
+
+**Second lever found in the same pass, parked until the A/B ends:** DOGE15M is
+the toxic venue (-1.354c mean 30s markout across 250 real fills) while GOLD,
+SOL and WTI are positive. Dropping one venue is a bigger effect than the gate,
+and it must not be changed mid-A/B.
+
+Early live tally, 2 cycles per arm: control -$1.49, -$0.57; gated +$0.60,
++$0.43. Consistent with the offline direction, far too small to call.
