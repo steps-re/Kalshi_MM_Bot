@@ -21,6 +21,14 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
+# Measured on both recorded corpora, independently and in agreement, for the
+# KXBTCD 2-5c near-expiry cell: a resting exit that fills is worth +0.69c and
+# one forced to cross is worth -0.50c. So the strategy lives or dies on how
+# often the resting exit trades.
+TOUCH_CENTS = 0.694
+CROSS_CENTS = -0.509
+BREAK_EVEN_FILL_RATE = -CROSS_CENTS / (TOUCH_CENTS - CROSS_CENTS)
+
 
 def load(path: Path) -> list[dict]:
     rows = []
@@ -91,6 +99,29 @@ def summarise(label: str, rows: list[dict]) -> None:
 
     if exits:
         print(f"  exits              {dict(exits)}")
+
+    # The number that decides the strategy. Both recorded corpora agree that a
+    # resting exit filling at the touch is worth about +0.69c and being forced
+    # to cross is worth about -0.50c, so the break-even passive fill rate is
+    # 0.50 / (0.69 + 0.50) = 42%. Above that the cell pays, below it does not.
+    rested = exits.get("rested", 0)
+    attempted = rested + exits.get("partial", 0)
+
+    if attempted:
+        rate = rested / attempted
+        print(f"\n  PASSIVE EXIT FILL RATE   {rested}/{attempted} = {rate:.0%}")
+        print(f"    break-even needs         {BREAK_EVEN_FILL_RATE:.0%}")
+        blended = (rate * TOUCH_CENTS + (1 - rate) * CROSS_CENTS)
+        print(f"    implied edge             {blended:+.3f}c per trade")
+
+        if attempted < 20:
+            print(f"    {attempted} exits is far too few to call. The interval on this "
+                  f"rate is wide.")
+        elif rate >= BREAK_EVEN_FILL_RATE:
+            print("    -> above break-even. The cell pays.")
+        else:
+            print("    -> below break-even. The round trip costs more than the "
+                  "forecast is worth.")
 
 
 def main() -> None:

@@ -296,21 +296,24 @@ Worst case per trade is the entry price, two to five cents, because there is no
 leverage and a sell at 97c is a buy of NO at 3c. Thirty trades all losing the
 maximum is about a dollar and a half.
 
-**The exits are the problem.** The first completed trade rested its exit at the
-touch for forty seconds, did not fill, and had to cross - which is exactly the
-CROSS column above, and it cost 2c. That is one trade and proves nothing on its
-own, but it is the number to watch, and it is the number the adversarial review
-said would decide this.
+**The whole thing reduces to one number.** For the candidate cell, both recorded
+corpora agree independently on what the two exits are worth:
 
-Two things are still unknown, in this order:
+| exit | archive (69 markets) | recovered (16 markets) |
+|---|---:|---:|
+| rests at the touch and fills | +0.694c | +0.695c |
+| has to cross out | -0.509c | -0.502c |
 
-1. **The passive-exit fill rate.** If a resting exit fills most of the time the
-   strategy is roughly break-even overall and positive in the cheap cell. If it
-   rarely fills, the round trip costs 2.19c against a 0.861c forecast and the
-   answer is a clean no.
-2. **Size.** One contract was never going to move a book showing 74. Ten and
-   twenty-five contracts come after the exit question is settled, because there
-   is no point measuring capacity for a strategy that cannot exit.
+So the strategy pays if, and only if, a resting exit fills often enough:
+
+    break-even passive fill rate = 0.509 / (0.694 + 0.509) = 42%
+
+Both corpora give 42%. That is the entire question, and it is measurable live
+in an afternoon. The run so far is sitting almost exactly on the line, on a
+sample far too small to call.
+
+Size is the question *after* this one. There is no point measuring how many
+contracts you can get filled for a strategy that cannot get out.
 """
 )
 
