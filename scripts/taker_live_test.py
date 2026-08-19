@@ -46,6 +46,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import random
 import sys
 import time
 from datetime import datetime, timezone
@@ -82,7 +83,16 @@ PHASE_MAX = 900.0                       # last 15 minutes
 # being measured. The audited cell ran 0-900s; this is a conservative subset.
 PHASE_MIN = 150.0
 MIN_CROSSABLE = 10                      # contracts showing on the side we cross
-HOLD_SECONDS = 30.0                     # the horizon the audit measured
+# --- randomised arms -----------------------------------------------------------
+# A fixed policy answers one question: does THIS configuration pay? Randomising
+# the two parameters that matter turns the same trades into a controlled
+# experiment, so the run measures the fill CURVE rather than one point on it.
+# Both are assigned per trade, independently, from a uniform draw.
+HOLD_ARMS = (15.0, 30.0, 60.0)          # how long to hold before exiting
+REST_ARMS = (20.0, 45.0, 90.0)          # how long to rest the exit before crossing
+EXIT_POLL_SECONDS = 3.0                 # resolution of the time-to-fill curve
+SHADOW_HORIZONS = (5.0, 15.0, 30.0, 60.0, 120.0)
+HOLD_SECONDS = 30.0                     # only used when arms are disabled
 EXIT_REST_SECONDS = 40.0   # rest the exit before crossing whatever is left
 
 # --- hard limits --------------------------------------------------------------
@@ -103,6 +113,31 @@ def log(message: str) -> None:
 def fee_cents(price_ticks: float, count: int = 1) -> float:
     p = price_ticks / ONE_DOLLAR
     return 0.07 * count * p * (1.0 - p) * 100.0
+
+
+def snapshot(book) -> dict | None:
+    """Everything about the book we might want later, in one small dict.
+
+    Counterfactuals are free if the state is recorded and expensive if it is
+    not. One trade with snapshots at six horizons can price six exit rules; one
+    trade without them can price the one rule that was actually run.
+    """
+
+    if book is None or book.best_bid is None or book.best_ask is None:
+        return None
+
+    bid_sz = book.bids[book.best_bid]
+    ask_sz = book.asks[book.best_ask]
+    total = bid_sz + ask_sz
+
+    return {
+        "bid": book.best_bid,
+        "ask": book.best_ask,
+        "mid": (book.best_bid + book.best_ask) / 2,
+        "bid_sz": bid_sz / COUNT_SCALE,
+        "ask_sz": ask_sz / COUNT_SCALE,
+        "obi": (bid_sz - ask_sz) / total if total else 0.0,
+    }
 
 
 def long_equivalent(entry: int, buying: bool) -> int:
@@ -324,16 +359,15 @@ async def realised_fill(rest, ticker: str, since: float) -> dict:
     }
 
 
-async def passive_exit(rest, controller, ticker: str, position: int) -> dict:
-    """Rest the exit at the touch, cross only what is left. The audited model.
+async def passive_exit(rest, controller, ticker: str, position: int,
+                       rest_seconds: float) -> dict:
+    """Rest the exit at the touch, polling so we learn WHEN it fills.
 
-    Crossing straight out pays the spread AND a second fee, which is about 0.67c
-    a trade - larger than the edge being measured. The whole project turned
-    positive the day it stopped flattening by crossing, so the live test has to
-    exit the way the model assumes or it is measuring a worse strategy.
-
-    post_only guarantees the resting order cannot accidentally cross and pay a
-    taker fee while trying to avoid one.
+    A single fill/no-fill observation at a fixed 40s answers whether that one
+    rest duration clears the 42% break-even. Polling turns the same trade into a
+    point on the fill curve, which is what says whether resting longer is worth
+    the extra exposure. Time-to-fill is the most valuable number this test can
+    produce, and it costs only a few REST calls.
     """
 
     book = controller.orderbooks.get(ticker)
@@ -342,8 +376,11 @@ async def passive_exit(rest, controller, ticker: str, position: int) -> dict:
         return {"exit": "no book"}
 
     long_position = position > 0
-    # A long exits by SELLING at the ask; a short exits by BUYING at the bid.
     price = book.best_ask if long_position else book.best_bid
+    # Queue context: how much is already resting at our price. This is the best
+    # available proxy for queue position, which is what decides the fill.
+    ahead = (book.asks[book.best_ask] if long_position
+             else book.bids[book.best_bid]) / COUNT_SCALE
 
     try:
         await rest.batch_create_orders([CreateOrderRequest(
@@ -355,18 +392,28 @@ async def passive_exit(rest, controller, ticker: str, position: int) -> dict:
             post_only=True,
         )])
     except Exception as error:  # noqa: BLE001
-        log(f"  resting exit rejected ({type(error).__name__}), crossing instead")
-        return {"exit": "rest rejected"}
+        log(f"  resting exit rejected ({type(error).__name__}), will cross")
+        return {"exit": "rest rejected", "queue_ahead": ahead}
 
-    await asyncio.sleep(EXIT_REST_SECONDS)
-    left = (await rest.get_positions((ticker,))).get(ticker, 0)
+    started = now()
+    filled_at = None
 
-    if left == 0:
-        log(f"  exited passively at {price / 100:.0f}c, no fee")
-        return {"exit": "rested", "exit_price": price, "crossed": 0}
+    while now() - started < rest_seconds:
+        await asyncio.sleep(EXIT_POLL_SECONDS)
 
-    # Cancel whatever is still resting before crossing, or the stub cross and
-    # the resting order can both fill and leave us the opposite way round.
+        if (await rest.get_positions((ticker,))).get(ticker, 0) == 0:
+            filled_at = now() - started
+            break
+
+    if filled_at is not None:
+        log(f"  exited passively at {price / 100:.0f}c after "
+            f"{filled_at:.0f}s, no fee")
+        return {"exit": "rested", "exit_price": price, "crossed": 0,
+                "fill_seconds": round(filled_at, 1), "queue_ahead": ahead,
+                "rest_seconds": rest_seconds}
+
+    # Cancel before crossing, or the resting order and the stub cross can both
+    # fill and leave us the opposite way round.
     try:
         orders = await rest.get_orders(ticker=ticker, status="resting", limit=50)
 
@@ -377,8 +424,10 @@ async def passive_exit(rest, controller, ticker: str, position: int) -> dict:
     except Exception as error:  # noqa: BLE001
         log(f"  cancel of resting exit failed: {type(error).__name__} {error}")
 
-    return {"exit": "partial", "exit_price": price,
-            "crossed": abs(left) // COUNT_SCALE}
+    left = (await rest.get_positions((ticker,))).get(ticker, 0)
+    return {"exit": "partial" if left else "rested", "exit_price": price,
+            "crossed": abs(left) // COUNT_SCALE, "fill_seconds": None,
+            "queue_ahead": ahead, "rest_seconds": rest_seconds}
 
 
 async def flatten(rest, controller, ticker: str, log_prefix: str = "  ") -> int:
@@ -518,12 +567,13 @@ async def run(args) -> None:
 
             last_trigger[ticker] = now()
 
-            # One trade at a time. A full queue means we are mid-trade, and
-            # dropping the signal is correct: it will come round again.
+            # One trade at a time. A full queue means we are mid-trade, so the
+            # signal cannot be traded - but it is still evidence, so follow it.
             try:
                 pending.put_nowait((ticker, trade))
             except asyncio.QueueFull:
-                pass
+                stats["shadowed"] = stats.get("shadowed", 0) + 1
+                track(ticker, trade)
 
     async def refresh() -> None:
         """Re-discover markets as hourly strikes expire and new ones open.
@@ -553,6 +603,37 @@ async def run(args) -> None:
     if initial:
         await subscribe_queue.put(initial)
 
+    shadow_tasks: set = set()
+
+    async def shadow(ticker: str, trade: dict) -> None:
+        """Record a signal we could not trade, and what the book did next.
+
+        Only one position is open at a time, so most signals are dropped. Those
+        drops are not random: we are busy exactly when the market is active, so
+        the traded sample is biased toward quiet moments. Following the dropped
+        signals costs nothing (no orders, just reading the book the pump is
+        already maintaining) and gives an unbiased read on the signal itself,
+        at roughly ten times the volume of the traded sample.
+        """
+
+        row = {"kind": "shadow", "ts": now(), "ticker": ticker, **trade,
+               "entry_book": snapshot(controller.orderbooks.get(ticker)),
+               "forward": {}}
+        started = now()
+
+        for horizon in SHADOW_HORIZONS:
+            await asyncio.sleep(max(0.0, horizon - (now() - started)))
+            row["forward"][f"{horizon:.0f}"] = snapshot(
+                controller.orderbooks.get(ticker))
+
+        with journal.open("a") as handle:
+            handle.write(json.dumps(row) + "\n")
+
+    def track(ticker: str, trade: dict) -> None:
+        task = asyncio.create_task(shadow(ticker, trade))
+        shadow_tasks.add(task)
+        task.add_done_callback(shadow_tasks.discard)
+
     pump_task = asyncio.create_task(pump())
     refresh_task = asyncio.create_task(refresh())
     deadline = now() + args.duration_sec
@@ -576,14 +657,24 @@ async def run(args) -> None:
             f"(equiv {trade['equiv'] / 100:.0f}c) obi {trade['obi']:+.2f} "
             f"size showing {trade['crossable']:.0f} t-{trade['to_close']:.0f}s")
 
+        # Randomise both parameters per trade, independently. This is what
+        # makes the run an experiment rather than a sample of one policy.
+        hold = random.choice(HOLD_ARMS)
+        rest_for = random.choice(REST_ARMS)
         record = {
-            "ts": now(), "ticker": ticker, **trade,
+            "kind": "trade", "ts": now(), "ticker": ticker, **trade,
             "displayed_touch": trade["entry"], "executed": False,
+            "arm_hold": hold, "arm_rest": rest_for, "size": SIZE,
+            "entry_book": snapshot(controller.orderbooks.get(ticker)),
+            "forward": {},
         }
 
         if not args.execute:
-            with journal.open("a") as handle:
-                handle.write(json.dumps(record) + "\n")
+            # Dry run is not a rehearsal, it is a free data collector. Following
+            # every signal forward with no orders gives unbiased signal-quality
+            # data at unlimited volume and zero risk, which is the cheapest way
+            # to grow the sample the traded run cannot.
+            track(ticker, trade)
             continue
 
         balance = await rest.get_available_balance_cents()
@@ -622,15 +713,25 @@ async def run(args) -> None:
         else:
             log("  order sent but nothing filled yet")
 
-        # Hold the measured horizon, then leave the way the audit assumed:
-        # rest at the touch, cross only the stub. Both steps run whatever the
-        # measurement did, because a stranded position is the one outcome that
-        # actually costs money.
-        await asyncio.sleep(HOLD_SECONDS)
+        # Hold the assigned horizon, snapshotting along the way so any other
+        # horizon can be priced later without having had to trade it.
+        entered = now()
+
+        for horizon in SHADOW_HORIZONS:
+            if horizon > hold:
+                break
+
+            await asyncio.sleep(max(0.0, horizon - (now() - entered)))
+            record["forward"][f"{horizon:.0f}"] = snapshot(
+                controller.orderbooks.get(ticker))
+
+        await asyncio.sleep(max(0.0, hold - (now() - entered)))
+        record["exit_book"] = snapshot(controller.orderbooks.get(ticker))
         held = (await rest.get_positions((ticker,))).get(ticker, 0)
 
         if held:
-            record.update(await passive_exit(rest, controller, ticker, held))
+            record.update(
+                await passive_exit(rest, controller, ticker, held, rest_for))
 
         left = await flatten(rest, controller, ticker)
         record["left_open"] = left
@@ -643,6 +744,19 @@ async def run(args) -> None:
         with journal.open("a") as handle:
             handle.write(json.dumps(record) + "\n")
 
+    # Shadow tasks follow a signal for up to two minutes. Cancelling them at
+    # shutdown throws away the rows they were about to write, which on a short
+    # run is every row.
+    if shadow_tasks:
+        log(f"  waiting for {len(shadow_tasks)} shadow follow-ups to finish")
+
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*shadow_tasks, return_exceptions=True),
+                timeout=max(SHADOW_HORIZONS) + 15.0)
+        except asyncio.TimeoutError:
+            log("  some shadow follow-ups did not finish in time")
+
     stats["stop"] = True
     pump_task.cancel()
     refresh_task.cancel()
@@ -653,7 +767,8 @@ async def run(args) -> None:
 
     final = await rest.get_available_balance_cents()
     log(f"done. {updates} book updates, signals {signals}, trades {guard.trades}, "
-        f"balance ${final / 100:.2f}. journal -> {journal}")
+        f"{stats.get('shadowed', 0)} shadowed, balance ${final / 100:.2f}. "
+        f"journal -> {journal}")
 
     if tally:
         log("why candidates were rejected (a working run rejects nearly all of them):")
@@ -673,7 +788,13 @@ def main() -> None:
     parser.add_argument("--max-trades", type=int, default=40)
     parser.add_argument("--duration-sec", type=float, default=3600.0)
     parser.add_argument("--journal", default="/var/tmp/taker_live_test.jsonl")
+    # The phase window is itself a parameter worth varying: the audited cell was
+    # 0-900s, and whether the edge lives early or late in that band is unknown.
+    parser.add_argument("--phase-min", type=float, default=PHASE_MIN)
+    parser.add_argument("--phase-max", type=float, default=PHASE_MAX)
     args = parser.parse_args()
+    globals()["PHASE_MIN"] = args.phase_min
+    globals()["PHASE_MAX"] = args.phase_max
     asyncio.run(run(args))
 
 

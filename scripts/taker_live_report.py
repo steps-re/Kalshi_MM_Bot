@@ -136,6 +136,93 @@ def summarise(label: str, rows: list[dict]) -> None:
                   "forecast is worth.")
 
 
+def shadow_report(rows: list[dict]) -> None:
+    """Signal quality from the untraded population.
+
+    These cost nothing and there are many more of them than traded rows, so
+    they carry most of the statistical weight for the question "does the signal
+    forecast", as opposed to "can we monetise it".
+    """
+
+    shadows = [r for r in rows if r.get("kind") == "shadow" and r.get("entry_book")]
+
+    if not shadows:
+        return
+
+    print(f"\n{'=' * 62}\nSHADOW SIGNALS (followed, never traded): {len(shadows)}")
+    print(f"{'horizon':>9}{'n':>7}{'signed mid move':>18}{'% favourable':>14}")
+
+    for horizon in ("5", "15", "30", "60", "120"):
+        moves = []
+
+        for row in shadows:
+            book = (row.get("forward") or {}).get(horizon)
+
+            if not book:
+                continue
+
+            sign = 1.0 if row["buying"] else -1.0
+            moves.append(sign * (book["mid"] - row["entry_book"]["mid"]) / 100.0)
+
+        if len(moves) >= 5:
+            good = sum(1 for m in moves if m > 0) / len(moves)
+            print(f"{horizon + 's':>9}{len(moves):>7}{st.mean(moves):>+16.3f}c"
+                  f"{good:>13.0%}")
+
+    print("  These are forecasts, not P&L: no spread paid, no fee, no exit.")
+
+
+def arm_report(rows: list[dict]) -> None:
+    """Did the randomised parameters matter? This is the causal part."""
+
+    trades = [r for r in rows if r.get("kind") == "trade" and (r.get("filled") or 0) > 0]
+
+    if not trades or "arm_rest" not in trades[0]:
+        return
+
+    print(f"\n{'=' * 62}\nRANDOMISED ARMS")
+    by_rest: dict[float, list[dict]] = defaultdict(list)
+
+    for row in trades:
+        by_rest[row.get("arm_rest", 0.0)].append(row)
+
+    print(f"\n{'rest window':>13}{'exits':>8}{'filled passively':>19}{'implied edge':>15}")
+
+    for arm in sorted(by_rest):
+        group = by_rest[arm]
+        attempts = [r for r in group if r.get("exit") in ("rested", "partial")]
+
+        if not attempts:
+            continue
+
+        rested = sum(1 for r in attempts if r.get("exit") == "rested")
+        rate = rested / len(attempts)
+        edge = rate * TOUCH_CENTS + (1 - rate) * CROSS_CENTS
+        print(f"{arm:>11.0f}s{len(attempts):>8}{rested}/{len(attempts)} = {rate:>6.0%}"
+              f"{edge:>+14.3f}c")
+
+    print("  A rising fill rate with a longer rest is the result that would make")
+    print("  this tradeable. Flat means resting longer only adds exposure.")
+    times = [r["fill_seconds"] for r in trades if r.get("fill_seconds") is not None]
+
+    if times:
+        print(f"\n  time-to-fill when it filled: median {st.median(times):.0f}s, "
+              f"max {max(times):.0f}s  (n={len(times)})")
+
+    by_hold: dict[float, list[int]] = defaultdict(list)
+
+    for row in trades:
+        if "pnl_cents" in row:
+            by_hold[row.get("arm_hold", 0.0)].append(row["pnl_cents"])
+
+    if len(by_hold) > 1:
+        print(f"\n{'hold':>8}{'trades':>9}{'mean cash':>12}")
+
+        for arm in sorted(by_hold):
+            vals = by_hold[arm]
+            print(f"{arm:>6.0f}s{len(vals):>9}{st.mean(vals):>+11.2f}c")
+
+
 def main() -> None:
     path = Path(sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/taker_live_test.jsonl")
 
@@ -148,18 +235,21 @@ def main() -> None:
         sys.exit("journal is empty")
 
     print(f"{len(rows)} journal rows from {path}")
-    summarise("ALL", rows)
+    traded = [r for r in rows if r.get("kind") != "shadow"]
+    summarise("TRADED", traded)
+    arm_report(rows)
+    shadow_report(rows)
     by_size: dict[int, list[dict]] = defaultdict(list)
 
-    for row in rows:
+    for row in traded:
         by_size[int(row.get("size", 1))].append(row)
 
     if len(by_size) > 1:
         for size in sorted(by_size):
             summarise(f"AT {size} CONTRACT(S)", by_size[size])
 
-    buys = [r for r in rows if r.get("buying")]
-    sells = [r for r in rows if r.get("buying") is False]
+    buys = [r for r in traded if r.get("buying")]
+    sells = [r for r in traded if r.get("buying") is False]
 
     if buys and sells:
         summarise("BUY side", buys)
