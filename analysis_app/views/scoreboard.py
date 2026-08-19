@@ -49,13 +49,12 @@ if board is None:
     st.stop()
 
 st.warning(
-    r"""Status: we removed a **proven** loser (crossing to flatten lost at t = -2.4),
-but we have **not** yet proven a winner. The corrected strategy is +\$0.37 over
-4 cycles - indistinguishable from zero, carried by one lucky +\$1.32 cycle. The
-per-cycle swing (~\$0.84) dwarfs any edge, so it takes ~250 cycles to tell a
-\$0.15/cycle edge from luck. Read the number below as a measurement in progress,
-not a verdict.""",
-    icon="⚖️",
+    r"""**Final: trading is stopped, by choice, with the account above its \$35
+floor.** The measured verdict came in - maker edge indistinguishable from zero,
+and every taker slice that looked profitable failed replication on unseen data
+(full story on the "What we found" page). The numbers below are the historical
+record of the corrected strategy's run, frozen where it ended.""",
+    icon="🏁",
 )
 
 balance = board.get("balance")

@@ -12,15 +12,15 @@ st.caption(
 
 st.header("The one-sentence version")
 st.markdown(
-    r"""**Crossing the spread to flatten was a measured, provable loss; removing it
-stopped the bleed but has not yet proven a profit.** Over 9 cycles the
-flatten-by-crossing bot lost \$0.31 a cycle (t = -2.4, real, not noise).
-Switching to free passive exits moved that to +\$0.09 a cycle over the next
-4 cycles - but that is statistically indistinguishable from zero (t = +0.2), and
-a single lucky +\$1.32 cycle carries it: the other three corrected cycles sum
--\$0.95 on still-positive markout. What remains after fees is adverse selection,
-and we have not shown it nets positive. The honest status is: we removed a proven
-loser, we have not yet proven a winner."""
+    r"""**On this exchange's fee schedule, nobody small keeps money: not a resting
+maker, not a selective taker.** We proved each piece in turn. Crossing to flatten
+was a provable loss (-\$0.31/cycle, t = -2.4) - removed. Passive exits took the
+strategy to +\$0.09/cycle - indistinguishable from zero over any horizon we could
+afford. The order book's imbalance genuinely predicts the next move (~0.85c per
+unit, n = 1.36M updates), but every attempt to harvest it - recentered quotes,
+selective taking - lost the edge to fees and noise, and every "winning slice"
+failed replication on unseen data. The full verdict is at the bottom; the journey
+to it is everything in between."""
 )
 
 st.header("How Nate made ~$1.50 (and why our bot didn't, at first)")
@@ -165,16 +165,44 @@ an independent source; a small sample always flatters.**
 """
 )
 
+st.header("The ending: three periods, no survivor")
+st.markdown(
+    r"""
+The last live hypothesis was the **sniper**: don't quote at all, just cross the
+spread on extreme order-book imbalance (a signal proven predictive over 1.36M
+book updates) and exit passively for free. Taker fills are deterministic on
+recorded books, so unlike every maker backtest this one is trustworthy - and it
+found slices clearing all costs: GOLD at +1.39c/trade (t=2.0), SOL, DOGE, BTC.
+
+Then the only test that matters: the same frozen slices on data they had never
+seen. **GOLD went to zero positive slices. SOL's winner vanished. BTC's flipped
+negative.** And each new day crowned different winners (WTI, XRP) that had shown
+nothing the day before. Three independent periods, three disjoint winner lists,
+no slice ever repeating - the exact signature of searching hundreds of noisy
+slices rather than of an edge.
+
+**Final verdict, measured:** on Kalshi's fee schedule, neither a resting maker
+nor a selective taker keeps money on any venue we can record. The imbalance
+signal is real, but the move it predicts (~0.85c) is smaller than the cost of
+acting on it. The market gives the signal away for free because it isn't worth
+the fee to harvest.
+
+And that completes the Nate reconciliation: his bot's real achievement was **zero
+expected cost** (maker-only, one book, never a forced cross). From there, +\$1.50
+over a limited run is about a one-in-three draw - preserved by stopping. The
+skill was the zero-cost build and the good sense to pocket the draw.
+"""
+)
+
 st.header("Where the coffee fund stands")
 st.markdown(
-    """
-$50 -> ~$41. Most of the drop bought the map (deliberate worst-regime
-experiments, the venue census, the flatten diagnosis). The strategy in its
-*corrected* form - commodity books, passive exits, phase-gated - has only just
-started its first clean run. The honest answer to "$50 -> $85" is: **unknown,
-and now measurable.** If passive exits let the positive commodity markout reach
-the account, it's a question of patience at ~$1-4/day. If not, the real money is
-Polymarket's maker-rewards pool - which pays makers to do exactly this - and
-that's gated on jurisdiction, not on anything we can code.
+    r"""
+\$50 -> \$36.66, trading stopped by choice with the account above its \$35
+floor. About \$13 bought the complete map: the fee schedule read off the ledger,
+the maker-free discovery, the passive-exit fix, the venue census, the biased-mid
+proof, and the three-period taker verdict above. The coffee target is not
+reachable on this exchange, and knowing that for sure - with the toolchain to
+re-ask the question on any venue in an evening - is what the \$13 bought. The
+account keeps the rest.
 """
 )
