@@ -164,3 +164,12 @@ instrument-limited rather than as a bracket answer. Settle-outs are reported
 as their own line (count, entry cost at risk) and never folded into the mean.
 
 No trading behaviour changes mid-run.
+
+**Clarification to Amendment 1, same day, still blind (n=10, no endpoint
+computed):** the stranding marker is `left_open != 0` - the position flatten
+could not close, journalled per trade - not the `exit` label. The second
+stranding of the run was journalled `exit: "partial"` because `passive_exit`
+recorded its crossing attempt and the flatten failure afterwards never updated
+the label. Position state beats path labels. Current tally: 2 of 10 executed
+(20%), 5c at risk, both books one-sided near expiry rather than window
+overruns (every trade's hold+rest fit inside its market's remaining life).

@@ -255,8 +255,15 @@ def bracket_verdict(traded: list[dict]) -> None:
     # Amendment 1: a trade abandoned to settlement ('no book') carries the mark
     # at abandonment, not its P&L - the position resolves at 0 or 100 after the
     # journal row is written. Excluded from the mean, counted against a 10% gate.
-    stranded = [r for r in executed if r.get("exit") == "no book"]
-    clean = [r for r in executed if r.get("exit") != "no book"]
+    # `left_open` is flatten's leftover, journalled per trade. It is the
+    # definitive marker: one stranding was recorded with exit=="partial"
+    # because passive_exit reported its crossing attempt and the later flatten
+    # failure never updated the exit field. Position state beats path labels.
+    def is_stranded(r):
+        return bool(r.get("left_open")) or r.get("exit") == "no book"
+
+    stranded = [r for r in executed if is_stranded(r)]
+    clean = [r for r in executed if not is_stranded(r)]
     pnl = [r["pnl_cents"] for r in clean]
     n = len(pnl)
 
