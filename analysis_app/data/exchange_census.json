@@ -1,0 +1,770 @@
+{
+ "total_markets": 615825,
+ "distinct_days": 43,
+ "day_span": [
+  "2026-07-09",
+  "2026-08-20"
+ ],
+ "families": [
+  {
+   "family": "sports-props",
+   "markets": 193766,
+   "series": 154,
+   "share": 0.31464458247066945
+  },
+  {
+   "family": "other",
+   "markets": 142548,
+   "series": 1688,
+   "share": 0.23147485080988917
+  },
+  {
+   "family": "crypto-hourly",
+   "markets": 76712,
+   "series": 7,
+   "share": 0.12456785612795843
+  },
+  {
+   "family": "weather",
+   "markets": 50842,
+   "series": 63,
+   "share": 0.08255916859497422
+  },
+  {
+   "family": "commodities",
+   "markets": 48201,
+   "series": 18,
+   "share": 0.07827061259286323
+  },
+  {
+   "family": "crypto-15M",
+   "markets": 39812,
+   "series": 12,
+   "share": 0.06464823610603662
+  },
+  {
+   "family": "tennis",
+   "markets": 34682,
+   "series": 25,
+   "share": 0.05631794746884261
+  },
+  {
+   "family": "indices",
+   "markets": 29262,
+   "series": 12,
+   "share": 0.04751674582876629
+  }
+ ],
+ "breadth": [
+  {
+   "series": "KXBTCD",
+   "family": "crypto-hourly",
+   "markets": 24354,
+   "days": 43,
+   "per_day": 566.4,
+   "tails": 11013,
+   "faves": 13302,
+   "avg_volume": 69146
+  },
+  {
+   "series": "KXMLBHIT",
+   "family": "sports-props",
+   "markets": 25713,
+   "days": 39,
+   "per_day": 659.3,
+   "tails": 15021,
+   "faves": 7903,
+   "avg_volume": 708
+  },
+  {
+   "series": "KXMLBHRR",
+   "family": "sports-props",
+   "markets": 32682,
+   "days": 39,
+   "per_day": 838.0,
+   "tails": 7230,
+   "faves": 15060,
+   "avg_volume": 373
+  },
+  {
+   "series": "KXETHD",
+   "family": "crypto-hourly",
+   "markets": 16537,
+   "days": 43,
+   "per_day": 384.6,
+   "tails": 5580,
+   "faves": 10751,
+   "avg_volume": 4053
+  },
+  {
+   "series": "KXMLBHR",
+   "family": "sports-props",
+   "markets": 14906,
+   "days": 39,
+   "per_day": 382.2,
+   "tails": 12554,
+   "faves": 1123,
+   "avg_volume": 7211
+  },
+  {
+   "series": "KXMLBTB",
+   "family": "sports-props",
+   "markets": 25036,
+   "days": 39,
+   "per_day": 641.9,
+   "tails": 6074,
+   "faves": 7153,
+   "avg_volume": 365
+  },
+  {
+   "series": "KXGOLDH",
+   "family": "commodities",
+   "markets": 15947,
+   "days": 36,
+   "per_day": 443.0,
+   "tails": 5749,
+   "faves": 7454,
+   "avg_volume": 807
+  },
+  {
+   "series": "KXBTC",
+   "family": "crypto-hourly",
+   "markets": 12340,
+   "days": 43,
+   "per_day": 287.0,
+   "tails": 10782,
+   "faves": 998,
+   "avg_volume": 3524
+  },
+  {
+   "series": "KXWTIH",
+   "family": "commodities",
+   "markets": 13603,
+   "days": 34,
+   "per_day": 400.1,
+   "tails": 4456,
+   "faves": 6612,
+   "avg_volume": 618
+  },
+  {
+   "series": "KXSILVERH",
+   "family": "commodities",
+   "markets": 14461,
+   "days": 35,
+   "per_day": 413.2,
+   "tails": 4547,
+   "faves": 5979,
+   "avg_volume": 552
+  },
+  {
+   "series": "KXSOLD",
+   "family": "crypto-hourly",
+   "markets": 9576,
+   "days": 43,
+   "per_day": 222.7,
+   "tails": 4706,
+   "faves": 4701,
+   "avg_volume": 2033
+  },
+  {
+   "series": "KXTEMPAUSH",
+   "family": "weather",
+   "markets": 8467,
+   "days": 43,
+   "per_day": 196.9,
+   "tails": 3140,
+   "faves": 5159,
+   "avg_volume": 742
+  },
+  {
+   "series": "KXNASDAQ100U",
+   "family": "indices",
+   "markets": 13130,
+   "days": 31,
+   "per_day": 423.5,
+   "tails": 2931,
+   "faves": 5324,
+   "avg_volume": 1654
+  },
+  {
+   "series": "KXTEMPNYCH",
+   "family": "weather",
+   "markets": 8080,
+   "days": 43,
+   "per_day": 187.9,
+   "tails": 3995,
+   "faves": 3977,
+   "avg_volume": 807
+  },
+  {
+   "series": "KXTEMPLAXH",
+   "family": "weather",
+   "markets": 8088,
+   "days": 43,
+   "per_day": 188.1,
+   "tails": 2720,
+   "faves": 5227,
+   "avg_volume": 1105
+  },
+  {
+   "series": "KXITFMATCH",
+   "family": "tennis",
+   "markets": 7803,
+   "days": 43,
+   "per_day": 181.5,
+   "tails": 3895,
+   "faves": 3900,
+   "avg_volume": 207999
+  },
+  {
+   "series": "KXMLBRBI",
+   "family": "sports-props",
+   "markets": 11775,
+   "days": 39,
+   "per_day": 301.9,
+   "tails": 4468,
+   "faves": 3310,
+   "avg_volume": 207
+  },
+  {
+   "series": "KXMLBTEAMTOTAL",
+   "family": "sports-props",
+   "markets": 7420,
+   "days": 39,
+   "per_day": 190.3,
+   "tails": 4040,
+   "faves": 3293,
+   "avg_volume": 5962
+  },
+  {
+   "series": "KXMLBKS",
+   "family": "sports-props",
+   "markets": 7241,
+   "days": 38,
+   "per_day": 190.6,
+   "tails": 4011,
+   "faves": 3180,
+   "avg_volume": 6732
+  },
+  {
+   "series": "KXTEMPCHIH",
+   "family": "weather",
+   "markets": 7344,
+   "days": 43,
+   "per_day": 170.8,
+   "tails": 2677,
+   "faves": 4430,
+   "avg_volume": 750
+  },
+  {
+   "series": "KXDJI",
+   "family": "indices",
+   "markets": 8046,
+   "days": 26,
+   "per_day": 309.5,
+   "tails": 2278,
+   "faves": 4721,
+   "avg_volume": 49
+  },
+  {
+   "series": "KXITFWMATCH",
+   "family": "tennis",
+   "markets": 6934,
+   "days": 43,
+   "per_day": 161.3,
+   "tails": 3461,
+   "faves": 3465,
+   "avg_volume": 195876
+  },
+  {
+   "series": "KXETH",
+   "family": "crypto-hourly",
+   "markets": 7793,
+   "days": 43,
+   "per_day": 181.2,
+   "tails": 5830,
+   "faves": 970,
+   "avg_volume": 1550
+  },
+  {
+   "series": "KXTEMPDCH",
+   "family": "weather",
+   "markets": 6846,
+   "days": 43,
+   "per_day": 159.2,
+   "tails": 2527,
+   "faves": 4051,
+   "avg_volume": 527
+  },
+  {
+   "series": "KXINXU",
+   "family": "indices",
+   "markets": 6958,
+   "days": 31,
+   "per_day": 224.5,
+   "tails": 3300,
+   "faves": 3269,
+   "avg_volume": 6577
+  },
+  {
+   "series": "KXMLBTOTAL",
+   "family": "sports-props",
+   "markets": 6388,
+   "days": 40,
+   "per_day": 159.7,
+   "tails": 3019,
+   "faves": 3358,
+   "avg_volume": 127087
+  },
+  {
+   "series": "KXMLBSPREAD",
+   "family": "sports-props",
+   "markets": 4508,
+   "days": 40,
+   "per_day": 112.7,
+   "tails": 3214,
+   "faves": 1278,
+   "avg_volume": 94083
+  },
+  {
+   "series": "KXCLUBFTOTAL",
+   "family": "sports-props",
+   "markets": 4244,
+   "days": 30,
+   "per_day": 141.5,
+   "tails": 2444,
+   "faves": 1753,
+   "avg_volume": 14429
+  },
+  {
+   "series": "KXCS2MAP",
+   "family": "other",
+   "markets": 4068,
+   "days": 43,
+   "per_day": 94.6,
+   "tails": 2005,
+   "faves": 2028,
+   "avg_volume": 10457
+  },
+  {
+   "series": "KXETH15M",
+   "family": "crypto-15M",
+   "markets": 4007,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 1984,
+   "faves": 2022,
+   "avg_volume": 88286
+  },
+  {
+   "series": "KXBTC15M",
+   "family": "crypto-15M",
+   "markets": 4007,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 1997,
+   "faves": 2009,
+   "avg_volume": 1617491
+  },
+  {
+   "series": "KXHYPE15M",
+   "family": "crypto-15M",
+   "markets": 4008,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 2011,
+   "faves": 1992,
+   "avg_volume": 28636
+  },
+  {
+   "series": "KXXRP15M",
+   "family": "crypto-15M",
+   "markets": 4008,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 1965,
+   "faves": 2036,
+   "avg_volume": 28189
+  },
+  {
+   "series": "KXSOL15M",
+   "family": "crypto-15M",
+   "markets": 4008,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 2011,
+   "faves": 1990,
+   "avg_volume": 25431
+  },
+  {
+   "series": "KXZEC15M",
+   "family": "crypto-15M",
+   "markets": 4008,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 2056,
+   "faves": 1943,
+   "avg_volume": 5143
+  },
+  {
+   "series": "KXBNB15M",
+   "family": "crypto-15M",
+   "markets": 4007,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 1988,
+   "faves": 2011,
+   "avg_volume": 17935
+  },
+  {
+   "series": "KXDOGE15M",
+   "family": "crypto-15M",
+   "markets": 4007,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 1996,
+   "faves": 1999,
+   "avg_volume": 24560
+  },
+  {
+   "series": "KXNEAR15M",
+   "family": "crypto-15M",
+   "markets": 4008,
+   "days": 43,
+   "per_day": 93.2,
+   "tails": 1972,
+   "faves": 2020,
+   "avg_volume": 4409
+  },
+  {
+   "series": "KXXRPD",
+   "family": "crypto-hourly",
+   "markets": 3850,
+   "days": 43,
+   "per_day": 89.5,
+   "tails": 1800,
+   "faves": 1999,
+   "avg_volume": 1002
+  },
+  {
+   "series": "KXMLBSB",
+   "family": "sports-props",
+   "markets": 5066,
+   "days": 39,
+   "per_day": 129.9,
+   "tails": 3196,
+   "faves": 559,
+   "avg_volume": 337
+  }
+ ],
+ "breadth_total": 421,
+ "pooled": [
+  {
+   "lookback_min": 5,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 2027,
+   "clusters": 377,
+   "net_cents": 0.928,
+   "se_cents": 0.551
+  },
+  {
+   "lookback_min": 5,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 972,
+   "clusters": 329,
+   "net_cents": 0.693,
+   "se_cents": 0.476
+  },
+  {
+   "lookback_min": 5,
+   "family": "commodities",
+   "trade": "fave BUY",
+   "n": 576,
+   "clusters": 41,
+   "net_cents": -0.146,
+   "se_cents": 0.987
+  },
+  {
+   "lookback_min": 5,
+   "family": "commodities",
+   "trade": "tail SELL",
+   "n": 289,
+   "clusters": 31,
+   "net_cents": 0.47,
+   "se_cents": 1.313
+  },
+  {
+   "lookback_min": 5,
+   "family": "crypto-15M",
+   "trade": "fave BUY",
+   "n": 819,
+   "clusters": 146,
+   "net_cents": 0.574,
+   "se_cents": 0.826
+  },
+  {
+   "lookback_min": 5,
+   "family": "crypto-15M",
+   "trade": "tail SELL",
+   "n": 268,
+   "clusters": 116,
+   "net_cents": 1.465,
+   "se_cents": 0.953
+  },
+  {
+   "lookback_min": 5,
+   "family": "crypto-hourly",
+   "trade": "fave BUY",
+   "n": 129,
+   "clusters": 49,
+   "net_cents": 2.939,
+   "se_cents": 1.197
+  },
+  {
+   "lookback_min": 5,
+   "family": "crypto-hourly",
+   "trade": "tail SELL",
+   "n": 78,
+   "clusters": 38,
+   "net_cents": -1.167,
+   "se_cents": 2.634
+  },
+  {
+   "lookback_min": 5,
+   "family": "indices",
+   "trade": "fave BUY",
+   "n": 248,
+   "clusters": 33,
+   "net_cents": 0.656,
+   "se_cents": 1.924
+  },
+  {
+   "lookback_min": 5,
+   "family": "indices",
+   "trade": "tail SELL",
+   "n": 136,
+   "clusters": 30,
+   "net_cents": -0.795,
+   "se_cents": 0.734
+  },
+  {
+   "lookback_min": 5,
+   "family": "sports-props",
+   "trade": "tail SELL",
+   "n": 73,
+   "clusters": 46,
+   "net_cents": 1.748,
+   "se_cents": 0.139
+  },
+  {
+   "lookback_min": 5,
+   "family": "tennis",
+   "trade": "fave BUY",
+   "n": 199,
+   "clusters": 72,
+   "net_cents": 4.188,
+   "se_cents": 1.326
+  },
+  {
+   "lookback_min": 5,
+   "family": "tennis",
+   "trade": "tail SELL",
+   "n": 110,
+   "clusters": 58,
+   "net_cents": 1.719,
+   "se_cents": 0.114
+  },
+  {
+   "lookback_min": 15,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 1751,
+   "clusters": 272,
+   "net_cents": 0.373,
+   "se_cents": 0.725
+  },
+  {
+   "lookback_min": 15,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 951,
+   "clusters": 275,
+   "net_cents": -0.382,
+   "se_cents": 0.251
+  },
+  {
+   "lookback_min": 15,
+   "family": "commodities",
+   "trade": "fave BUY",
+   "n": 701,
+   "clusters": 42,
+   "net_cents": -0.942,
+   "se_cents": 1.675
+  },
+  {
+   "lookback_min": 15,
+   "family": "commodities",
+   "trade": "tail SELL",
+   "n": 294,
+   "clusters": 39,
+   "net_cents": -1.245,
+   "se_cents": 0.775
+  },
+  {
+   "lookback_min": 15,
+   "family": "crypto-hourly",
+   "trade": "fave BUY",
+   "n": 223,
+   "clusters": 48,
+   "net_cents": 0.832,
+   "se_cents": 1.276
+  },
+  {
+   "lookback_min": 15,
+   "family": "crypto-hourly",
+   "trade": "tail SELL",
+   "n": 153,
+   "clusters": 41,
+   "net_cents": -1.025,
+   "se_cents": 0.996
+  },
+  {
+   "lookback_min": 15,
+   "family": "indices",
+   "trade": "fave BUY",
+   "n": 360,
+   "clusters": 31,
+   "net_cents": -2.88,
+   "se_cents": 3.809
+  },
+  {
+   "lookback_min": 15,
+   "family": "indices",
+   "trade": "tail SELL",
+   "n": 173,
+   "clusters": 36,
+   "net_cents": -1.988,
+   "se_cents": 1.141
+  },
+  {
+   "lookback_min": 15,
+   "family": "sports-props",
+   "trade": "fave BUY",
+   "n": 187,
+   "clusters": 52,
+   "net_cents": 3.255,
+   "se_cents": 2.108
+  },
+  {
+   "lookback_min": 15,
+   "family": "sports-props",
+   "trade": "tail SELL",
+   "n": 189,
+   "clusters": 84,
+   "net_cents": 1.19,
+   "se_cents": 0.179
+  },
+  {
+   "lookback_min": 15,
+   "family": "tennis",
+   "trade": "fave BUY",
+   "n": 273,
+   "clusters": 92,
+   "net_cents": 5.579,
+   "se_cents": 0.532
+  },
+  {
+   "lookback_min": 15,
+   "family": "tennis",
+   "trade": "tail SELL",
+   "n": 119,
+   "clusters": 62,
+   "net_cents": 2.075,
+   "se_cents": 0.119
+  },
+  {
+   "lookback_min": 60,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 1020,
+   "clusters": 198,
+   "net_cents": -1.636,
+   "se_cents": 1.413
+  },
+  {
+   "lookback_min": 60,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 543,
+   "clusters": 199,
+   "net_cents": -2.266,
+   "se_cents": 1.013
+  },
+  {
+   "lookback_min": 60,
+   "family": "commodities",
+   "trade": "fave BUY",
+   "n": 355,
+   "clusters": 36,
+   "net_cents": -5.853,
+   "se_cents": 4.345
+  },
+  {
+   "lookback_min": 60,
+   "family": "commodities",
+   "trade": "tail SELL",
+   "n": 105,
+   "clusters": 36,
+   "net_cents": -6.173,
+   "se_cents": 3.134
+  },
+  {
+   "lookback_min": 60,
+   "family": "indices",
+   "trade": "fave BUY",
+   "n": 293,
+   "clusters": 18,
+   "net_cents": -3.728,
+   "se_cents": 2.019
+  },
+  {
+   "lookback_min": 60,
+   "family": "indices",
+   "trade": "tail SELL",
+   "n": 126,
+   "clusters": 28,
+   "net_cents": -3.047,
+   "se_cents": 1.678
+  },
+  {
+   "lookback_min": 60,
+   "family": "sports-props",
+   "trade": "fave BUY",
+   "n": 197,
+   "clusters": 66,
+   "net_cents": 3.452,
+   "se_cents": 1.362
+  },
+  {
+   "lookback_min": 60,
+   "family": "sports-props",
+   "trade": "tail SELL",
+   "n": 240,
+   "clusters": 98,
+   "net_cents": -0.993,
+   "se_cents": 1.281
+  },
+  {
+   "lookback_min": 60,
+   "family": "tennis",
+   "trade": "fave BUY",
+   "n": 158,
+   "clusters": 63,
+   "net_cents": 4.91,
+   "se_cents": 3.181
+  }
+ ],
+ "generated_utc": "2026-08-20T19:53:41+00:00"
+}

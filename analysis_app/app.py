@@ -27,6 +27,7 @@ st.set_page_config(
 pages = [
     st.Page("views/findings.py", title="What we found", icon="🎯", default=True),
     st.Page("views/audit.py", title="The audit (2026-08-19)", icon="🔬"),
+    st.Page("views/anatomy.py", title="Anatomy of the exchange", icon="🔬"),
     st.Page("views/profit.py", title="Where the money might be", icon="💰"),
     st.Page("views/falsify.py", title="Prove this wrong", icon="🎯"),
     st.Page("views/scoreboard.py", title="Coffee scoreboard (live)", icon="☕"),
@@ -43,8 +44,8 @@ with st.sidebar:
     st.markdown("### Kalshi market making")
     st.caption("Market size, what is addressable, and what it could pay.")
     st.warning(
-        "Re-audited 2026-08-19. The verdict held, most of the original numbers "
-        "did not. Start at **The audit**.",
+        "Re-audited 2026-08-19, extended 2026-08-20 with a full settled-history "
+        "crawl. Start at **The audit**, then **Anatomy of the exchange**.",
         icon="🔬",
     )
 
