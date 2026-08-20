@@ -460,24 +460,134 @@
  "breadth_total": 421,
  "pooled": [
   {
-   "losses": 90,
+   "losses": 74,
+   "lookback_min": 2,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 2224,
+   "clusters": 467,
+   "net_cents": 0.288,
+   "se_cents": 0.391
+  },
+  {
+   "losses": 18,
+   "lookback_min": 2,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 1422,
+   "clusters": 424,
+   "net_cents": 0.144,
+   "se_cents": 0.294
+  },
+  {
+   "losses": 16,
+   "lookback_min": 2,
+   "family": "commodities",
+   "trade": "fave BUY",
+   "n": 373,
+   "clusters": 36,
+   "net_cents": -0.773,
+   "se_cents": 1.874
+  },
+  {
+   "losses": 4,
+   "lookback_min": 2,
+   "family": "commodities",
+   "trade": "tail SELL",
+   "n": 243,
+   "clusters": 29,
+   "net_cents": -0.286,
+   "se_cents": 0.811
+  },
+  {
+   "losses": 49,
+   "lookback_min": 2,
+   "family": "crypto-15M",
+   "trade": "fave BUY",
+   "n": 1000,
+   "clusters": 146,
+   "net_cents": -1.633,
+   "se_cents": 0.678
+  },
+  {
+   "losses": 12,
+   "lookback_min": 2,
+   "family": "crypto-15M",
+   "trade": "tail SELL",
+   "n": 617,
+   "clusters": 145,
+   "net_cents": -0.678,
+   "se_cents": 0.607
+  },
+  {
+   "losses": 0,
+   "lookback_min": 2,
+   "family": "crypto-hourly",
+   "trade": "fave BUY",
+   "n": 73,
+   "clusters": 36,
+   "net_cents": 3.528,
+   "se_cents": 2.017
+  },
+  {
+   "losses": 7,
+   "lookback_min": 2,
+   "family": "indices",
+   "trade": "fave BUY",
+   "n": 182,
+   "clusters": 32,
+   "net_cents": 0.755,
+   "se_cents": 3.136
+  },
+  {
+   "losses": 1,
+   "lookback_min": 2,
+   "family": "indices",
+   "trade": "tail SELL",
+   "n": 106,
+   "clusters": 31,
+   "net_cents": 0.401,
+   "se_cents": 0.93
+  },
+  {
+   "losses": 1,
+   "lookback_min": 2,
+   "family": "tennis",
+   "trade": "fave BUY",
+   "n": 564,
+   "clusters": 188,
+   "net_cents": 3.863,
+   "se_cents": 0.285
+  },
+  {
+   "losses": 0,
+   "lookback_min": 2,
+   "family": "tennis",
+   "trade": "tail SELL",
+   "n": 359,
+   "clusters": 157,
+   "net_cents": 1.679,
+   "se_cents": 0.419
+  },
+  {
+   "losses": 92,
    "lookback_min": 5,
    "family": "ALL",
    "trade": "fave BUY",
-   "n": 2417,
-   "clusters": 441,
-   "net_cents": 1.446,
-   "se_cents": 0.487
+   "n": 3149,
+   "clusters": 623,
+   "net_cents": 2.131,
+   "se_cents": 0.387
   },
   {
    "losses": 10,
    "lookback_min": 5,
    "family": "ALL",
    "trade": "tail SELL",
-   "n": 1221,
-   "clusters": 382,
-   "net_cents": 0.911,
-   "se_cents": 0.41
+   "n": 1692,
+   "clusters": 548,
+   "net_cents": 1.129,
+   "se_cents": 0.287
   },
   {
    "losses": 24,
@@ -570,184 +680,334 @@
    "se_cents": 2.057
   },
   {
-   "losses": 1,
+   "losses": 3,
    "lookback_min": 5,
    "family": "tennis",
    "trade": "fave BUY",
-   "n": 552,
-   "clusters": 109,
-   "net_cents": 4.469,
-   "se_cents": 0.322
+   "n": 1271,
+   "clusters": 286,
+   "net_cents": 4.445,
+   "se_cents": 0.39
   },
   {
    "losses": 0,
    "lookback_min": 5,
    "family": "tennis",
    "trade": "tail SELL",
-   "n": 344,
-   "clusters": 99,
-   "net_cents": 1.752,
-   "se_cents": 0.436
+   "n": 805,
+   "clusters": 256,
+   "net_cents": 1.719,
+   "se_cents": 0.187
   },
   {
-   "losses": 113,
-   "lookback_min": 15,
+   "losses": 136,
+   "lookback_min": 10,
    "family": "ALL",
    "trade": "fave BUY",
-   "n": 2514,
-   "clusters": 377,
-   "net_cents": 1.053,
-   "se_cents": 0.688
+   "n": 3612,
+   "clusters": 719,
+   "net_cents": 2.09,
+   "se_cents": 0.512
   },
   {
-   "losses": 20,
-   "lookback_min": 15,
+   "losses": 12,
+   "lookback_min": 10,
    "family": "ALL",
    "trade": "tail SELL",
-   "n": 1270,
-   "clusters": 372,
-   "net_cents": 0.114,
-   "se_cents": 0.346
+   "n": 1747,
+   "clusters": 538,
+   "net_cents": 1.034,
+   "se_cents": 0.279
   },
   {
-   "losses": 44,
-   "lookback_min": 15,
+   "losses": 34,
+   "lookback_min": 10,
    "family": "commodities",
    "trade": "fave BUY",
-   "n": 701,
-   "clusters": 42,
-   "net_cents": -0.942,
-   "se_cents": 1.675
+   "n": 689,
+   "clusters": 43,
+   "net_cents": -0.11,
+   "se_cents": 0.961
   },
   {
-   "losses": 8,
-   "lookback_min": 15,
+   "losses": 6,
+   "lookback_min": 10,
    "family": "commodities",
    "trade": "tail SELL",
-   "n": 294,
-   "clusters": 39,
-   "net_cents": -1.245,
-   "se_cents": 0.947
+   "n": 304,
+   "clusters": 34,
+   "net_cents": -0.521,
+   "se_cents": 2.983
+  },
+  {
+   "losses": 38,
+   "lookback_min": 10,
+   "family": "crypto-15M",
+   "trade": "fave BUY",
+   "n": 348,
+   "clusters": 131,
+   "net_cents": 0.076,
+   "se_cents": 1.888
   },
   {
    "losses": 7,
-   "lookback_min": 15,
+   "lookback_min": 10,
    "family": "crypto-hourly",
    "trade": "fave BUY",
-   "n": 223,
-   "clusters": 48,
-   "net_cents": 0.832,
-   "se_cents": 1.276
+   "n": 187,
+   "clusters": 50,
+   "net_cents": 0.917,
+   "se_cents": 2.041
+  },
+  {
+   "losses": 3,
+   "lookback_min": 10,
+   "family": "crypto-hourly",
+   "trade": "tail SELL",
+   "n": 122,
+   "clusters": 42,
+   "net_cents": -0.97,
+   "se_cents": 2.463
+  },
+  {
+   "losses": 21,
+   "lookback_min": 10,
+   "family": "indices",
+   "trade": "fave BUY",
+   "n": 290,
+   "clusters": 27,
+   "net_cents": -2.028,
+   "se_cents": 1.546
+  },
+  {
+   "losses": 2,
+   "lookback_min": 10,
+   "family": "indices",
+   "trade": "tail SELL",
+   "n": 137,
+   "clusters": 31,
+   "net_cents": 0.002,
+   "se_cents": 1.016
   },
   {
    "losses": 4,
-   "lookback_min": 15,
-   "family": "crypto-hourly",
-   "trade": "tail SELL",
-   "n": 153,
-   "clusters": 41,
-   "net_cents": -1.025,
-   "se_cents": 1.285
-  },
-  {
-   "losses": 30,
-   "lookback_min": 15,
-   "family": "indices",
-   "trade": "fave BUY",
-   "n": 360,
-   "clusters": 31,
-   "net_cents": -2.88,
-   "se_cents": 3.809
-  },
-  {
-   "losses": 6,
-   "lookback_min": 15,
-   "family": "indices",
-   "trade": "tail SELL",
-   "n": 173,
-   "clusters": 36,
-   "net_cents": -1.988,
-   "se_cents": 1.393
-  },
-  {
-   "losses": 6,
-   "lookback_min": 15,
+   "lookback_min": 10,
    "family": "sports-props",
    "trade": "fave BUY",
-   "n": 187,
-   "clusters": 52,
-   "net_cents": 3.255,
-   "se_cents": 2.108
+   "n": 166,
+   "clusters": 48,
+   "net_cents": 4.063,
+   "se_cents": 2.185
   },
   {
    "losses": 1,
-   "lookback_min": 15,
+   "lookback_min": 10,
    "family": "sports-props",
    "trade": "tail SELL",
-   "n": 189,
-   "clusters": 84,
-   "net_cents": 1.19,
-   "se_cents": 0.519
+   "n": 172,
+   "clusters": 72,
+   "net_cents": 1.135,
+   "se_cents": 0.571
   },
   {
-   "losses": 8,
-   "lookback_min": 15,
+   "losses": 15,
+   "lookback_min": 10,
    "family": "tennis",
    "trade": "fave BUY",
-   "n": 777,
-   "clusters": 130,
-   "net_cents": 5.091,
-   "se_cents": 0.563
+   "n": 1629,
+   "clusters": 344,
+   "net_cents": 4.639,
+   "se_cents": 0.476
   },
   {
    "losses": 0,
-   "lookback_min": 15,
+   "lookback_min": 10,
    "family": "tennis",
    "trade": "tail SELL",
-   "n": 332,
-   "clusters": 101,
-   "net_cents": 2.024,
-   "se_cents": 0.451
+   "n": 862,
+   "clusters": 278,
+   "net_cents": 1.903,
+   "se_cents": 0.174
   },
   {
-   "losses": 18,
-   "lookback_min": 15,
+   "losses": 17,
+   "lookback_min": 10,
    "family": "weather",
    "trade": "fave BUY",
-   "n": 263,
-   "clusters": 71,
-   "net_cents": -1.645,
-   "se_cents": 2.2
+   "n": 303,
+   "clusters": 76,
+   "net_cents": -0.719,
+   "se_cents": 1.862
+  },
+  {
+   "losses": 0,
+   "lookback_min": 10,
+   "family": "weather",
+   "trade": "tail SELL",
+   "n": 140,
+   "clusters": 74,
+   "net_cents": 1.557,
+   "se_cents": 1.075
+  },
+  {
+   "losses": 234,
+   "lookback_min": 30,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 3551,
+   "clusters": 609,
+   "net_cents": 0.158,
+   "se_cents": 0.784
+  },
+  {
+   "losses": 33,
+   "lookback_min": 30,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 1437,
+   "clusters": 474,
+   "net_cents": -0.469,
+   "se_cents": 0.408
+  },
+  {
+   "losses": 76,
+   "lookback_min": 30,
+   "family": "commodities",
+   "trade": "fave BUY",
+   "n": 679,
+   "clusters": 41,
+   "net_cents": -5.344,
+   "se_cents": 1.856
+  },
+  {
+   "losses": 12,
+   "lookback_min": 30,
+   "family": "commodities",
+   "trade": "tail SELL",
+   "n": 226,
+   "clusters": 39,
+   "net_cents": -3.706,
+   "se_cents": 1.992
+  },
+  {
+   "losses": 16,
+   "lookback_min": 30,
+   "family": "crypto-hourly",
+   "trade": "fave BUY",
+   "n": 303,
+   "clusters": 49,
+   "net_cents": 0.334,
+   "se_cents": 1.489
+  },
+  {
+   "losses": 4,
+   "lookback_min": 30,
+   "family": "crypto-hourly",
+   "trade": "tail SELL",
+   "n": 171,
+   "clusters": 42,
+   "net_cents": -0.596,
+   "se_cents": 1.148
+  },
+  {
+   "losses": 28,
+   "lookback_min": 30,
+   "family": "indices",
+   "trade": "fave BUY",
+   "n": 406,
+   "clusters": 24,
+   "net_cents": -0.63,
+   "se_cents": 2.47
+  },
+  {
+   "losses": 6,
+   "lookback_min": 30,
+   "family": "indices",
+   "trade": "tail SELL",
+   "n": 183,
+   "clusters": 38,
+   "net_cents": -1.675,
+   "se_cents": 1.315
+  },
+  {
+   "losses": 14,
+   "lookback_min": 30,
+   "family": "sports-props",
+   "trade": "fave BUY",
+   "n": 211,
+   "clusters": 68,
+   "net_cents": 0.566,
+   "se_cents": 3.353
   },
   {
    "losses": 1,
-   "lookback_min": 15,
-   "family": "weather",
+   "lookback_min": 30,
+   "family": "sports-props",
    "trade": "tail SELL",
-   "n": 128,
-   "clusters": 70,
-   "net_cents": 0.885,
-   "se_cents": 1.4
+   "n": 206,
+   "clusters": 95,
+   "net_cents": 1.255,
+   "se_cents": 0.476
   },
   {
-   "losses": 110,
+   "losses": 65,
+   "lookback_min": 30,
+   "family": "tennis",
+   "trade": "fave BUY",
+   "n": 1541,
+   "clusters": 337,
+   "net_cents": 3.517,
+   "se_cents": 1.03
+  },
+  {
+   "losses": 7,
+   "lookback_min": 30,
+   "family": "tennis",
+   "trade": "tail SELL",
+   "n": 476,
+   "clusters": 175,
+   "net_cents": 0.667,
+   "se_cents": 0.888
+  },
+  {
+   "losses": 35,
+   "lookback_min": 30,
+   "family": "weather",
+   "trade": "fave BUY",
+   "n": 408,
+   "clusters": 87,
+   "net_cents": -2.963,
+   "se_cents": 2.252
+  },
+  {
+   "losses": 3,
+   "lookback_min": 30,
+   "family": "weather",
+   "trade": "tail SELL",
+   "n": 175,
+   "clusters": 85,
+   "net_cents": -0.027,
+   "se_cents": 0.972
+  },
+  {
+   "losses": 160,
    "lookback_min": 60,
    "family": "ALL",
    "trade": "fave BUY",
-   "n": 1342,
-   "clusters": 260,
-   "net_cents": -0.624,
-   "se_cents": 1.19
+   "n": 1885,
+   "clusters": 419,
+   "net_cents": -0.579,
+   "se_cents": 1.219
   },
   {
-   "losses": 23,
+   "losses": 28,
    "lookback_min": 60,
    "family": "ALL",
    "trade": "tail SELL",
-   "n": 618,
-   "clusters": 232,
-   "net_cents": -1.91,
-   "se_cents": 0.964
+   "n": 739,
+   "clusters": 297,
+   "net_cents": -1.907,
+   "se_cents": 0.916
   },
   {
    "losses": 42,
@@ -810,35 +1070,35 @@
    "se_cents": 1.281
   },
   {
-   "losses": 27,
+   "losses": 77,
    "lookback_min": 60,
    "family": "tennis",
    "trade": "fave BUY",
-   "n": 452,
-   "clusters": 97,
-   "net_cents": 3.604,
-   "se_cents": 2.238
+   "n": 985,
+   "clusters": 246,
+   "net_cents": 1.348,
+   "se_cents": 1.871
   },
   {
-   "losses": 2,
+   "losses": 7,
    "lookback_min": 60,
    "family": "tennis",
    "trade": "tail SELL",
-   "n": 71,
-   "clusters": 33,
-   "net_cents": -0.322,
-   "se_cents": 4.203
+   "n": 176,
+   "clusters": 90,
+   "net_cents": -1.568,
+   "se_cents": 2.301
   },
   {
    "losses": 0,
    "lookback_min": 60,
    "family": "weather",
    "trade": "tail SELL",
-   "n": 71,
-   "clusters": 32,
-   "net_cents": 1.522,
-   "se_cents": 2.12
+   "n": 87,
+   "clusters": 40,
+   "net_cents": 1.521,
+   "se_cents": 1.73
   }
  ],
- "generated_utc": "2026-08-20T20:21:53+00:00"
+ "generated_utc": "2026-08-20T20:58:59+00:00"
 }

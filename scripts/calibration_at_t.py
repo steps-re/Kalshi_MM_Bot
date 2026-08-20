@@ -34,7 +34,14 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from calibration_curves import BUCKETS, family_of  # noqa: E402
 from cluster_stats import clustered  # noqa: E402
 
-LOOKBACKS = (5 * 60, 15 * 60, 60 * 60)
+# A RANGE, deliberately. The single most useful diagnostic in this whole study
+# is how a tail trade's return decays with time-to-close. A real mispricing
+# should persist as the horizon lengthens; a convergence artifact dies, because
+# it was only ever measuring "the outcome is already known". Tennis ran
+# +4.06c at T-2min on ZERO observed losses and -0.57c at T-60min on 50 of
+# them, with the loss rate climbing monotonically 0.00% -> 9.38% in between.
+# Report the curve, never a single horizon.
+LOOKBACKS = (2 * 60, 5 * 60, 10 * 60, 30 * 60, 60 * 60)
 MAX_SPREAD = 0.10          # book wider than 10c at T-minus = not actionable
 MIN_BUCKET = 40
 

@@ -117,16 +117,39 @@ st.warning(
 )
 
 st.error(
-    "**The cross-family comparison does not mean what it looks like.** "
-    "'Five minutes before close' is not a constant amount of remaining "
-    "uncertainty. For a 15-minute Bitcoin window it is a third of the window "
-    "with real price risk left. For a tennis match it is the final game: only "
-    "2% of tennis markets sit within a cent of their T-60 price, and typical "
-    "paths run 0.53 -> 0.26 -> 0.04. Selling a 4c tennis tail at T-5 is "
-    "selling a player who has already lost, which is a different trade from "
-    "selling a 4c Bitcoin strike that can still be reached. These rows are "
-    "not replications of each other.",
+    "**The last idea died here, and this is how.** 'Five minutes before close' "
+    "is not a constant amount of remaining uncertainty. For a 15-minute "
+    "Bitcoin window it is a third of the window with real price risk left. For "
+    "a tennis match it is the final game - typical paths run 0.53 -> 0.26 -> "
+    "0.04, and only 2% of tennis markets sit within a cent of their T-60 "
+    "price. So a positive number at a short horizon may be measuring nothing "
+    "but 'the outcome is already known'.",
     icon="🚨",
+)
+
+st.subheader("The decay curve, which is the diagnostic")
+st.markdown(
+    """
+Run the same trade at every horizon and watch the observed loss rate. Tennis,
+which had the largest apparent edge and by far the largest capacity in the
+whole study:
+
+    T-minus   trade       n    losses   loss rate     net
+       2m     fave BUY   306      0       0.00%     +4.06c
+       5m     fave BUY   719      2       0.28%     +4.43c
+      10m     fave BUY   876     10       1.14%     +4.36c
+      30m     fave BUY   841     35       4.16%     +3.60c
+      60m     fave BUY   533     50       9.38%     -0.57c
+
+The loss rate climbs monotonically and the return goes negative. At 60 minutes
+- the only horizon with genuine uncertainty and a real sample of losses - the
+trade loses money. The apparent edge at 2 minutes rests on **zero observed
+losses**, which is not evidence of a low rate, only of a short sample.
+
+A real mispricing should survive a longer horizon. A convergence artifact
+cannot, because it was only ever measuring resolution. **This curve is the
+test, and every tail trade in this study fails it.**
+"""
 )
 
 st.markdown(
