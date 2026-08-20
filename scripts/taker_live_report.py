@@ -16,6 +16,7 @@ if the edge is real but thin, and that is the distinction that matters.
 from __future__ import annotations
 
 import json
+import math
 import statistics as st
 import sys
 from collections import defaultdict
@@ -41,6 +42,8 @@ NAIVE_BREAK_EVEN = -CROSS_CENTS / (TOUCH_CENTS - CROSS_CENTS)
 # 84 markets, clustered on the ticker. The truth is inside this bracket and
 # recorded books cannot narrow it further, because snapshots cannot see trades.
 OFFLINE_BRACKET = (-0.4, +1.1)
+# Below this the pre-registration says print the count and no mean.
+MIN_TRIPS_TO_REPORT = 30
 
 
 def load(path: Path) -> list[dict]:
@@ -238,6 +241,90 @@ def arm_report(rows: list[dict]) -> None:
             print(f"{arm:>6.0f}s{len(vals):>9}{st.mean(vals):>+11.2f}c")
 
 
+def bracket_verdict(traded: list[dict]) -> None:
+    """The pre-registered primary endpoint, and nothing else.
+
+    `docs/pre-registration-exit-fill.md` fixes the decision rule before the run:
+    where in the offline bracket does the live mean land, and does its interval
+    exclude zero? The rule is applied here mechanically so it cannot be
+    reinterpreted once the numbers are in, which is how this project's taker
+    scan and gate study both went wrong.
+    """
+
+    pnl = [r["pnl_cents"] for r in traded if "pnl_cents" in r]
+    n = len(pnl)
+
+    print("\n" + "=" * 72)
+    print("PRIMARY ENDPOINT (pre-registered)")
+    print(f"  offline bracket   {OFFLINE_BRACKET[0]:+.1f}c to {OFFLINE_BRACKET[1]:+.1f}c "
+          f"per round trip")
+    print(f"  completed trips   {n}")
+
+    if n < MIN_TRIPS_TO_REPORT:
+        print(f"\n  Under {MIN_TRIPS_TO_REPORT} completed round trips. The "
+              f"pre-registration says report the count and stop, so no mean is "
+              f"printed here. Keep running.")
+        return
+
+    mean = st.mean(pnl)
+    sd = st.stdev(pnl) if n > 1 else float("nan")
+    half = 1.96 * sd / math.sqrt(n)
+    low, high = mean - half, mean + half
+    print(f"  realised mean     {mean:+.3f}c  95% CI [{low:+.3f}, {high:+.3f}]  "
+          f"(sd {sd:.2f}c)")
+    print(f"  precision needed for +/-0.50c: ~{(1.96 * sd / 0.5) ** 2:.0f} trips; "
+          f"for +/-0.25c: ~{(1.96 * sd / 0.25) ** 2:.0f}")
+
+    if low > 0:
+        print("""
+  -> UPPER HALF OF THE BRACKET. The interval excludes zero and the mean is
+     positive: the resting exit fills often enough that the cell pays at one
+     contract. Pre-registered action: escalate to 10 contracts and re-run.
+     Sign is settled; size is now the open question.""")
+    elif high < 0:
+        print("""
+  -> CONSERVATIVE END. The interval excludes zero and the mean is negative. The
+     round trip does not pay at one contract, and size cannot rescue it because
+     depth only makes the crossing worse. Pre-registered action: the cell is
+     dead. Stop.""")
+    else:
+        print("""
+  -> UNDECIDED at this sample size. The interval contains zero. Per the
+     pre-registration, do NOT read the sign of the mean: a positive-looking
+     number with an interval spanning zero is exactly the reading that produced
+     three disjoint winner lists in the taker scan. Either keep running to the
+     trip count above, or report it as undecided.""")
+
+
+def direction_split(traded: list[dict]) -> None:
+    """The secondary hypothesis, reported with the power it does not have."""
+
+    buys = [r["pnl_cents"] for r in traded
+            if r.get("buying") and "pnl_cents" in r]
+    sells = [r["pnl_cents"] for r in traded
+             if r.get("buying") is False and "pnl_cents" in r]
+
+    print("\n" + "=" * 72)
+    print("SECONDARY: direction split (pre-registered as UNDERPOWERED)")
+
+    if len(buys) < 2 or len(sells) < 2:
+        print(f"  bid-heavy {len(buys)}, ask-heavy {len(sells)}. Too few to "
+              f"report either way.")
+        return
+
+    pooled = st.stdev(buys + sells)
+    needed = 2 * (1.96 + 0.84) ** 2 * pooled ** 2 / 0.68 ** 2
+    print(f"  bid-heavy (buy)   n={len(buys):>4}  mean {st.mean(buys):+.3f}c")
+    print(f"  ask-heavy (sell)  n={len(sells):>4}  mean {st.mean(sells):+.3f}c")
+    print(f"""
+  Detecting the 0.68c split the archive suggests needs ~{needed:.0f} trades PER
+  ARM at this dispersion. This run has {min(len(buys), len(sells))} in the
+  smaller arm. Whatever these two numbers do, they do not test it. A null here
+  is not evidence of absence, and the archive's 2.5x split did not replicate on
+  the recovered corpus either. Do not restrict the strategy to one side on the
+  strength of this table.""")
+
+
 def main() -> None:
     path = Path(sys.argv[1] if len(sys.argv) > 1 else "/var/tmp/taker_live_test.jsonl")
 
@@ -252,6 +339,8 @@ def main() -> None:
     print(f"{len(rows)} journal rows from {path}")
     traded = [r for r in rows if r.get("kind") != "shadow"]
     summarise("TRADED", traded)
+    bracket_verdict(traded)
+    direction_split(traded)
     arm_report(rows)
     shadow_report(rows)
     by_size: dict[int, list[dict]] = defaultdict(list)
