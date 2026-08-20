@@ -1095,49 +1095,244 @@ half.
 
 ---
 
-# The gate, dosed on real fills before the live A/B decides (2026-08-19 evening)
+# The gate, dosed on real fills - and the dose does not hold up (2026-08-19/20)
 
-The OBI-gated maker is running live as an A/B (obi_gate=0 vs 90, round-robin
-per cycle, $25 floor). Rather than wait a night to learn whether 90 was the
-right level, the 2,208 journaled fills were used as the treatment group of
-every threshold at once: each real fill joined to the collector book for the
-imbalance just before it, markout from the journal's own timeline, veto
-simulated at six levels. 765 fills matched a fresh OBI sample.
+The OBI-gated maker went live as an A/B (obi_gate=0 vs 90, round-robin per
+cycle, $25 floor). Rather than wait a night to learn whether 90 was the right
+level, the journaled fills were re-scored under all six thresholds at once: each
+real fill joined to the collector book for the imbalance near it, markout from
+the journal's own timeline, veto simulated at every level. The first pass called
+that "the treatment group of every threshold", which oversells it - nothing was
+assigned, and the fills a veto would block differ from the rest in venue, price
+and time of day as well as in imbalance.
 
-**The mechanism, on real fills.** 30s markout by imbalance against the fill:
+The first pass said 90 sat on an efficient frontier and the A/B should stand.
+**Re-run with the joins fixed and errors clustered on the market, none of that
+survives.** The corrected output is `docs/adversarial/gate-dose-study.txt`, in
+full, as the script printed it.
 
-    balanced              +0.092c   45% losing
-    against .20-.50       +0.311c   48%
-    against .90-.95       -0.320c   71% losing
-    against >= .95        -1.435c   60% losing
+## What the corpus actually contains
 
-The fills the signal says not to take are the fills that lost. This is the same
-dose-response as the recorded-book study, now on fills that carry real adverse
-selection.
+    2,507  journaled fills
+    1,957  with a 30s markout that is not stale and does not predate the fill
+      661  also matched to a collector OBI sample (34%)
+        0  taker fills, in the entire corpus
 
-**The sweep.** Blocked-vs-kept markout by threshold:
+Two of those lines are load-bearing.
 
-    thresh   blocked   %fills   blocked mkt   kept mkt   saved/cycle
-      50%       131      17%      -0.534c     -0.412c      +5.00c
-      60%       117      15%      -0.077c     -0.498c      +0.64c
-      70%       103      13%      -0.117c     -0.483c      +0.86c
-      90%        60       8%      -0.963c     -0.388c      +4.13c
-      95%        43       6%      -1.251c     -0.385c      +3.84c
+**Zero takers.** The ledger's own per-venue cross rate is 2-9%, so a corpus with
+no forced crosses cannot show what a veto costs when the stranded inventory has
+to be crossed out later. The "takers are our own crosses, the gate never sees
+them" filter excluded nothing, because there was nothing to exclude.
 
-90 and 95 are the selective levels: what they block is 2.5-3x worse than what
-they keep. 60-70 block fills no worse than average (nothing gained), and 50's
-apparent savings ride on a noisy mid bucket without selectivity. **The live arm
-at 90 sits on the efficient frontier**, so the A/B stands unchanged - about
-+4c/cycle of avoided losses against the maker's ~9c/cycle historical edge, if
-live agrees.
+**The markout timeline is almost entirely the wrong one.** `record_mid` was
+added partway through the August run. Fifteen of the 21 journals contain *zero*
+`mid` events, and in the six that do, only 11-29% of the filled tickers are
+covered. So 1,651 of 1,957 markouts come from `placed` mids - the event-driven
+timeline that `record_mid` exists to replace, because a fill triggers a re-quote
+which writes a mid milliseconds after the event being measured. Of the 661 fills
+that matched an OBI sample, **4** have a clean-timeline markout.
 
-Caveats: 35% OBI match rate (collector coverage), and saved/cycle ignores
-forgone spread capture on blocked fills, so it is an upper bound.
+The bias is now measured rather than argued about. On the 306 fills carrying
+both timelines, placed-derived minus mid-derived markout is **-0.000c +/-0.017**.
+So the contamination mechanism is real and its magnitude is nil - on the fills
+where it can be checked, which are not the fills the study rests on. That is the
+honest statement, and it is the one good piece of news here.
 
-**Second lever found in the same pass, parked until the A/B ends:** DOGE15M is
-the toxic venue (-1.354c mean 30s markout across 250 real fills) while GOLD,
-SOL and WTI are positive. Dropping one venue is a bigger effect than the gate,
-and it must not be changed mid-A/B.
+## The join was never anchored to a real time
 
-Early live tally, 2 cycles per arm: control -$1.49, -$0.57; gated +$0.60,
-+$0.43. Consistent with the offline direction, far too small to call.
+The journal's `at` field is when we *wrote* the event. `mid_lag_seconds` exists
+to measure the gap to actual execution and is **null on all 2,507 fills**,
+because no caller ever passed `executed_at`. The first pass papered over that
+with a hardcoded 0.25s lookback.
+
+That is not a detail, because the artifact runs the same direction as the
+hypothesis: being filled depletes the touch we were resting on, so a book
+sampled a moment late looks imbalanced against us *because* we were filled, and
+the aggression that lifted us moves the mid over the next 30 seconds. So the
+lookback became a sweep, with a deliberate placebo at +5s - a book that
+certainly postdates the fill, where any "signal" is pure contamination:
+
+    offset      matched   gap: markout(against >= .9) - markout(rest)
+    -30.00s         640   +0.209c +/-0.876   t=0.2
+    -10.00s         651   +1.477c +/-1.166   t=1.3
+     -2.00s         656   -0.244c +/-1.038   t=0.2
+     -0.25s         661   -0.724c +/-0.851   t=0.9
+     +5.00s         663   -2.543c +/-1.304   t=1.9   <- PLACEBO
+
+**The placebo is the strongest result in the table.** The association is three
+times larger when the book is sampled after the fill than at the lookback the
+first pass chose, and it is the only row anywhere near significance. That is the
+contamination signature, not a forecast. `trader.py` now passes `executed_at`,
+so future runs can pin the lag instead of sweeping around it.
+
+## Nothing clears its own error bar
+
+Clustered on the market ticker - which this project already established as
+mandatory, having watched it turn -0.231c at t=-2.5 into a published -0.980c at
+t=-44.4 - the dose-response is not monotone and not significant:
+
+    bucket                 fills  mkts       mean markout   % losing
+    WITH the fill >= .5      164    37    -0.213c +/-0.880       47%
+    balanced                 124    27    +0.213c +/-0.796       43%
+    against .20-.50           71    20    +0.309c +/-0.892       45%
+    against .50-.70           56    20    -1.345c +/-2.643       39%
+    against .70-.90           87    20    -0.675c +/-1.112       54%
+    against .90-.95           38    12    -0.237c +/-1.058       74%
+    against >= .95           121    24    -1.193c +/-0.702       60%
+
+The first pass published four of these seven rows. The three it dropped are the
+three that break the story: `.50-.70` at -1.345c is nearly as negative as the
+top bucket while sitting below every level the write-up called "no worse than
+average", and `WITH the fill` shows that books pointing our *way* lost money
+too, which removes the directional reading entirely.
+
+Demeaning by venue leaves the top bucket at -0.998c +/-0.551 and by venue and
+price decile at -0.960c +/-0.564, both non-monotone below. So there is a
+residual something at extreme imbalance, around -1c at t under 2, and no
+gradient leading up to it.
+
+## The association lives in the half with no signal
+
+The audit established the underlying signal is one-sided: relative to a balanced
+book, bid-heavy predicts +0.68c at 5s and ask-heavy +0.02c. A resting SELL is
+endangered by a bid-heavy book (the supported half); a resting BUY by an
+ask-heavy one. Split:
+
+    SELL fills, bid-heavy books (the supported half)   gap +0.065c +/-1.392  t=0.0
+    BUY  fills, ask-heavy books (no measured support)  gap -1.489c +/-1.029  t=1.4
+
+**The half the signal supports shows nothing at all.** Whatever the pooled
+number was measuring, it is not the mechanism the gate is built on.
+
+## And there is no frontier at 90
+
+    thresh  blocked    %      blocked markout        kept markout      blocked - kept
+       50%      170  26%    -1.759c +/-1.119    +0.051c +/-0.432   -1.811c +/-1.069
+       60%      160  24%    -1.513c +/-1.042    -0.063c +/-0.547   -1.449c +/-1.146
+       70%      135  20%    -1.569c +/-1.041    -0.118c +/-0.577   -1.451c +/-1.216
+       80%      113  17%    -1.758c +/-0.963    -0.137c +/-0.558   -1.621c +/-1.114
+       90%       81  12%    -2.133c +/-0.774    -0.174c +/-0.542   -1.959c +/-0.969
+       95%       61   9%    -2.398c +/-0.989    -0.212c +/-0.522   -2.186c +/-1.067
+
+Selectivity is flat: every threshold from 50 to 95 blocks fills about 1.4c to
+2.2c worse than what it keeps, with error bars that overlap all of them. The
+first pass reported 60-70 as blocking "fills no worse than average" and 90-95 as
+the selective levels. That contrast was an artifact of two things now fixed: the
+sweep scored every threshold against the *factual* position path, in which
+nothing was ever blocked, and it had no error bars.
+
+The 80% row was in the first pass's output and not in its write-up. Restored, it
+sits mid-range and makes the sequence read as noise, which it is.
+
+**Also corrected:** the first pass compared its savings against "the maker's ~9c
+per cycle historical edge." That figure appears nowhere else in this document
+and nothing in the repo derives it. The nearest real numbers are 0.43c per fill
+over 3,582 fills and +$15.06 across 7 recordings, which is roughly 215c per
+recording. The comparison was meaningless and is withdrawn. The replacement
+metric is deliberately not a P&L: the blocked fills' size-weighted 30s markout
+runs 5.5c to 10c per journal across thresholds, and it excludes the spread
+captured on those fills, the exit that still has to happen, the queue position
+lost when a veto cancels a resting order, and the inventory a veto strands.
+
+## The second lever was not one either
+
+DOGE15M was flagged as the toxic venue at -1.354c and "a bigger effect than the
+gate." Corrected, it is **-1.661c +/-1.394 across 5 markets** - t=1.19. Every
+venue in that table rests on 5 to 8 markets. Only GOLD15M (+0.517c +/-0.214) and
+SOL15M (+0.389c +/-0.163) clear t=2, and in the favourable direction. Dropping a
+venue on 5 markets is the same mistake as publishing +1.39c from two windows.
+
+## Where this leaves the gate
+
+The offline study can neither support nor refute the live arm. It cannot
+distinguish 90 from 50, its strongest reading is its own placebo, and the half
+of the mechanism with measured backing is the half showing nothing.
+
+The A/B was the only remaining evidence. **It has since finished, and it agrees
+with the corrected offline study: nothing.**
+
+    arm        cycles   $/cycle      SE  t vs 0    sum $   markout   fills
+    obigate0        9    +0.007   0.101   +0.07    +0.06   +0.567c     401
+    obigate90       9    -0.051   0.144   -0.36    -0.46   +0.434c     471
+
+18 cycles, 2026-08-19 21:10 to 2026-08-20 01:25, balance $35.44 -> $35.95.
+Welch t = 0.33 between arms. Cycles alternate, so they also pair cleanly by
+time: paired difference (gated minus control) is **-$0.058 per cycle, sd 0.490,
+t = -0.35**.
+
+Two details worth more than the headline. The point estimate is *negative* on
+both measures - the gated arm made less money and marked out worse (+0.434c
+against +0.567c) - which is the opposite direction to the mechanism, not a
+smaller version of it. And the gated arm took *more* fills than the control,
+471 against 401, which is not what a filter is supposed to do.
+
+None of that is significant. The honest reading is that 9 cycles per arm cannot
+see an effect this size: pooled per-cycle sd is $0.36, so detecting a
+$0.15/cycle difference at 80% power needs about **46 cycles per arm**. At
+roughly 4 cycles an hour per arm that is a day and a half of continuous running,
+on a $36 account, to resolve an effect that neither the offline study nor the
+first 18 cycles can find any sign of.
+
+`obi_gate.py` is unchanged in behaviour on purpose, so this result still applies
+to the current code: `obi_gate_floor` (a touch-depth floor, defect #5 from
+`taker_extract`) and `obi_gate_buys=0` (run only the supported half) both exist
+now and both default to what the live arm ran, because changing a default
+mid-flight would have silently redefined the treatment.
+
+Worth keeping in view: this design is "v1 withhold exposed side" plus an
+increases-only carve-out. v1 is in the table above at 977 fills against a
+3,582-fill baseline, $3.85 captured against $15.34, and -$14.78 of inventory.
+The carve-out is the entire hypothesis and no backtest of it exists. A replay of
+un-vetoed fills cannot produce one, because the cost that sank v1 is the
+inventory a veto strands, and there are no vetoes in the history being replayed.
+
+## Same pass: the taker round trip is undecided again, not dead
+
+The gate was framed as "the remaining use" of the imbalance signal, on the
+grounds that buying the move had been measured to death and lost. That framing
+came from `exit_fill_study.py`, and the script was wrong in the direction of its
+own conclusion.
+
+Its fill detector required the best BID to rise to our resting ASK. The ordinary
+way a resting sell fills is a marketable buy consuming the ask level, after
+which the book re-quotes with the bid still below us. Those are real fills, and
+every one of them was scored as a forced cross carrying an exit fee that would
+never have been paid. The write-up then said "these are the optimistic bound, so
+the truth is worse", which had the sign of the error backwards.
+
+Rebuilt with a two-sided bracket, one shared trigger set per grid, no window
+running past expiry, no lookahead on the exit book, and errors clustered on the
+market:
+
+    ORIGINAL ARCHIVE, 598 triggers, 84 markets
+
+    hold  rest   optimistic  conservative   realised if opt.   if conservative
+     15s   20s      93%          37%       +0.559c +/-0.138   -0.375c +/-0.143
+     30s   45s      93%          47%       +0.738c +/-0.194   -0.237c +/-0.196
+     60s   90s      95%          49%       +1.054c +/-0.296   -0.034c +/-0.304
+
+Upper bound clearly positive at t around 4, conservative bound between -0.4c and
+zero. Recorded books cannot narrow that further, because snapshots cannot see
+trades. The candidate is bracketed and undecided, which is exactly what the
+script's design note said it would be before the detector buried it.
+
+The recovered corpus agrees on the shape and not the size: 136 triggers across
+19 markets, optimistic +0.34c to +0.59c, conservative -0.40c to -0.82c. Same
+bracket straddling zero, weaker, and small enough that it settles nothing.
+
+**The direction split looked like the bigger prize and does not replicate.** On
+the archive, at hold 30s / rest 45s, bid-heavy triggers realise +1.122c +/-0.411
+against ask-heavy at +0.439c +/-0.138, and on a forced cross bid-heavy is
++0.473c +/-0.611 while ask-heavy is -0.550c +/-0.239. That is the pattern the
+audit's one-sidedness finding predicts, on 84 markets, and it is the most
+interesting thing in the run.
+
+On the recovered corpus the two sides are indistinguishable: +0.502c +/-0.628
+bid-heavy against +0.464c +/-0.406 ask-heavy in the same cell, on 8 and 11
+markets. Eight markets cannot refute anything, so this is not a contradiction so
+much as no second reading. It is exactly the position the "three periods, no
+survivor" chapter was in, and the lesson from that chapter applies here: a
+split found in one period and absent in an underpowered second one is a
+hypothesis, not a finding. Worth pre-registering before the next live run.
+Not worth restricting a strategy on today.

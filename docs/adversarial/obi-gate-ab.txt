@@ -1,0 +1,10 @@
+18 cycles across 2 arm(s) from /Users/mike/kalshi-audit/ab_final/session_ab/ab_ledger.jsonl
+
+arm        cycles   $/cycle      SE  t vs 0    sum $   markout   fills
+obigate0        9    +0.007   0.101   +0.07    +0.06   +0.567c     401
+obigate90       9    -0.051   0.144   -0.36    -0.46   +0.434c     471
+
+pairwise account-P&L comparison (Welch t; |t|<2 = inside the noise):
+  obigate0 vs obigate90: t=+0.33 (df~14)  inside the noise
+
+Pooled per-cycle sd $0.36. To detect a $0.15/cycle arm difference at 80% power needs ~46 cycles per arm; $0.25 needs ~16.

@@ -65,6 +65,13 @@ def strategy_from_name(
     if normalized.startswith("obigate:"):
         params = dict(adaptive_params or ())
         threshold = int(params.pop("obi_gate", 90))
+        # Both default to the behaviour the live A/B arm started with, so an
+        # arm string that does not mention them is unchanged. `obi_gate_floor`
+        # is whole contracts of combined touch depth below which the imbalance
+        # ratio is not believed; `obi_gate_buys=0` runs only the sell half,
+        # which is the half with measured support. See obi_gate.py.
+        floor = int(params.pop("obi_gate_floor", 0))
+        gate_buys = int(params.pop("obi_gate_buys", 1))
         return OBIGatedStrategy(
             inner=strategy_from_name(
                 normalized.split(":", 1)[1],
@@ -73,6 +80,8 @@ def strategy_from_name(
                 adaptive_params=params,
             ),
             threshold_hundredths=threshold,
+            min_touch_contracts=floor,
+            gate_buys=gate_buys,
         )
 
     if normalized.startswith(("defended:", "symmetric:")):

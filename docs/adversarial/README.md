@@ -78,7 +78,7 @@ The thick side lifts +0.800c from control to extreme. Spread widening accounts
 for about 0.16c of the 0.86c. The bid genuinely rises after a bid-heavy signal,
 which is exactly what has to happen for the trade to be sellable.
 
-## Upheld, and it flipped the answer: the fills are adversely selected
+## Upheld: the fills are adversely selected. Corrected: it does not kill it
 
 The break-even framing multiplied the passive fill rate by the average P&L of
 ALL trades. That assumes the trades that fill are a random sample of them. They
@@ -86,31 +86,102 @@ are not: **you fill precisely when the market comes to you**, so fills are
 concentrated in the trades that went wrong.
 
 `scripts/exit_fill_study.py` replays every qualifying trigger against the book
-that followed it and lets each take the path it would really have taken:
+that followed it and lets each take the path it would really have taken.
 
-    ORIGINAL ARCHIVE, 1,022 triggers
-    hold  rest   exits   filled passively   realised
-     15s   90s     726          57%          -0.412c
-     30s   90s     678          51%          -0.405c
-     60s   45s     722          40%          -0.247c
-     60s   90s     586          49%          -0.017c
+**Corrected 2026-08-20, and the correction flips this section back.** The first
+version's fill detector required the best BID to rise to our resting ASK, and
+called that the optimistic bound. It is not a bound in either direction. The
+ordinary way a resting sell fills is a marketable buy consuming the ask level,
+after which the book re-quotes with the bid still below us - a real fill that
+the detector scored as a forced cross, complete with an exit fee that would
+never have been paid. Every missed fill was re-priced as the bad outcome, so the
+realised expectancy was pushed down, toward the conclusion the script was
+written to test. "So the truth is worse" had the sign of its own error
+backwards.
 
-    RECOVERED CORPUS, 212 triggers: -0.52c to -0.77c throughout
+The detector now brackets from both sides. `optimistic` fires if the level was
+consumed, cleared, or traded through, which includes cancellations and is a
+genuine upper bound. `conservative` requires the level to have emptied AND the
+market to have traded through our price. Also fixed: every (hold, rest) cell now
+runs on ONE shared trigger set instead of nine differently-censored ones, no
+window is allowed to run past the market's close, the exit book is read with the
+no-lookahead convention, and every mean is clustered on the market ticker.
 
-Fill rates do rise with a longer rest window, and several configurations clear
-the 42% threshold. **The realised expectancy is negative anyway.** A 57% fill
-rate still loses 0.412c, because the 57% that fill are the wrong 57%.
+    ORIGINAL ARCHIVE, 598 triggers across 84 markets, one shared set
 
-These are also the optimistic bound - a fill is counted whenever a counterparty
-reached our price, ignoring the queue ahead of us - so the truth is worse.
+    hold  rest   optimistic  conservative   realised if opt.   if conservative
+     15s   20s      93%          37%       +0.559c +/-0.138   -0.375c +/-0.143
+     15s   90s      97%          60%       +0.603c +/-0.140   -0.270c +/-0.151
+     30s   45s      93%          47%       +0.738c +/-0.194   -0.237c +/-0.196
+     60s   45s      92%          40%       +1.022c +/-0.296   -0.054c +/-0.310
+     60s   90s      95%          49%       +1.054c +/-0.296   -0.034c +/-0.304
+
+**The round trip is not dead. It is bracketed and undecided.** At the upper
+bound it earns +0.6c to +1.1c per trade at t of roughly 4. At the conservative
+bound it is between -0.4c and zero. The truth is in between, and nothing in
+recorded book data can narrow it further, because snapshots cannot see trades.
+That is what the script's own design note said it would find, before the
+detector bug buried it.
+
+**The direction split is the most interesting thing in the archive run.** Taking `sign = +1 if
+obi > 0 else -1` puts roughly half the trades on the ask-heavy side, where the
+audit measured the signal at +0.02c over a balanced book against +0.68c for
+bid-heavy. Those halves do not look alike:
+
+    hold 30s / rest 45s        n   realised if opt.     if it never fills
+    bid-heavy                262   +1.122c +/-0.411     +0.473c +/-0.611
+    ask-heavy                336   +0.439c +/-0.138     -0.550c +/-0.239
+
+Bid-heavy triggers are roughly 2.5x better on the optimistic column, and the
+never-fills column separates cleanly: forced to cross out, a bid-heavy entry is
+about break-even while an ask-heavy one loses half a cent at t over 2.
+
+**It does not replicate on the recovered corpus.** Same cell, 136 triggers:
+bid-heavy +0.502c +/-0.628 against ask-heavy +0.464c +/-0.406, on 8 and 11
+markets respectively. That is not a refutation, it is no power - 8 markets
+cannot detect a half-cent difference. But it means the split is one period's
+result, which is the exact situation the "three periods, no survivor" chapter
+was in. Pre-register it before the next live run rather than acting on it.
+
+    RECOVERED CORPUS, 136 triggers across 19 markets
+
+    hold  rest   optimistic  conservative   realised if opt.   if conservative
+     15s   20s      91%          32%       +0.337c +/-0.213   -0.540c +/-0.249
+     30s   45s      90%          38%       +0.481c +/-0.350   -0.463c +/-0.377
+     60s   90s      90%          35%       +0.590c +/-0.425   -0.718c +/-0.433
+
+Same bracket straddling zero, weaker throughout, and too small to settle it.
+
+Two things worth stating about the fixes rather than the result.
+
+Requiring one shared trigger set with the whole window inside the market's life
+drops 13,782 candidate triggers to keep 598 clean ones. Fewer, but comparable
+across cells, which the old 586-to-726 spread was not.
+
+And the post-close guard turned out to be inert here. It flags 4,693 triggers,
+every one of which was already dropped for insufficient recording length,
+because these recordings end near the market's close. It was a real hole in the
+method and it was not costing anything on this data. Both counts are now in the
+census so the next corpus does not have to re-derive that.
 
 ## Verdict
 
-The signal is real: +0.86c of directional forecast at extreme imbalance against
-a control of +0.013c, monotone across 640 markets, with the thick side carrying
-+0.78c of it. The round trip is not tradeable: every hold and rest combination
-realises a loss once fills are priced conditionally.
+The signal is real: +0.86c of mid-to-mid directional forecast at extreme
+imbalance against a control of +0.013c, monotone across 640 markets, with the
+thick side carrying +0.78c of it - so it is not a thin-side widening artifact.
+At the touch convention that a resting quote actually collects, the same table
+reads -0.905c control to -0.014c at |OBI| > 0.9: a +0.891c lift off a baseline
+that starts under water.
 
-Live confirmation, 13 real orders and 33 cents: entries filled at the displayed
-touch every time, and realised cash ran -1.09c per completed trade, in the same
-negative territory the study predicts.
+The round trip is **undecided, not refuted**. Priced conditionally, with a fill
+detector that brackets rather than one that misses the common case, realised
+expectancy runs +0.6c to +1.1c at the upper bound and -0.4c to 0.0c at the
+conservative one. Live orders on the bid-heavy side are the test that decides
+it.
+
+Live so far, 13 real orders and 33 cents: entries filled at the displayed touch
+every time, realised cash -1.09c per completed trade. That is 13 orders. It
+does not distinguish between the two bounds above and should not be quoted as
+if it did.
+
+Full corrected output: `exit-fill-study.txt` and `gate-dose-study.txt`, verbatim.

@@ -210,3 +210,52 @@ def test_a_fill_is_journalled_even_when_its_order_is_gone() -> None:
     filled = [e for e in journal.events if e["event"] == "filled"]
     assert len(filled) == 1
     assert filled[0]["mid_at_fill"] == parse_price_fp("0.4950")
+
+
+def test_fill_records_side_position_and_the_exchange_stamp(tmp_path):
+    """Three fields the offline studies had to guess at.
+
+    Without `side`, a markout has to be signed off `action` alone, which
+    inverts the day a strategy quotes NO. Without `post_position`, inventory
+    gets re-derived from zero at each file boundary. Without `executed_at`,
+    `mid_lag_seconds` is null and the gap between execution and our own write
+    stamp is unmeasurable - which is exactly what happened to all 2,507 fills
+    in the August corpus.
+    """
+
+    path = tmp_path / "j.jsonl"
+    journal = OrderJournal(path=path)
+    journal.record_filled(
+        order_id="o1", trade_id="t1", market_ticker="M1", action="sell",
+        side="yes", yes_price=5000, count=100, post_position=-300,
+        is_taker=False, fee_micros=None, book=None,
+        executed_at=1_000_000.0,
+    )
+    journal.close()
+
+    event = read_journal(path)[0]
+
+    assert event["side"] == "yes"
+    assert event["post_position"] == -300
+    assert event["executed_at"] == 1_000_000.0
+    assert event["mid_lag_seconds"] is not None
+
+
+def test_a_fill_with_no_exchange_stamp_keeps_a_null_lag(tmp_path):
+    """None is not zero. A lag we could not read must stay unreadable rather
+    than reporting a confident 0.0."""
+
+    path = tmp_path / "j.jsonl"
+    journal = OrderJournal(path=path)
+    journal.record_filled(
+        order_id="o1", trade_id="t1", market_ticker="M1", action="buy",
+        yes_price=400, count=100, is_taker=False, fee_micros=None, book=None,
+    )
+    journal.close()
+
+    event = read_journal(path)[0]
+
+    assert event["mid_lag_seconds"] is None
+    assert event["executed_at"] is None
+    assert event["side"] is None
+    assert event["post_position"] is None

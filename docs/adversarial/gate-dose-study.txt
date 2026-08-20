@@ -1,58 +1,195 @@
-2208 real fills with a 30s self-book markout
+1957 fills with a clean 30s self-book markout
+
+journal census (every drop counted):
+  drop_clean_horizon_past_end                47
+  drop_clean_no_timeline                   2154
+  drop_full_horizon_past_end                299
+  drop_full_sample_stale                    251
+  dropped_no_markout_either_timeline        550
+  journaled_fills                          2507
+  journals                                   21
+  journals_with_no_mid_events                15
+  kept_from_mid                             306
+  kept_from_placed                         1651
+  position_derived                         2507
+
+  markout source: {'placed': 1651, 'mid': 306}
+  placed-timeline bias, paired on 306 fills across 17 markets: -0.000c +/-0.017
+  (placed-derived markout minus mid-derived markout, same fill)
+
+  WARNING: mid_lag_seconds is null on every fill, so the gap between exchange
+  execution and our own journal stamp is UNMEASURED in this corpus. The OBI
+  join below is therefore reported across a range of offsets rather than at a
+  single assumed lookback. Runs after the trader.py fix will carry the real
+  lag and can pin this down.
+
+  taker fills: 0 of 1957
+  Zero. The ledger's own per-venue cross rate is 2-9%, so this
+  corpus contains no forced crosses at all - it cannot show what a blocked fill
+  costs when the stranded inventory has to be crossed out later. The passive
+  filter below excludes nothing.
+
 joining OBI from recordings for 120 tickers...
-  /Users/mike/kalshi-audit/recs2: 120/159
-765 fills matched to a fresh OBI sample (35%)
+  scanning /Users/mike/kalshi-audit/recs2: 159 recordings
+    /Users/mike/kalshi-audit/recs2: 120/159
+  scanning /Users/mike/kalshi-audit/recs: 187 recordings
+  331 recordings skipped by manifest (no overlapping ticker)
 
+======================================================================================
+OBI JOIN OFFSET SWEEP - is the dose-response a forecast or an echo?
 
-REAL-FILL MARKOUT BY IMBALANCE AGAINST THE FILL (the direct evidence)
-bucket                  fills   mean markout  % losing
-0against .50-.70           62       -1.190c       40%
-0against .70-.90          104       -0.309c       49%
-0against .90-.95           49       -0.320c       71%
-0against >= .95           142       -1.435c       60%
-1against .20-.50           82       +0.311c       48%
-4 balanced                143       +0.092c       45%
-5 WITH the fill >= .5     183       -0.244c       48%
+Negative offsets sample the book before the fill stamp; +5s samples a book that
+certainly postdates it and is a pure placebo. Being filled itself depletes the
+touch we were resting on, so a book sampled late looks imbalanced against us
+BECAUSE we were filled. If the gap widens monotonically as the sample moves
+toward and past the fill, that is the artifact, not the signal.
+
+  offset  matched   rate   gap: markout(obi_against >= .9) - markout(rest)
+ -30.00s      640    33%   n=  86 vs  554   gap +0.209c +/-0.876  t=  0.2
+ -10.00s      651    33%   n=  86 vs  565   gap +1.477c +/-1.166  t=  1.3
+  -2.00s      656    34%   n= 111 vs  545   gap -0.244c +/-1.038  t=  0.2
+  -0.25s      661    34%   n= 159 vs  502   gap -0.724c +/-0.851  t=  0.9
++5.00s PLACEBO      663    34%   n=  78 vs  585   gap -2.543c +/-1.304  t=  1.9
+
+======================================================================================
+DETAIL AT OFFSET -0.25s  (661 fills, 34% of the corpus)
+
+The matched subset is selected on collector coverage, which is not random with
+respect to venue or time of day. Read every number below as conditional on it.
+
+RAW MARKOUT BY IMBALANCE AGAINST THE FILL
+bucket                    fills  mkts        mean markout    median  % losing
+0 WITH the fill >= .5       164    37    -0.213c +/-0.880   +0.000c       47%
+1 balanced                  124    27    +0.213c +/-0.796   +0.650c       43%
+2 against .20-.50            71    20    +0.309c +/-0.892   +0.500c       45%
+3 against .50-.70            56    20    -1.345c +/-2.643   +1.500c       39%
+4 against .70-.90            87    20    -0.675c +/-1.112   -0.500c       54%
+5 against .90-.95            38    12    -0.237c +/-1.058   -0.750c       74%
+6 against >= .95            121    24    -1.193c +/-0.702   -1.000c       60%
+
+--------------------------------------------------------------------------------------
+SAME GRADIENT, SPLIT BY WHICH TIMELINE PRODUCED THE MARKOUT
+
+A gradient that lives only in the placed-sourced rows is a property of the
+timeline, not of the market: those mids cluster milliseconds after the very
+fill being measured.
+
+  mid-sourced (4 fills): n=   1 vs    3   gap +6.333c +/-nan  t=  nan
+
+  placed-sourced (657 fills): n= 158 vs  499   gap -0.767c +/-0.852  t=  0.9
 
 BY PRICE DECILE (ticks/1000)
-bucket                  fills   mean markout  % losing
-price 0x                   22       -1.318c       64%
-price 1x                  121       +0.088c       50%
-price 2x                  130       -0.631c       52%
-price 3x                   48       -0.927c       58%
-price 4x                   48       +0.292c       40%
-price 5x                   28       -5.179c       61%
-price 6x                   49       -2.286c       57%
-price 7x                   85       +1.053c       44%
-price 8x                  158       -0.113c       48%
-price 9x                   76       -0.201c       51%
+bucket                    fills  mkts        mean markout    median  % losing
+price 0x                     16     1      -0.438c    n/a   -0.500c       62%
+price 1x                    107    10    +0.142c +/-0.392   -0.500c       50%
+price 2x                    110    13    -0.582c +/-1.586   -0.500c       55%
+price 3x                     43    15    -0.709c +/-1.328   -0.500c       53%
+price 4x                     37     9    +0.027c +/-2.047   +1.000c       43%
+price 5x                     28    11    -5.179c +/-4.042   -5.750c       61%
+price 6x                     45    11    -2.844c +/-2.694   -3.000c       58%
+price 7x                     82    19    +1.012c +/-0.901   +1.000c       45%
+price 8x                    130    15    +0.115c +/-0.492   +0.500c       44%
+price 9x                     63     7    -0.214c +/-0.452   -0.000c       49%
 
 BY VENUE
-bucket                  fills   mean markout  % losing
-KXBTC15M                   29       -1.005c       62%
-KXDOGE15M                 250       -1.354c       55%
-KXGOLD15M                 133       +0.365c       47%
-KXSILVER15M                41       -0.122c       51%
-KXSOL15M                  102       +0.217c       44%
-KXWTI15M                  103       +0.102c       51%
-KXXRP15M                   99       -0.422c       44%
+bucket                    fills  mkts        mean markout    median  % losing
+KXBTC15M                     27     5    -1.524c +/-1.781   -2.500c       67%
+KXDOGE15M                   204     5    -1.661c +/-1.394   -0.500c       57%
+KXETH15M                      8     1      +0.250c    n/a   +0.000c       50%  (thin)
+KXGOLD15M                   119     6    +0.517c +/-0.214   -0.000c       46%
+KXSILVER15M                  40     5    -0.113c +/-1.225   -0.250c       50%
+KXSOL15M                     95     5    +0.389c +/-0.163   +2.000c       42%
+KXWTI15M                     86     8    +0.523c +/-0.701   +0.000c       49%
+KXXRP15M                     82     6    -0.426c +/-0.894   +1.000c       43%
+  (1 bucket(s) under 15 fills, marked thin, shown anyway)
 
 BY FILL ROLE
-bucket                  fills   mean markout  % losing
-maker                     765       -0.433c       50%
+bucket                    fills  mkts        mean markout    median  % losing
+maker                       661    41    -0.414c +/-0.499   -0.150c       50%
 
-==========================================================================
-GATE SWEEP over 765 passive fills (takers are our own crosses - the gate never sees them)
+======================================================================================
+IS IT IMBALANCE, OR IS IT VENUE AND PRICE?
 
- thresh  blocked  % fills  blocked markout  kept markout  saved/cycle*
-    50%      131      17%         -0.534c      -0.412c        +5.00c
-    60%      117      15%         -0.077c      -0.498c        +0.64c
-    70%      103      13%         -0.117c      -0.483c        +0.86c
-    80%       85      11%         -0.376c      -0.440c        +2.29c
-    90%       60       8%         -0.963c      -0.388c        +4.13c
-    95%       43       6%         -1.251c      -0.385c        +3.84c
+VENUE-DEMEANED MARKOUT BY IMBALANCE
+  each fill minus its own venue's mean, so a toxic venue cannot print as a dose-response
+bucket                    fills  mkts        mean markout    median  % losing
+0 WITH the fill >= .5       164    37    +0.073c +/-0.828   +1.293c       43%
+1 balanced                  124    27    +0.719c +/-0.866   +1.261c       36%
+2 against .20-.50            71    20    +0.993c +/-0.914   +1.613c       38%
+3 against .50-.70            56    20    -0.849c +/-2.396   +1.611c       45%
+4 against .70-.90            87    20    -0.278c +/-0.966   +0.161c       48%
+5 against .90-.95            38    12    +0.549c +/-0.916   +0.661c       32%
+6 against >= .95            121    24    -0.998c +/-0.551   -1.023c       59%
 
-baseline mean markout, all passive fills: -0.433c
-* 'saved/cycle' = the blocked fills' total markout, negated, per journal
-  (a journal is one cycle). Positive means the gate removes net losers.
-  A good threshold blocks strongly-negative fills and few of the rest.
+VENUE-AND-PRICE-DEMEANED MARKOUT BY IMBALANCE
+  also minus the venue x price-decile cell mean
+bucket                    fills  mkts        mean markout    median  % losing
+0 WITH the fill >= .5       164    37    +0.311c +/-0.493   +0.944c       41%
+1 balanced                  124    27    +0.272c +/-0.859   +0.523c       36%
+2 against .20-.50            71    20    +0.541c +/-0.804   +1.200c       38%
+3 against .50-.70            56    20    +0.781c +/-1.023   +0.333c       48%
+4 against .70-.90            87    20    -0.426c +/-1.071   -0.375c       53%
+5 against .90-.95            38    12    -0.356c +/-1.265   -1.023c       74%
+6 against >= .95            121    24    -0.960c +/-0.564   -0.556c       58%
+
+======================================================================================
+BY DIRECTION - the gate's two halves, never pooled
+
+The audit measured the underlying signal as one-sided: relative to a balanced
+book, bid-heavy predicts +0.68c at 5s and ask-heavy +0.02c. A resting SELL is
+endangered by a bid-heavy book (the supported half); a resting BUY by an
+ask-heavy one (the half with no measured support). Pooling them would hide a
+result that lives entirely in one.
+
+SELL fills, endangered by a bid-heavy book (supported half)
+bucket                    fills  mkts        mean markout    median  % losing
+0 WITH the fill >= .5        71    27    -1.066c +/-1.655   -0.500c       54%
+1 balanced                   60    22    -0.906c +/-1.096   -0.400c       52%
+2 against .20-.50            46    15    +0.629c +/-0.980   +0.500c       48%
+3 against .50-.70            30    12    -4.317c +/-4.150   -2.500c       57%
+4 against .70-.90            31    12    +1.023c +/-1.044   +0.500c       48%
+5 against .90-.95            17     6    -0.853c +/-1.202   -0.500c       82%
+6 against >= .95             69    18    -0.751c +/-0.767   -1.000c       57%
+  gradient: n=  86 vs  238   gap +0.065c +/-1.392  t=  0.0
+
+BUY fills, endangered by an ask-heavy book (unsupported half)
+bucket                    fills  mkts        mean markout    median  % losing
+0 WITH the fill >= .5        93    26    +0.439c +/-0.714   +0.800c       42%
+1 balanced                   64    19    +1.262c +/-1.026   +1.500c       34%
+2 against .20-.50            25    10    -0.280c +/-1.969   +0.500c       40%
+3 against .50-.70            26    12    +2.085c +/-1.782   +2.000c       19%
+4 against .70-.90            56    16    -1.614c +/-1.555   -1.000c       57%
+5 against .90-.95            21    10    +0.262c +/-1.431   -1.000c       67%
+6 against >= .95             52    17    -1.779c +/-1.422   -0.750c       63%
+  gradient: n=  73 vs  264   gap -1.489c +/-1.029  t=  1.4
+
+======================================================================================
+GATE SWEEP over 661 passive fills
+Counterfactual position path: a blocked fill does not move inventory.
+
+ thresh  blocked    %       blocked markout          kept markout        blocked - kept
+    50%      170  26%      -1.759c +/-1.119      +0.051c +/-0.432      -1.811c +/-1.069
+    60%      160  24%      -1.513c +/-1.042      -0.063c +/-0.547      -1.449c +/-1.146
+    70%      135  20%      -1.569c +/-1.041      -0.118c +/-0.577      -1.451c +/-1.216
+    80%      113  17%      -1.758c +/-0.963      -0.137c +/-0.558      -1.621c +/-1.114
+    90%       81  12%      -2.133c +/-0.774      -0.174c +/-0.542      -1.959c +/-0.969
+    95%       61   9%      -2.398c +/-0.989      -0.212c +/-0.522      -2.186c +/-1.067
+
+ thresh   drift-leg cents per journal
+    50%                         8.62c
+    60%                        10.15c
+    70%                         7.39c
+    80%                         6.54c
+    90%                         7.10c
+    95%                         5.51c
+
+The last column is the only thing here that speaks to the gate's premise: is
+what it blocks worse than what it keeps, by more than its own error bar?
+
+'drift-leg cents per journal' is the blocked fills' 30s markout, size-weighted
+by contracts and negated, over 14 journals. It is NOT a P&L estimate and
+must not be compared against a per-cycle profit figure. It omits the spread
+captured on those fills, the exit that still has to happen, the queue position
+lost when the veto cancels a resting order, and the inventory a veto strands.
+The last of those is what turned this design's predecessor from +$1.33 to
+-$14.78, and no offline replay of un-vetoed fills can see it.

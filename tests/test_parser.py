@@ -94,3 +94,41 @@ def test_an_unparseable_fee_raises_rather_than_reading_as_free() -> None:
 
     with pytest.raises(ValueError):
         parse_fill_fee_micros({"fee_cost": "not-a-number"})
+
+
+def test_fill_carries_the_exchange_execution_stamp():
+    """Our journal stamps events when we WRITE them. Without the venue's own
+    stamp the offline joins cannot tell "the book before the fill" from "the
+    book before we heard about the fill", and the difference is the whole
+    result of a gate study."""
+
+    from kalshi_mm_bot.api.parser import parse_order_fill
+
+    fill = parse_order_fill({"msg": {
+        "trade_id": "t", "order_id": "o", "market_ticker": "M", "action": "buy",
+        "side": "yes", "yes_price_dollars": "0.40", "count_fp": "1.00",
+        "post_position_fp": "3.00", "is_taker": False, "ts": 1_700_000_000,
+    }})
+
+    assert fill.exchange_ts == 1_700_000_000.0
+
+
+def test_a_millisecond_stamp_is_normalised_to_seconds():
+    from kalshi_mm_bot.api.parser import parse_exchange_ts
+
+    assert parse_exchange_ts({"ts": 1_700_000_000_000}) == 1_700_000_000.0
+
+
+def test_an_iso_stamp_parses():
+    from kalshi_mm_bot.api.parser import parse_exchange_ts
+
+    assert parse_exchange_ts(
+        {"created_time": "2026-08-19T12:00:00Z"}) == 1787140800.0
+
+
+def test_a_missing_stamp_is_none_not_now():
+    """Guessing here would silently claim zero lag on every fill."""
+
+    from kalshi_mm_bot.api.parser import parse_exchange_ts
+
+    assert parse_exchange_ts({"yes_price_dollars": "0.40"}) is None

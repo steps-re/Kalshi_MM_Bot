@@ -27,6 +27,11 @@ class OrderFill:
     count: int
     post_position: int
     is_taker: bool
+    # Exchange-side execution time, epoch seconds, when the payload carries one.
+    # None means the venue did not say, and it must stay None: the difference
+    # between this and our own write stamp is the only measurement of how stale
+    # a journalled fill timestamp is, and every offline join depends on it.
+    exchange_ts: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

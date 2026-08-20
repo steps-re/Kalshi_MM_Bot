@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
 from kalshi_mm_bot.market.price import parse_count_fp, parse_money_fp, parse_price_fp
@@ -44,7 +45,40 @@ def parse_order_fill(msg: dict[str, Any]) -> OrderFill:
         yes_price=_parse_field(parse_price_fp, data, "yes_price_dollars"),
         count=_parse_field(parse_count_fp, data, "count_fp"),
         post_position=_parse_field(parse_count_fp, data, "post_position_fp"),
+        exchange_ts=parse_exchange_ts(data),
     )
+
+
+# The venue's own execution stamp. Spelling varies by payload and Kalshi has
+# more than one, so try them all and return None rather than guessing: a
+# missing stamp must stay missing. Our journal stamps events when we WRITE
+# them, so without this the gap between execution and journalling is
+# unmeasurable, and every offline join that says "the book just before the
+# fill" is really saying "the book just before we heard about the fill".
+EXCHANGE_TS_FIELDS = ("ts", "created_time", "executed_time", "trade_time")
+
+
+def parse_exchange_ts(data: dict[str, Any]) -> float | None:
+    for field in EXCHANGE_TS_FIELDS:
+        raw = data.get(field)
+
+        if raw is None:
+            continue
+
+        if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+            value = float(raw)
+            # Kalshi sends seconds on some channels and milliseconds on others.
+            # Anything past the year 2100 in seconds is milliseconds.
+            return value / 1000.0 if value > 4_102_444_800 else value
+
+        try:
+            return datetime.fromisoformat(
+                str(raw).replace("Z", "+00:00")
+            ).timestamp()
+        except (ValueError, AttributeError):
+            continue
+
+    return None
 
 
 def parse_market_position(msg: dict[str, Any]) -> MarketPosition:

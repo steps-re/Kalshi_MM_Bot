@@ -371,11 +371,17 @@ class LiveOrderManager:
                 trade_id=str(fill.trade_id),
                 market_ticker=str(fill.market_ticker),
                 action=str(fill.action),
+                side=(str(fill.side) if getattr(fill, "side", None) else None),
                 yes_price=fill.yes_price,
                 count=fill.count,
+                post_position=getattr(fill, "post_position", None),
                 is_taker=bool(getattr(fill, "is_taker", False)),
                 fee_micros=getattr(fill, "fees_paid", None),
                 book=self._last_book.get(str(fill.market_ticker)),
+                # Never omitted. Leaving this unpassed is why every journalled
+                # fill reported a null lag, which let an offline study assume
+                # a 0.25s gap between execution and our own write stamp.
+                executed_at=getattr(fill, "exchange_ts", None),
             )
 
         for client_order_id, order in tuple(self.orders.items()):

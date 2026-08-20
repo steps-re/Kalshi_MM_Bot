@@ -163,6 +163,8 @@ class OrderJournal:
         is_taker: bool,
         fee_micros: int | None,
         book: Orderbook | None,
+        side: str | None = None,
+        post_position: int | None = None,
         executed_at: float | None = None,
     ) -> None:
         """Record a fill. `fee_micros` of None means the payload did not say.
@@ -179,6 +181,22 @@ class OrderJournal:
         None is not zero and must survive as None all the way to analysis: a fee
         we could not read once made 48 taker fills that really cost $0.5879 look
         free, and confirmed the conclusion the project most wanted to be true.
+
+        `side` and `post_position` are recorded because dropping them cost a
+        study its two most important joins. Without `side`, an analysis has to
+        sign the trade off `action` alone, which is only correct while every
+        strategy hard-codes `side="yes"` - a `buy` of NO is economically a short
+        of YES, and the day one strategy quotes NO, every markout sign silently
+        inverts. Without `post_position`, the exchange's own position after the
+        fill, an analysis has to re-derive inventory by summing counts from zero
+        at each file boundary, so any inherited position or any missed fill
+        flips the increases/reduces flag that a gate study depends on.
+
+        `executed_at` is the venue's stamp. `at` is ours, written when we learn
+        of the fill, and the gap between them is `mid_lag_seconds`. Measured on
+        21 journals from the August run, that field was None on all 2,507 fills
+        because no caller ever passed `executed_at` - the lag was declared
+        unmeasurable-by-omission while an offline study assumed it was 0.25s.
         """
 
         mid = book_mid(book)
@@ -194,14 +212,19 @@ class OrderJournal:
                 "trade_id": trade_id,
                 "market_ticker": market_ticker,
                 "action": action,
+                # None only for a payload that did not say. Analyses must treat
+                # a missing side as unknown, never as "yes".
+                "side": side,
                 "yes_price": yes_price,
                 "count": count,
+                "post_position": post_position,
                 "is_taker": is_taker,
                 "fee_micros": fee_micros,
                 "mid_at_fill": mid,
                 # The markout horizon. Reported, never assumed - the book is
                 # sampled when we learn of the fill, not when it happened.
                 "mid_lag_seconds": lag,
+                "executed_at": executed_at,
             }
         )
 

@@ -363,11 +363,14 @@ async def passive_exit(rest, controller, ticker: str, position: int,
                        rest_seconds: float) -> dict:
     """Rest the exit at the touch, polling so we learn WHEN it fills.
 
-    A single fill/no-fill observation at a fixed 40s answers whether that one
-    rest duration clears the 42% break-even. Polling turns the same trade into a
-    point on the fill curve, which is what says whether resting longer is worth
-    the extra exposure. Time-to-fill is the most valuable number this test can
-    produce, and it costs only a few REST calls.
+    A single fill/no-fill observation at a fixed 40s is one point. Polling turns
+    the same trade into a point on the fill curve, which is what says whether
+    resting longer is worth the extra exposure. Time-to-fill is the most
+    valuable number this test can produce, and it costs only a few REST calls.
+
+    Do not score the result against the old 42% break-even. That blend assumes
+    filled trades are a random sample of all trades, and they are not. See
+    `exit_fill_study.py` and `taker_live_report.py`.
     """
 
     book = controller.orderbooks.get(ticker)

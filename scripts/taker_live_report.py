@@ -21,13 +21,26 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-# Measured on both recorded corpora, independently and in agreement, for the
-# KXBTCD 2-5c near-expiry cell: a resting exit that fills is worth +0.69c and
-# one forced to cross is worth -0.50c. So the strategy lives or dies on how
-# often the resting exit trades.
+# Measured on both recorded corpora for the KXBTCD 2-5c near-expiry cell: a
+# resting exit that fills is worth +0.69c and one forced to cross is worth
+# -0.50c, which gives an apparent break-even fill rate of 42%.
+#
+# That 42% is NOT a valid pass mark and this script no longer treats it as one.
+# It blends E[touch over ALL trades] with E[cross over ALL trades] at the fill
+# rate, which assumes the trades that fill are a random sample. They are not:
+# you fill precisely when the market comes to you, so the filled trades are
+# systematically the ones that went against you. `exit_fill_study.py` prices
+# each trigger on the path it would really have taken, and that is the number
+# to compare a live run against.
+#
+# Kept only to show the reference point and how far the live rate sits from it.
 TOUCH_CENTS = 0.694
 CROSS_CENTS = -0.509
-BREAK_EVEN_FILL_RATE = -CROSS_CENTS / (TOUCH_CENTS - CROSS_CENTS)
+NAIVE_BREAK_EVEN = -CROSS_CENTS / (TOUCH_CENTS - CROSS_CENTS)
+# From the corrected exit_fill_study on the original archive, 598 triggers over
+# 84 markets, clustered on the ticker. The truth is inside this bracket and
+# recorded books cannot narrow it further, because snapshots cannot see trades.
+OFFLINE_BRACKET = (-0.4, +1.1)
 
 
 def load(path: Path) -> list[dict]:
@@ -112,28 +125,30 @@ def summarise(label: str, rows: list[dict]) -> None:
     if exits:
         print(f"  exits              {dict(exits)}")
 
-    # The number that decides the strategy. Both recorded corpora agree that a
-    # resting exit filling at the touch is worth about +0.69c and being forced
-    # to cross is worth about -0.50c, so the break-even passive fill rate is
-    # 0.50 / (0.69 + 0.50) = 42%. Above that the cell pays, below it does not.
     rested = exits.get("rested", 0)
     attempted = rested + exits.get("partial", 0)
 
     if attempted:
         rate = rested / attempted
         print(f"\n  PASSIVE EXIT FILL RATE   {rested}/{attempted} = {rate:.0%}")
-        print(f"    break-even needs         {BREAK_EVEN_FILL_RATE:.0%}")
-        blended = (rate * TOUCH_CENTS + (1 - rate) * CROSS_CENTS)
-        print(f"    implied edge             {blended:+.3f}c per trade")
+        print(f"    naive break-even         {NAIVE_BREAK_EVEN:.0%}  "
+              f"(NOT a pass mark - see below)")
 
         if attempted < 20:
-            print(f"    {attempted} exits is far too few to call. The interval on this "
-                  f"rate is wide.")
-        elif rate >= BREAK_EVEN_FILL_RATE:
-            print("    -> above break-even. The cell pays.")
-        else:
-            print("    -> below break-even. The round trip costs more than the "
-                  "forecast is worth.")
+            print(f"    {attempted} exits is far too few to call anything. The "
+                  f"interval on this rate is wide.")
+
+        print(f"""
+    The 42% figure blends the touch and cross outcomes at the fill rate, which
+    assumes the trades that fill are a random sample of all trades. They are
+    not - you fill when the market comes to you - so comparing this rate
+    against 42% overstates the strategy whenever the fill rate is high.
+
+    The number to beat is realised cash per completed trade, above. Offline,
+    priced conditionally on 598 triggers across 84 markets, this cell brackets
+    {OFFLINE_BRACKET[0]:+.1f}c to {OFFLINE_BRACKET[1]:+.1f}c per trade depending on how
+    many of the resting exits truly filled. A live run's job is to land inside
+    that bracket and say where.""")
 
 
 def shadow_report(rows: list[dict]) -> None:

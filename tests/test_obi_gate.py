@@ -142,3 +142,162 @@ def test_factory_threshold_zero_builds_a_transparent_wrapper() -> None:
     )
 
     assert strategy.threshold_hundredths == 0
+
+
+# --------------------------------------------------------- audit corrections
+
+
+def test_counter_counts_the_episode_not_every_book_event():
+    """A suppressed quote riding one OBI episode is ONE block, not forty.
+
+    The counters used to increment per dropped intent per orderbook event, so a
+    3-second episode across 40 book updates reported 40 blocks. Anything reading
+    these as "fills avoided" was inflated by the event rate.
+    """
+
+    strategy = OBIGatedStrategy(inner=BothSides(), threshold_hundredths=90)
+    imbalanced = book("100.00", "1.00")
+
+    for _ in range(40):
+        strategy.on_orderbook(
+            context=StrategyContext(event_count=1, offset_seconds=1.0),
+            market_ticker="M1",
+            orderbook=imbalanced,
+            portfolio=Held(0),
+        )
+
+    assert strategy.blocked_sells == 1
+
+
+def test_a_new_episode_counts_again():
+    """Two separate episodes are two blocks. The counter must not latch."""
+
+    strategy = OBIGatedStrategy(inner=BothSides(), threshold_hundredths=90)
+    imbalanced = book("100.00", "1.00")
+    balanced = book("10.00", "10.00")
+
+    for orderbook in (imbalanced, balanced, imbalanced):
+        strategy.on_orderbook(
+            context=StrategyContext(event_count=1, offset_seconds=1.0),
+            market_ticker="M1",
+            orderbook=orderbook,
+            portfolio=Held(0),
+        )
+
+    assert strategy.blocked_sells == 2
+
+
+def test_flipping_to_the_other_side_is_a_new_episode():
+    strategy = OBIGatedStrategy(inner=BothSides(), threshold_hundredths=90)
+
+    for orderbook in (book("100.00", "1.00"), book("1.00", "100.00")):
+        strategy.on_orderbook(
+            context=StrategyContext(event_count=1, offset_seconds=1.0),
+            market_ticker="M1",
+            orderbook=orderbook,
+            portfolio=Held(0),
+        )
+
+    assert (strategy.blocked_sells, strategy.blocked_buys) == (1, 1)
+
+
+def test_depth_floor_refuses_to_believe_a_one_lot_touch():
+    """taker_extract defect #5: a 1-lot ask against a 19-lot bid scores 0.90
+    mechanically. With a floor the ratio is not believed at all."""
+
+    thin = book("19.00", "1.00")
+    strategy = OBIGatedStrategy(
+        inner=BothSides(), threshold_hundredths=90, min_touch_contracts=50)
+    intents = strategy.on_orderbook(
+        context=StrategyContext(event_count=1, offset_seconds=1.0),
+        market_ticker="M1",
+        orderbook=thin,
+        portfolio=Held(0),
+    )
+
+    assert sorted(i.action for i in intents) == ["buy", "sell"]
+    assert strategy.blocked_sells == 0
+
+    # The same book with the floor off is the live arm's behaviour, unchanged.
+    unfloored = OBIGatedStrategy(inner=BothSides(), threshold_hundredths=90)
+    kept = unfloored.on_orderbook(
+        context=StrategyContext(event_count=1, offset_seconds=1.0),
+        market_ticker="M1",
+        orderbook=thin,
+        portfolio=Held(0),
+    )
+    assert [i.action for i in kept] == ["buy"]
+
+
+def test_gate_buys_zero_runs_only_the_supported_half():
+    """The audit measured the signal as one-sided. gate_buys=0 blocks SELLs on a
+    bid-heavy book and leaves the unsupported half alone."""
+
+    sell_only = OBIGatedStrategy(
+        inner=BothSides(), threshold_hundredths=90, gate_buys=0)
+    ask_heavy = sell_only.on_orderbook(
+        context=StrategyContext(event_count=1, offset_seconds=1.0),
+        market_ticker="M1",
+        orderbook=book("1.00", "100.00"),
+        portfolio=Held(0),
+    )
+    assert sorted(i.action for i in ask_heavy) == ["buy", "sell"]
+
+    bid_heavy = sell_only.on_orderbook(
+        context=StrategyContext(event_count=1, offset_seconds=1.0),
+        market_ticker="M1",
+        orderbook=book("100.00", "1.00"),
+        portfolio=Held(0),
+    )
+    assert [i.action for i in bid_heavy] == ["buy"]
+
+
+def test_a_no_side_quote_is_never_gated():
+    """A `sell` of NO is economically a BUY of YES, so a bid-heavy book does not
+    endanger it. Signing off `action` alone would block the wrong quote."""
+
+    class NoSideSell:
+        name = "no-side"
+
+        def on_orderbook(self, context, market_ticker, orderbook, portfolio):
+            return (
+                QuoteIntent("s", market_ticker, "sell", "no",
+                            parse_price_fp("0.5000"), ONE),
+            )
+
+    strategy = OBIGatedStrategy(inner=NoSideSell(), threshold_hundredths=90)
+    intents = strategy.on_orderbook(
+        context=StrategyContext(event_count=1, offset_seconds=1.0),
+        market_ticker="M1",
+        orderbook=book("100.00", "1.00"),
+        portfolio=Held(0),
+    )
+
+    assert len(intents) == 1
+    assert strategy.blocked_sells == 0
+
+
+def test_factory_defaults_leave_the_running_ab_arm_untouched():
+    """The A/B has been live since 2026-08-19. An arm string that does not
+    mention the new params must build exactly what it built yesterday."""
+
+    from kalshi_mm_bot.strategy.factory import strategy_from_name
+
+    gate = strategy_from_name(
+        "obigate:dumb", count=ONE, max_position=ONE,
+        adaptive_params={"obi_gate": 90})
+
+    assert gate.threshold_hundredths == 90
+    assert gate.min_touch_contracts == 0
+    assert gate.gate_buys == 1
+
+
+def test_factory_passes_the_new_params_through_and_hides_them_from_the_inner():
+    from kalshi_mm_bot.strategy.factory import strategy_from_name
+
+    gate = strategy_from_name(
+        "obigate:dumb", count=ONE, max_position=ONE, adaptive_params={
+            "obi_gate": 95, "obi_gate_floor": 40, "obi_gate_buys": 0})
+
+    assert (gate.threshold_hundredths, gate.min_touch_contracts,
+            gate.gate_buys) == (95, 40, 0)
