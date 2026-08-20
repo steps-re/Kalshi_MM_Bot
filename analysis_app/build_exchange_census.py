@@ -22,6 +22,7 @@ Three things end up in the file:
 from __future__ import annotations
 
 import json
+import math
 import sys
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -138,7 +139,8 @@ def census(history: Path) -> dict:
 def pooled(candle_paths: list[Path]) -> list[dict]:
     """The two pre-specified trades, by family, at each lookback."""
 
-    cells: dict[tuple, dict] = defaultdict(lambda: defaultdict(lambda: [0.0, 0]))
+    cells: dict[tuple, dict] = defaultdict(
+        lambda: defaultdict(lambda: [0.0, 0, 0, 0.0]))
 
     for path in candle_paths:
         if not path.exists():
@@ -175,8 +177,10 @@ def pooled(candle_paths: list[Path]) -> list[dict]:
 
                 if mid <= TAIL_MAX:
                     zone, value = "tail SELL", bid - won - fee(bid)
+                    losses, loss_size = won, 1.0 - bid
                 elif mid >= FAVE_MIN:
                     zone, value = "fave BUY", won - ask - fee(ask)
+                    losses, loss_size = 1 - won, ask
                 else:
                     continue
 
@@ -184,20 +188,32 @@ def pooled(candle_paths: list[Path]) -> list[dict]:
                     slot = cells[(lookback, fam, zone)][cluster]
                     slot[0] += value
                     slot[1] += 1
+                    slot[2] += losses
+                    slot[3] += loss_size
 
     rows = []
 
     for (lookback, family, zone), clusters in cells.items():
-        n = sum(c for _, c in clusters.values())
+        n = sum(v[1] for v in clusters.values())
 
         if n < 60:
             continue
 
-        per = [total / count for total, count in clusters.values()]
-        weights = [count for _, count in clusters.values()]
+        per = [v[0] / v[1] for v in clusters.values()]
+        weights = [v[1] for v in clusters.values()]
         mean = sum(p * w for p, w in zip(per, weights)) / sum(weights)
         _, groups, _, se = clustered(per, list(clusters.keys()))
+        # Rule of three, in money. With no losses observed the cluster means
+        # are near-identical and the clustered SE collapses: tennis printed
+        # t=24.6 off ZERO losses in 344 contracts. Bound the error bar by the
+        # uncertainty in the LOSS RATE instead.
+        losses = sum(v[2] for v in clusters.values())
+        loss_cost = sum(v[3] for v in clusters.values()) / max(n, 1)
+        count_sd = math.sqrt(losses) if losses else 1.53
+        floor = count_sd * loss_cost / max(n, 1)
+        se = max(se if se == se else 0.0, floor)
         rows.append({
+            "losses": losses,
             "lookback_min": lookback // 60,
             "family": family,
             "trade": zone,

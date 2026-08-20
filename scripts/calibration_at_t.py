@@ -188,7 +188,7 @@ def main() -> None:
   tail SELL: every market with mid <= 5c  -> sell YES at bid, hold to settle
   fave BUY:  every market with mid >= 80c -> buy YES at ask, hold to settle""")
     print(f"\n{'lookback':>9} {'family':<15}{'trade':<11}{'n':>6}{'clusters':>9}"
-          f"{'net c/contract':>16}{'t':>7}")
+          f"{'losses':>8}{'net c/contract':>16}{'t':>7}")
 
     for lookback in LOOKBACKS:
         for fam in sorted({f for lb, f, _ in cells if lb == lookback}):
@@ -196,7 +196,8 @@ def main() -> None:
                 ("tail SELL", lambda lo, hi: hi <= 0.05 + 1e-9, "sell"),
                 ("fave BUY", lambda lo, hi: lo >= 0.80 - 1e-9, "buy"),
             ):
-                merged: dict[str, list] = defaultdict(lambda: [0.0, 0])
+                merged: dict[str, list] = defaultdict(
+                    lambda: [0.0, 0, 0, 0.0])
 
                 for (lo, hi) in BUCKETS:
                     if not wanted(lo, hi):
@@ -216,26 +217,53 @@ def main() -> None:
                         if side == "sell":
                             pnl = (sum_bid - wins
                                    - fee(sum_bid / count) * count)
+                            # A "loss" is the rare event that decides this
+                            # trade: the tail actually came in.
+                            losses = wins
+                            loss_size = 1.0 - sum_bid / count
                         else:
                             pnl = (wins - sum_ask
                                    - fee(sum_ask / count) * count)
+                            losses = count - wins
+                            loss_size = sum_ask / count
 
                         merged[event][0] += pnl
                         merged[event][1] += count
+                        merged[event][2] += losses
+                        # POTENTIAL loss magnitude, accrued for every
+                        # contract - not just the ones that lost. With
+                        # zero observed losses the average of observed
+                        # ones is zero, which silently disabled the floor.
+                        merged[event][3] += count * loss_size
 
-                total = sum(c for _, c in merged.values())
+                total = sum(v[1] for v in merged.values())
 
                 if total < 60:
                     continue
 
-                per = [pnl / count for pnl, count in merged.values()]
-                weights = [count for _, count in merged.values()]
+                per = [v[0] / v[1] for v in merged.values()]
+                weights = [v[1] for v in merged.values()]
                 mean = sum(p * w for p, w in zip(per, weights)) / sum(weights)
                 _, groups, _, se = clustered(per, list(merged.keys()))
-                t = mean / se if se and not math.isnan(se) else float("nan")
+                losses = sum(v[2] for v in merged.values())
+                loss_cost = (sum(v[3] for v in merged.values())
+                             / max(total, 1))
+
+                # RULE OF THREE, in money. With few or no losses observed, the
+                # cluster means are near-identical, the clustered SE collapses
+                # and t explodes - tennis printed t=24.6 off ZERO losses in 344
+                # contracts. The real uncertainty is in the loss RATE: the
+                # Poisson sd on a count of k is sqrt(k), and for k=0 the 95%
+                # upper bound is 3, i.e. an sd of about 1.5. Convert that count
+                # uncertainty into per-contract dollars and never report a
+                # tighter error bar than it allows.
+                count_sd = math.sqrt(losses) if losses else 1.53
+                floor = count_sd * loss_cost / max(total, 1)
+                se = max(se if not math.isnan(se) else 0.0, floor)
+                t = mean / se if se else float("nan")
                 print(f"{lookback // 60:>7}m  {fam:<15}{label:<11}{total:>6}"
-                      f"{groups:>9}{mean * 100:>+13.2f}c +/-{se * 100:.2f}"
-                      f"{t:>7.1f}")
+                      f"{groups:>9}{losses:>8}{mean * 100:>+13.2f}c "
+                      f"+/-{se * 100:.2f}{t:>7.1f}")
 
     print("""
 SELL@bid net = cents per contract from selling YES at the bid as a taker and

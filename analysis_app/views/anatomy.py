@@ -99,22 +99,44 @@ pooled = pd.DataFrame(census["pooled"])
 
 if not pooled.empty:
     pooled["t"] = (pooled["net_cents"] / pooled["se_cents"]).round(1)
-    view = pooled.rename(columns={
+    view = pooled[["lookback_min", "family", "trade", "n", "clusters",
+                   "losses", "net_cents", "se_cents", "t"]].rename(columns={
         "lookback_min": "lookback (min)", "family": "family", "trade": "trade",
-        "n": "contracts", "clusters": "clusters", "net_cents": "net (c)",
-        "se_cents": "se (c)"})
+        "n": "contracts", "clusters": "clusters", "losses": "losses",
+        "net_cents": "net (c)", "se_cents": "se (c)"})
     st.dataframe(view, hide_index=True)
 
 st.warning(
-    "The crypto families show a positive tail edge. Commodities and indices - "
-    "structurally the same thing, a ladder of strikes on a price - show zero. "
-    "Same code, different underlying. Until that replicates somewhere else, "
-    "the honest reading is artifact, not edge.",
+    "Read the **losses** column before any t-statistic. These trades win small "
+    "and often and lose big and rarely, so a cell with no losses in sample has "
+    "no variance and its error bar collapses. Tennis first printed t=24.6 off "
+    "ZERO losses in 344 contracts. Every error bar here is now floored by the "
+    "uncertainty in the loss RATE (rule of three, in money), which is what "
+    "brought that to t=3.8.",
     icon="⚠️",
+)
+
+st.error(
+    "**The cross-family comparison does not mean what it looks like.** "
+    "'Five minutes before close' is not a constant amount of remaining "
+    "uncertainty. For a 15-minute Bitcoin window it is a third of the window "
+    "with real price risk left. For a tennis match it is the final game: only "
+    "2% of tennis markets sit within a cent of their T-60 price, and typical "
+    "paths run 0.53 -> 0.26 -> 0.04. Selling a 4c tennis tail at T-5 is "
+    "selling a player who has already lost, which is a different trade from "
+    "selling a 4c Bitcoin strike that can still be reached. These rows are "
+    "not replications of each other.",
+    icon="🚨",
 )
 
 st.markdown(
     """
+The right conditioner is *fraction of the event's uncertainty still
+outstanding*, not wall-clock minutes, and that has to be built per family
+before any of these numbers can be compared. Until it is, the only honest
+statement is that crypto ladders show a modest tail edge that commodities and
+indices do not reproduce.
+
 This is the fourth idea in this project to look good on one slice and vanish on
 the next. The taker scan crowned a different winner in each of three periods.
 The order-imbalance gate was null offline and null live. A weather model lost
