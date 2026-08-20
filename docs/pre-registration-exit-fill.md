@@ -134,3 +134,33 @@ test it.
 Size. Median depth on the crossing side is 74 contracts and every trade here is
 1. A clean result at 1 contract says the price is real; it says nothing about
 what 10 or 25 does to it. That is the next test, not this one.
+
+---
+
+## Amendment 1, 2026-08-20 11:58 EDT, during the run and blind to the endpoint
+
+Written at 7 executed trades, before any endpoint mean has been computed, and
+below the 30-trip gate at which this document permits computing one.
+
+Signal 8 (BUY 1 @ 3c, t-266s) could not be exited: by the end of its hold the
+strike's book was one-sided, so `flatten` left +1 to settle, journalled as
+`exit: "no book"` with `pnl_cents: -3`. Two problems the original text did not
+anticipate precisely enough:
+
+1. That -3c is the mark at abandonment, not the trade's P&L. The position
+   settles at 0 or 100 after the journal row is written, so the journal number
+   is wrong for this trade *in either direction*.
+2. The original invalidation clause ("any exit that neither rests nor crosses")
+   read literally would throw away the whole run on one 3c lottery ticket. Its
+   intent was systematic instrument failure, like slippage; a rare one-sided
+   book near expiry is a market condition the offline study simply cannot
+   price, because its triggers require a two-sided book throughout.
+
+**Rule, fixed now:** trades with `exit: "no book"` are EXCLUDED from the
+primary endpoint and counted separately. At the reporting gate, if such
+strandings exceed **10% of executed trades**, the live sample no longer
+resembles the offline round trip and the run is reported as
+instrument-limited rather than as a bracket answer. Settle-outs are reported
+as their own line (count, entry cost at risk) and never folded into the mean.
+
+No trading behaviour changes mid-run.

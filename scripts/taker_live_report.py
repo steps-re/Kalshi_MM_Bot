@@ -251,11 +251,31 @@ def bracket_verdict(traded: list[dict]) -> None:
     scan and gate study both went wrong.
     """
 
-    pnl = [r["pnl_cents"] for r in traded if "pnl_cents" in r]
+    executed = [r for r in traded if "pnl_cents" in r]
+    # Amendment 1: a trade abandoned to settlement ('no book') carries the mark
+    # at abandonment, not its P&L - the position resolves at 0 or 100 after the
+    # journal row is written. Excluded from the mean, counted against a 10% gate.
+    stranded = [r for r in executed if r.get("exit") == "no book"]
+    clean = [r for r in executed if r.get("exit") != "no book"]
+    pnl = [r["pnl_cents"] for r in clean]
     n = len(pnl)
 
     print("\n" + "=" * 72)
     print("PRIMARY ENDPOINT (pre-registered)")
+
+    if stranded:
+        at_risk = sum(r.get("equiv", 0) for r in stranded) / 100.0
+        share = len(stranded) / max(len(executed), 1)
+        print(f"  settle-outs       {len(stranded)} of {len(executed)} executed "
+              f"({share:.0%}), {at_risk:.0f}c at risk - EXCLUDED from the mean "
+              f"(Amendment 1)")
+
+        if len(executed) >= MIN_TRIPS_TO_REPORT and share > 0.10:
+            print("""
+  -> INSTRUMENT-LIMITED: over 10% of executed trades could not complete the
+     round trip the offline study prices. Per Amendment 1 this run cannot be
+     compared to the bracket. No verdict follows.""")
+            return
     print(f"  offline bracket   {OFFLINE_BRACKET[0]:+.1f}c to {OFFLINE_BRACKET[1]:+.1f}c "
           f"per round trip")
     print(f"  completed trips   {n}")
