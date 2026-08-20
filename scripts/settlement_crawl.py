@@ -76,16 +76,24 @@ async def throttled(request, *args, **kwargs):
             return result
         except Exception as error:  # noqa: BLE001
             text = str(error)
+            name = type(error).__name__
 
-            if "429" in text or "rate" in text.lower():
-                delay = min(delay * 2, 10.0)
-                log(f"  rate limited, backing off {delay:.1f}s")
+            # Transient network faults get the same backoff as 429s. A
+            # ReadError twenty minutes into a slice killed the whole window
+            # and left a partial gz that looked complete to the skip-check.
+            transient = ("429" in text or "rate" in text.lower()
+                         or "ReadError" in name or "ConnectError" in name
+                         or "Timeout" in name or "RemoteProtocol" in name)
+
+            if transient:
+                delay = min(delay * 2, 15.0)
+                log(f"  {name}, backing off {delay:.1f}s")
                 await asyncio.sleep(delay)
                 continue
 
             raise
 
-    raise RuntimeError("still rate limited after 6 backoffs")
+    raise RuntimeError("still failing after 6 backoffs")
 
 
 def slim(market: dict) -> dict:

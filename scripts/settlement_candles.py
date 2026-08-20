@@ -52,8 +52,15 @@ def parse_close(stamp: str) -> float | None:
         return None
 
 
-def choose(settled: Path, per_family: int) -> list[dict]:
-    """Stratified deterministic sample of traded, settled markets."""
+def choose(settled: Path, per_family: int, families: set[str] | None = None,
+           min_volume: float = 0.0) -> list[dict]:
+    """Stratified deterministic sample of traded, settled markets.
+
+    `families` restricts to named families; `min_volume` targets markets with
+    real books. The 'other' family taught the need for both: a uniform draw
+    from it is dominated by sparse oddities, and only 9 of 2,500 had an
+    actionable book five minutes before close.
+    """
 
     pools: dict[str, list[dict]] = defaultdict(list)
 
@@ -68,9 +75,11 @@ def choose(settled: Path, per_family: int) -> list[dict]:
                 continue
 
             try:
-                if float(d.get("volume_fp") or d.get("volume") or 0) <= 0:
-                    continue
+                volume = float(d.get("volume_fp") or d.get("volume") or 0)
             except (TypeError, ValueError):
+                continue
+
+            if volume <= 0 or volume < min_volume:
                 continue
 
             close = parse_close(d.get("close_time", ""))
@@ -79,7 +88,12 @@ def choose(settled: Path, per_family: int) -> list[dict]:
                 continue
 
             series = d.get("ticker", "").split("-", 1)[0]
-            pools[family_of(series)].append({
+            family = family_of(series)
+
+            if families is not None and family not in families:
+                continue
+
+            pools[family].append({
                 "ticker": d["ticker"],
                 "series": series,
                 "event": d.get("event_ticker"),
@@ -183,9 +197,20 @@ def main() -> None:
     parser.add_argument("settled", type=Path)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--per-family", type=int, default=2500)
+    parser.add_argument("--families", nargs="+", default=None)
+    parser.add_argument("--min-volume", type=float, default=0.0)
+    parser.add_argument("--gap", type=float, default=None,
+                        help="request gap override, e.g. 0.4 when sharing the "
+                             "rate limit with a running crawl")
     args = parser.parse_args()
+
+    if args.gap:
+        globals()["REQUEST_GAP"] = args.gap
+
     log("sampling...")
-    sample = choose(args.settled, args.per_family)
+    sample = choose(args.settled, args.per_family,
+                    set(args.families) if args.families else None,
+                    args.min_volume)
     log(f"{len(sample)} markets in the sample")
     asyncio.run(fetch(sample, args.out))
 
