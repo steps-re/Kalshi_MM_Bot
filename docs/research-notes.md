@@ -1380,3 +1380,37 @@ What the money bought, since it was never going to be the returns:
   packaged as the `venue-audit` skill.
 
 The account keeps the $35.45. The map is the deliverable.
+
+
+## Amendment, same day: the overnight audit reopens the taker question
+
+The closing chapter above says the program produced "a measured no in every
+construction tried". Hours later a hostile audit of the two newest studies
+(`9e9123f`) corrected that, and the correction goes against my own conclusion,
+so it gets the loudest placement I can give it:
+
+- **The exit-fill study was biased toward its own verdict.** Its fill detector
+  required the best bid to rise to our resting ask, which misses the ordinary
+  way a resting sell fills - a marketable buy consuming the level. Every missed
+  fill was scored as a forced cross with a fee never actually paid. Rebuilt
+  two-sided, the KXBTCD 2-5c near-expiry round trip is **bracketed and
+  undecided**: +0.6c to +1.1c if fills are read optimistically, -0.4c to 0.0c
+  conservatively, and recorded books cannot narrow it because snapshots cannot
+  see trades.
+- **The gate dose study partly measured our own fills.** The fill stamp was a
+  write time, the OBI lookback was hardcoded, and a +5s placebo comes back
+  stronger than the signal reading. With clustered errors nothing clears its
+  bar. The gate's offline support is withdrawn; the live A/B result (harmless,
+  unmeasurable) stands on its own.
+
+So the honest final state is narrower than either verdict written before it:
+the **maker** program is measured to zero, including the exploit run above; the
+**taker** cell is an open bracket straddling zero with exactly one decidable
+experiment left - `docs/pre-registration-exit-fill.md`, 160 pre-registered
+1-contract round trips, ~$8 of maximum risk, decision rule fixed before any
+order is sent. Whether to run it is a capital decision, not an engineering one,
+and trading is currently stopped by choice.
+
+The project's own lesson applied to itself one last time: the error that
+survived longest was the one that flattered the author - in this case, me,
+because "conclusively dead" closed the story cleanly and "undecided" does not.

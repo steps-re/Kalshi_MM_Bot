@@ -299,14 +299,17 @@ maximum is about a dollar and a half.
 """
 )
 
-st.error(
-    "**Answered, and the answer is no.** The break-even arithmetic below was "
-    "wrong, a hostile reviewer caught it, and correcting it turns the candidate "
-    "negative. Simulating the resting exit against the book that actually "
-    "followed each of 1,234 triggers gives a realised expectancy of -0.02c to "
-    "-0.77c per trade, in every combination of hold and rest window, on both "
-    "corpora independently.",
-    icon="🛑",
+st.warning(
+    "**Twice corrected, now honestly undecided.** The break-even blend was wrong "
+    "(fills are adversely selected), and the study that then declared the cell "
+    "dead was wrong the other way - its fill detector missed the ordinary way a "
+    "resting order fills and scored real fills as forced crosses. Rebuilt "
+    "two-sided on 598 triggers: the round trip realises **+0.6c to +1.1c** under "
+    "optimistic fill reading and **-0.4c to 0.0c** under conservative, and book "
+    "data cannot narrow the bracket further. One experiment can: 160 "
+    "pre-registered live round trips (~\\$8 max risk, decision rule fixed in "
+    "docs/pre-registration-exit-fill.md before any order). Not currently running.",
+    icon="⚖️",
 )
 
 st.subheader("The arithmetic that was wrong")
