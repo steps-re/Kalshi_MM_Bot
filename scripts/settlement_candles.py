@@ -101,10 +101,15 @@ def choose(settled: Path, per_family: int, families: set[str] | None = None,
                 "close_ts": close,
             })
 
-    rng = random.Random(SEED)
     sample: list[dict] = []
 
     for family, pool in sorted(pools.items()):
+        # A SEPARATE stream per family. One shared generator made each family's
+        # draw depend on every draw before it, so `--families tennis` returned a
+        # different tennis sample than a full run - and the two got appended to
+        # the same file by the resume path, silently mixing two designs.
+        pool.sort(key=lambda m: m["ticker"])
+        rng = random.Random(f"{SEED}|{family}")
         take = pool if len(pool) <= per_family else rng.sample(pool, per_family)
         sample.extend(take)
         log(f"  {family}: {len(take)} of {len(pool)}")
@@ -129,6 +134,7 @@ async def fetch(sample: list[dict], out_path: Path) -> None:
     auth = KalshiAuth(settings.api_key_id, settings.private_key_path)
     rest = KalshiRestClient(environment.rest_base_url, auth)
     fetched = failures = 0
+    dropped: list[str] = []
     delay = REQUEST_GAP
 
     with out_path.open("a", encoding="utf-8") as handle:
@@ -144,29 +150,37 @@ async def fetch(sample: list[dict], out_path: Path) -> None:
                       "period_interval": 1}
 
             data = None
+            last_error = None
 
-            for _attempt in range(6):
+            for attempt in range(6):
                 try:
                     data = await rest._request("GET", path, params=params)
                     delay = REQUEST_GAP
                     break
                 except Exception as error:  # noqa: BLE001
-                    if "429" in str(error):
-                        # Same market, longer wait. Skipping on a 429 would
-                        # silently thin the sample by exactly the rate limit.
-                        delay = min(delay * 2, 15.0)
+                    last_error = error
+                    # EVERY transient fault gets the same treatment. The
+                    # previous version retried only on "429" and broke out on
+                    # the first timeout or 5xx, while its commit message said
+                    # it retried transient network faults. A dropped market is
+                    # not random: 429s and upstream wobbles cluster in time, so
+                    # the thinning lands on whole stretches of the calendar.
+                    if attempt < 5:
+                        delay = min(max(delay, REQUEST_GAP) * 2, 15.0)
                         await asyncio.sleep(delay)
-                        continue
-
-                    failures += 1
-
-                    if failures <= 5 or failures % 100 == 0:
-                        log(f"  {market['ticker']}: {type(error).__name__} "
-                            f"(failure {failures})")
-
-                    break
 
             if data is None:
+                # Exhausting the retries IS a failure. It used to leave
+                # `failures` untouched, so the closing "N fetched, M failures"
+                # line under-reported every market the rate limit ate.
+                failures += 1
+                dropped.append(market["ticker"])
+
+                if failures <= 5 or failures % 100 == 0:
+                    log(f"  {market['ticker']}: "
+                        f"{type(last_error).__name__ if last_error else 'no data'} "
+                        f"after 6 attempts (failure {failures})")
+
                 await asyncio.sleep(REQUEST_GAP)
                 continue
 
@@ -189,7 +203,15 @@ async def fetch(sample: list[dict], out_path: Path) -> None:
             await asyncio.sleep(REQUEST_GAP)
 
     await rest.close()
-    log(f"done: {fetched} fetched this run, {failures} failures -> {out_path}")
+    log(f"done: {fetched} fetched this run, {failures} failures "
+        f"({len(dropped)} markets dropped after exhausting retries) "
+        f"-> {out_path}")
+
+    if dropped:
+        record = out_path.with_suffix(out_path.suffix + ".dropped")
+        record.write_text("\n".join(dropped) + "\n")
+        log(f"dropped tickers written to {record} - the sample is thinner "
+            f"than the design by {len(dropped)} markets, non-randomly")
 
 
 def main() -> None:

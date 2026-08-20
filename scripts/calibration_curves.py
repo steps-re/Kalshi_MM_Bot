@@ -48,8 +48,11 @@ BUCKETS = ((0.0, 0.01), (0.01, 0.02), (0.02, 0.03), (0.03, 0.05),
 # Families rebuilt from what actually settles, repeatedly, with populated
 # tails - see the 161-series census. The first version's "other" bucket was
 # 94% MVE parlay products, which carry volume but no continuous two-sided
-# book: of 4,000 sampled, 2,089 had a placeholder book five minutes out and
-# only 39 were actionable. They are excluded by name rather than by accident.
+# book. The exact split is derived by `build_exchange_census.py` into
+# `parlay_sample` rather than quoted here: the numbers that used to sit in this
+# comment (4,000 / 2,089 / 39) did not reconcile - they summed to 3,786, the
+# file held non-parlay rows too, and the "actionable" count was reading books
+# minutes or hours stale. They are excluded by name rather than by accident.
 PARLAY_PREFIXES = ("KXMVE",)
 FAMILIES = {
     # One underlying, many strikes: these do NOT diversify against each other.
@@ -88,7 +91,8 @@ def opener(path: Path):
 def main() -> None:
     path = Path(sys.argv[1])
     # (family, bucket) -> {event: [wins, n]}
-    cells: dict[tuple, dict] = defaultdict(lambda: defaultdict(lambda: [0, 0]))
+    cells: dict[tuple, dict] = defaultdict(
+        lambda: defaultdict(lambda: [0, 0, 0.0]))
     skipped_no_price = skipped_no_result = skipped_no_volume = rows = 0
 
     with opener(path) as handle:
@@ -134,6 +138,7 @@ def main() -> None:
                         slot = cells[key][event]
                         slot[0] += 1 if result == "yes" else 0
                         slot[1] += 1
+                        slot[2] += price
 
                     break
 
@@ -149,7 +154,7 @@ stage 2 (prices at fixed T-minus-close) can confirm anything.\n""")
     for fam in families:
         print(f"\n== {fam} ==")
         print(f"{'last price':<14}{'markets':>9}{'events':>8}"
-              f"{'implied':>9}{'settled YES':>18}{'gap (c)':>10}")
+              f"{'avg price':>11}{'settled YES':>18}{'gap (c)':>10}")
 
         for lo, hi in BUCKETS:
             events = cells.get((fam, (lo, hi)))
@@ -170,12 +175,16 @@ stage 2 (prices at fixed T-minus-close) can confirm anything.\n""")
             # means (conservative: treats events equally for dispersion).
             win = sum(v * w for v, w in zip(values, weights)) / sum(weights)
             _, groups, _, se = clustered(values, list(events.keys()))
-            mid = (lo + hi) / 2
+            # The reference is the AVERAGE PRICE ACTUALLY OBSERVED, not the
+            # bucket centre. Prices pile toward the low end of every tail
+            # bucket, so a centre-based gap overstates tail overpricing - by up
+            # to 0.44c on this data, in the flattering direction, every time.
+            mid = sum(slot[2] for slot in events.values()) / n
             gap = (win - mid) * 100
             se_c = (se * 100) if not math.isnan(se) else float("nan")
             se_str = f"+/-{se_c:.2f}" if not math.isnan(se_c) else "n/a"
             print(f"{lo * 100:>5.0f}-{hi * 100:<7.0f}{n:>9}{groups:>8}"
-                  f"{mid * 100:>8.1f}c{win * 100:>11.2f}% {se_str:>9}"
+                  f"{mid * 100:>8.2f}c{win * 100:>11.2f}% {se_str:>9}"
                   f"{gap:>+9.2f}")
 
     print("""

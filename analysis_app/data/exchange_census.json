@@ -1,10 +1,16 @@
 {
+ "corpus_lines": 19760357,
+ "corpus_unique_tickers": 19758880,
+ "duplicate_tickers_across_files": 1477,
  "total_markets": 615825,
  "distinct_days": 43,
  "day_span": [
   "2026-07-09",
   "2026-08-20"
  ],
+ "parlays_excluded": 18482781,
+ "dropped_no_result": 4734,
+ "dropped_zero_volume": 655540,
  "families": [
   {
    "family": "sports-props",
@@ -62,8 +68,8 @@
    "markets": 24354,
    "days": 43,
    "per_day": 566.4,
-   "tails": 11013,
-   "faves": 13302,
+   "tails_lastprice": 11013,
+   "faves_lastprice": 13302,
    "avg_volume": 69146
   },
   {
@@ -72,8 +78,8 @@
    "markets": 25713,
    "days": 39,
    "per_day": 659.3,
-   "tails": 15021,
-   "faves": 7903,
+   "tails_lastprice": 15021,
+   "faves_lastprice": 7903,
    "avg_volume": 708
   },
   {
@@ -82,8 +88,8 @@
    "markets": 32682,
    "days": 39,
    "per_day": 838.0,
-   "tails": 7230,
-   "faves": 15060,
+   "tails_lastprice": 7230,
+   "faves_lastprice": 15060,
    "avg_volume": 373
   },
   {
@@ -92,8 +98,8 @@
    "markets": 16537,
    "days": 43,
    "per_day": 384.6,
-   "tails": 5580,
-   "faves": 10751,
+   "tails_lastprice": 5580,
+   "faves_lastprice": 10751,
    "avg_volume": 4053
   },
   {
@@ -102,8 +108,8 @@
    "markets": 14906,
    "days": 39,
    "per_day": 382.2,
-   "tails": 12554,
-   "faves": 1123,
+   "tails_lastprice": 12554,
+   "faves_lastprice": 1123,
    "avg_volume": 7211
   },
   {
@@ -112,8 +118,8 @@
    "markets": 25036,
    "days": 39,
    "per_day": 641.9,
-   "tails": 6074,
-   "faves": 7153,
+   "tails_lastprice": 6074,
+   "faves_lastprice": 7153,
    "avg_volume": 365
   },
   {
@@ -122,8 +128,8 @@
    "markets": 15947,
    "days": 36,
    "per_day": 443.0,
-   "tails": 5749,
-   "faves": 7454,
+   "tails_lastprice": 5749,
+   "faves_lastprice": 7454,
    "avg_volume": 807
   },
   {
@@ -132,8 +138,8 @@
    "markets": 12340,
    "days": 43,
    "per_day": 287.0,
-   "tails": 10782,
-   "faves": 998,
+   "tails_lastprice": 10782,
+   "faves_lastprice": 998,
    "avg_volume": 3524
   },
   {
@@ -142,8 +148,8 @@
    "markets": 13603,
    "days": 34,
    "per_day": 400.1,
-   "tails": 4456,
-   "faves": 6612,
+   "tails_lastprice": 4456,
+   "faves_lastprice": 6612,
    "avg_volume": 618
   },
   {
@@ -152,8 +158,8 @@
    "markets": 14461,
    "days": 35,
    "per_day": 413.2,
-   "tails": 4547,
-   "faves": 5979,
+   "tails_lastprice": 4547,
+   "faves_lastprice": 5979,
    "avg_volume": 552
   },
   {
@@ -162,8 +168,8 @@
    "markets": 9576,
    "days": 43,
    "per_day": 222.7,
-   "tails": 4706,
-   "faves": 4701,
+   "tails_lastprice": 4706,
+   "faves_lastprice": 4701,
    "avg_volume": 2033
   },
   {
@@ -172,8 +178,8 @@
    "markets": 8467,
    "days": 43,
    "per_day": 196.9,
-   "tails": 3140,
-   "faves": 5159,
+   "tails_lastprice": 3140,
+   "faves_lastprice": 5159,
    "avg_volume": 742
   },
   {
@@ -182,8 +188,8 @@
    "markets": 13130,
    "days": 31,
    "per_day": 423.5,
-   "tails": 2931,
-   "faves": 5324,
+   "tails_lastprice": 2931,
+   "faves_lastprice": 5324,
    "avg_volume": 1654
   },
   {
@@ -192,8 +198,8 @@
    "markets": 8080,
    "days": 43,
    "per_day": 187.9,
-   "tails": 3995,
-   "faves": 3977,
+   "tails_lastprice": 3995,
+   "faves_lastprice": 3977,
    "avg_volume": 807
   },
   {
@@ -202,8 +208,8 @@
    "markets": 8088,
    "days": 43,
    "per_day": 188.1,
-   "tails": 2720,
-   "faves": 5227,
+   "tails_lastprice": 2720,
+   "faves_lastprice": 5227,
    "avg_volume": 1105
   },
   {
@@ -212,8 +218,8 @@
    "markets": 7803,
    "days": 43,
    "per_day": 181.5,
-   "tails": 3895,
-   "faves": 3900,
+   "tails_lastprice": 3895,
+   "faves_lastprice": 3900,
    "avg_volume": 207999
   },
   {
@@ -222,8 +228,8 @@
    "markets": 11775,
    "days": 39,
    "per_day": 301.9,
-   "tails": 4468,
-   "faves": 3310,
+   "tails_lastprice": 4468,
+   "faves_lastprice": 3310,
    "avg_volume": 207
   },
   {
@@ -232,8 +238,8 @@
    "markets": 7420,
    "days": 39,
    "per_day": 190.3,
-   "tails": 4040,
-   "faves": 3293,
+   "tails_lastprice": 4040,
+   "faves_lastprice": 3293,
    "avg_volume": 5962
   },
   {
@@ -242,8 +248,8 @@
    "markets": 7241,
    "days": 38,
    "per_day": 190.6,
-   "tails": 4011,
-   "faves": 3180,
+   "tails_lastprice": 4011,
+   "faves_lastprice": 3180,
    "avg_volume": 6732
   },
   {
@@ -252,8 +258,8 @@
    "markets": 7344,
    "days": 43,
    "per_day": 170.8,
-   "tails": 2677,
-   "faves": 4430,
+   "tails_lastprice": 2677,
+   "faves_lastprice": 4430,
    "avg_volume": 750
   },
   {
@@ -262,8 +268,8 @@
    "markets": 8046,
    "days": 26,
    "per_day": 309.5,
-   "tails": 2278,
-   "faves": 4721,
+   "tails_lastprice": 2278,
+   "faves_lastprice": 4721,
    "avg_volume": 49
   },
   {
@@ -272,8 +278,8 @@
    "markets": 6934,
    "days": 43,
    "per_day": 161.3,
-   "tails": 3461,
-   "faves": 3465,
+   "tails_lastprice": 3461,
+   "faves_lastprice": 3465,
    "avg_volume": 195876
   },
   {
@@ -282,8 +288,8 @@
    "markets": 7793,
    "days": 43,
    "per_day": 181.2,
-   "tails": 5830,
-   "faves": 970,
+   "tails_lastprice": 5830,
+   "faves_lastprice": 970,
    "avg_volume": 1550
   },
   {
@@ -292,8 +298,8 @@
    "markets": 6846,
    "days": 43,
    "per_day": 159.2,
-   "tails": 2527,
-   "faves": 4051,
+   "tails_lastprice": 2527,
+   "faves_lastprice": 4051,
    "avg_volume": 527
   },
   {
@@ -302,8 +308,8 @@
    "markets": 6958,
    "days": 31,
    "per_day": 224.5,
-   "tails": 3300,
-   "faves": 3269,
+   "tails_lastprice": 3300,
+   "faves_lastprice": 3269,
    "avg_volume": 6577
   },
   {
@@ -312,8 +318,8 @@
    "markets": 6388,
    "days": 40,
    "per_day": 159.7,
-   "tails": 3019,
-   "faves": 3358,
+   "tails_lastprice": 3019,
+   "faves_lastprice": 3358,
    "avg_volume": 127087
   },
   {
@@ -322,8 +328,8 @@
    "markets": 4508,
    "days": 40,
    "per_day": 112.7,
-   "tails": 3214,
-   "faves": 1278,
+   "tails_lastprice": 3214,
+   "faves_lastprice": 1278,
    "avg_volume": 94083
   },
   {
@@ -332,8 +338,8 @@
    "markets": 4244,
    "days": 30,
    "per_day": 141.5,
-   "tails": 2444,
-   "faves": 1753,
+   "tails_lastprice": 2444,
+   "faves_lastprice": 1753,
    "avg_volume": 14429
   },
   {
@@ -342,8 +348,8 @@
    "markets": 4068,
    "days": 43,
    "per_day": 94.6,
-   "tails": 2005,
-   "faves": 2028,
+   "tails_lastprice": 2005,
+   "faves_lastprice": 2028,
    "avg_volume": 10457
   },
   {
@@ -352,8 +358,8 @@
    "markets": 4007,
    "days": 43,
    "per_day": 93.2,
-   "tails": 1984,
-   "faves": 2022,
+   "tails_lastprice": 1984,
+   "faves_lastprice": 2022,
    "avg_volume": 88286
   },
   {
@@ -362,8 +368,8 @@
    "markets": 4007,
    "days": 43,
    "per_day": 93.2,
-   "tails": 1997,
-   "faves": 2009,
+   "tails_lastprice": 1997,
+   "faves_lastprice": 2009,
    "avg_volume": 1617491
   },
   {
@@ -372,8 +378,8 @@
    "markets": 4008,
    "days": 43,
    "per_day": 93.2,
-   "tails": 2011,
-   "faves": 1992,
+   "tails_lastprice": 2011,
+   "faves_lastprice": 1992,
    "avg_volume": 28636
   },
   {
@@ -382,8 +388,8 @@
    "markets": 4008,
    "days": 43,
    "per_day": 93.2,
-   "tails": 1965,
-   "faves": 2036,
+   "tails_lastprice": 1965,
+   "faves_lastprice": 2036,
    "avg_volume": 28189
   },
   {
@@ -392,8 +398,8 @@
    "markets": 4008,
    "days": 43,
    "per_day": 93.2,
-   "tails": 2011,
-   "faves": 1990,
+   "tails_lastprice": 2011,
+   "faves_lastprice": 1990,
    "avg_volume": 25431
   },
   {
@@ -402,8 +408,8 @@
    "markets": 4008,
    "days": 43,
    "per_day": 93.2,
-   "tails": 2056,
-   "faves": 1943,
+   "tails_lastprice": 2056,
+   "faves_lastprice": 1943,
    "avg_volume": 5143
   },
   {
@@ -412,8 +418,8 @@
    "markets": 4007,
    "days": 43,
    "per_day": 93.2,
-   "tails": 1988,
-   "faves": 2011,
+   "tails_lastprice": 1988,
+   "faves_lastprice": 2011,
    "avg_volume": 17935
   },
   {
@@ -422,8 +428,8 @@
    "markets": 4007,
    "days": 43,
    "per_day": 93.2,
-   "tails": 1996,
-   "faves": 1999,
+   "tails_lastprice": 1996,
+   "faves_lastprice": 1999,
    "avg_volume": 24560
   },
   {
@@ -432,8 +438,8 @@
    "markets": 4008,
    "days": 43,
    "per_day": 93.2,
-   "tails": 1972,
-   "faves": 2020,
+   "tails_lastprice": 1972,
+   "faves_lastprice": 2020,
    "avg_volume": 4409
   },
   {
@@ -442,8 +448,8 @@
    "markets": 3850,
    "days": 43,
    "per_day": 89.5,
-   "tails": 1800,
-   "faves": 1999,
+   "tails_lastprice": 1800,
+   "faves_lastprice": 1999,
    "avg_volume": 1002
   },
   {
@@ -452,653 +458,1285 @@
    "markets": 5066,
    "days": 39,
    "per_day": 129.9,
-   "tails": 3196,
-   "faves": 559,
+   "tails_lastprice": 3196,
+   "faves_lastprice": 559,
    "avg_volume": 337
   }
  ],
  "breadth_total": 421,
+ "breadth_basis": "tails_lastprice/faves_lastprice count markets by LAST TRADED PRICE, which converges toward the outcome before settlement. Every market that ends up losing drifts into the tail on its way there, so these are an UPPER BOUND on how populated those zones were at a tradeable moment, not a measurement of it.",
  "pooled": [
   {
-   "losses": 74,
    "lookback_min": 2,
    "family": "ALL",
    "trade": "fave BUY",
-   "n": 2224,
-   "clusters": 467,
-   "net_cents": 0.288,
-   "se_cents": 0.391
+   "n": 2192,
+   "markets": 2192,
+   "clusters": 238,
+   "losses": 75,
+   "loss_clusters": 27,
+   "net_cents": 0.205,
+   "se_cents": 0.753,
+   "se_source": "loss-rate floor",
+   "t": 0.27,
+   "t_critical_95": 1.96,
+   "significant_95": false
   },
   {
+   "lookback_min": 2,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 1383,
+   "markets": 1383,
+   "clusters": 209,
    "losses": 18,
-   "lookback_min": 2,
-   "family": "ALL",
-   "trade": "tail SELL",
-   "n": 1422,
-   "clusters": 424,
-   "net_cents": 0.144,
-   "se_cents": 0.294
+   "loss_clusters": 13,
+   "net_cents": 0.102,
+   "se_cents": 0.391,
+   "se_source": "loss-rate floor",
+   "t": 0.26,
+   "t_critical_95": 1.96,
+   "significant_95": false
   },
   {
-   "losses": 16,
-   "lookback_min": 2,
-   "family": "commodities",
-   "trade": "fave BUY",
-   "n": 373,
-   "clusters": 36,
-   "net_cents": -0.773,
-   "se_cents": 1.874
-  },
-  {
-   "losses": 4,
-   "lookback_min": 2,
-   "family": "commodities",
-   "trade": "tail SELL",
-   "n": 243,
-   "clusters": 29,
-   "net_cents": -0.286,
-   "se_cents": 0.811
-  },
-  {
-   "losses": 49,
-   "lookback_min": 2,
-   "family": "crypto-15M",
-   "trade": "fave BUY",
-   "n": 1000,
-   "clusters": 146,
-   "net_cents": -1.633,
-   "se_cents": 0.678
-  },
-  {
-   "losses": 12,
-   "lookback_min": 2,
-   "family": "crypto-15M",
-   "trade": "tail SELL",
-   "n": 617,
-   "clusters": 145,
-   "net_cents": -0.678,
-   "se_cents": 0.607
-  },
-  {
-   "losses": 0,
-   "lookback_min": 2,
-   "family": "crypto-hourly",
-   "trade": "fave BUY",
-   "n": 73,
-   "clusters": 36,
-   "net_cents": 3.528,
-   "se_cents": 2.017
-  },
-  {
-   "losses": 7,
-   "lookback_min": 2,
-   "family": "indices",
-   "trade": "fave BUY",
-   "n": 182,
-   "clusters": 32,
-   "net_cents": 0.755,
-   "se_cents": 3.136
-  },
-  {
-   "losses": 1,
-   "lookback_min": 2,
-   "family": "indices",
-   "trade": "tail SELL",
-   "n": 106,
-   "clusters": 31,
-   "net_cents": 0.401,
-   "se_cents": 0.93
-  },
-  {
-   "losses": 1,
    "lookback_min": 2,
    "family": "tennis",
    "trade": "fave BUY",
-   "n": 564,
+   "n": 541,
+   "markets": 541,
    "clusters": 188,
-   "net_cents": 3.863,
-   "se_cents": 0.285
+   "losses": 1,
+   "loss_clusters": 1,
+   "net_cents": 3.842,
+   "se_cents": 0.353,
+   "se_source": "loss-rate floor",
+   "t": 10.89,
+   "t_critical_95": 1.96,
+   "significant_95": true
   },
   {
-   "losses": 0,
    "lookback_min": 2,
    "family": "tennis",
    "trade": "tail SELL",
-   "n": 359,
-   "clusters": 157,
-   "net_cents": 1.679,
-   "se_cents": 0.419
-  },
-  {
-   "losses": 92,
-   "lookback_min": 5,
-   "family": "ALL",
-   "trade": "fave BUY",
-   "n": 3149,
-   "clusters": 623,
-   "net_cents": 2.131,
-   "se_cents": 0.387
-  },
-  {
-   "losses": 10,
-   "lookback_min": 5,
-   "family": "ALL",
-   "trade": "tail SELL",
-   "n": 1692,
-   "clusters": 548,
-   "net_cents": 1.129,
-   "se_cents": 0.287
-  },
-  {
-   "losses": 24,
-   "lookback_min": 5,
-   "family": "commodities",
-   "trade": "fave BUY",
-   "n": 576,
-   "clusters": 41,
-   "net_cents": -0.146,
-   "se_cents": 0.987
-  },
-  {
-   "losses": 3,
-   "lookback_min": 5,
-   "family": "commodities",
-   "trade": "tail SELL",
-   "n": 289,
-   "clusters": 31,
-   "net_cents": 0.47,
-   "se_cents": 1.313
-  },
-  {
-   "losses": 50,
-   "lookback_min": 5,
-   "family": "crypto-15M",
-   "trade": "fave BUY",
-   "n": 819,
-   "clusters": 146,
-   "net_cents": 0.574,
-   "se_cents": 0.826
-  },
-  {
-   "losses": 2,
-   "lookback_min": 5,
-   "family": "crypto-15M",
-   "trade": "tail SELL",
-   "n": 268,
-   "clusters": 116,
-   "net_cents": 1.465,
-   "se_cents": 0.953
-  },
-  {
-   "losses": 2,
-   "lookback_min": 5,
-   "family": "crypto-hourly",
-   "trade": "fave BUY",
-   "n": 129,
-   "clusters": 49,
-   "net_cents": 2.939,
-   "se_cents": 1.197
-  },
-  {
-   "losses": 2,
-   "lookback_min": 5,
-   "family": "crypto-hourly",
-   "trade": "tail SELL",
-   "n": 78,
-   "clusters": 38,
-   "net_cents": -1.167,
-   "se_cents": 2.634
-  },
-  {
-   "losses": 10,
-   "lookback_min": 5,
-   "family": "indices",
-   "trade": "fave BUY",
-   "n": 248,
-   "clusters": 33,
-   "net_cents": 0.656,
-   "se_cents": 1.924
-  },
-  {
-   "losses": 3,
-   "lookback_min": 5,
-   "family": "indices",
-   "trade": "tail SELL",
-   "n": 136,
-   "clusters": 30,
-   "net_cents": -0.795,
-   "se_cents": 1.254
-  },
-  {
+   "n": 334,
+   "markets": 334,
+   "clusters": 154,
    "losses": 0,
+   "loss_clusters": 0,
+   "net_cents": 1.682,
+   "se_cents": 0.994,
+   "se_source": "loss-rate floor",
+   "t": 1.69,
+   "t_critical_95": 1.96,
+   "significant_95": false
+  },
+  {
+   "lookback_min": 5,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 3089,
+   "markets": 3089,
+   "clusters": 367,
+   "losses": 92,
+   "loss_clusters": 33,
+   "net_cents": 2.111,
+   "se_cents": 0.606,
+   "se_source": "loss-rate floor",
+   "t": 3.49,
+   "t_critical_95": 1.96,
+   "significant_95": true
+  },
+  {
+   "lookback_min": 5,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 1619,
+   "markets": 1619,
+   "clusters": 343,
+   "losses": 10,
+   "loss_clusters": 9,
+   "net_cents": 1.116,
+   "se_cents": 0.235,
+   "se_source": "loss-rate floor",
+   "t": 4.75,
+   "t_critical_95": 1.96,
+   "significant_95": true
+  },
+  {
    "lookback_min": 5,
    "family": "sports-props",
    "trade": "tail SELL",
-   "n": 73,
-   "clusters": 46,
-   "net_cents": 1.748,
-   "se_cents": 2.057
-  },
-  {
-   "losses": 3,
-   "lookback_min": 5,
-   "family": "tennis",
-   "trade": "fave BUY",
-   "n": 1271,
-   "clusters": 286,
-   "net_cents": 4.445,
-   "se_cents": 0.39
-  },
-  {
+   "n": 63,
+   "markets": 63,
+   "clusters": 44,
    "losses": 0,
+   "loss_clusters": 0,
+   "net_cents": 1.819,
+   "se_cents": 3.477,
+   "se_source": "loss-rate floor",
+   "t": 0.52,
+   "t_critical_95": 2.02,
+   "significant_95": false
+  },
+  {
+   "lookback_min": 5,
+   "family": "tennis",
+   "trade": "fave BUY",
+   "n": 1222,
+   "markets": 1222,
+   "clusters": 286,
+   "losses": 3,
+   "loss_clusters": 3,
+   "net_cents": 4.474,
+   "se_cents": 0.198,
+   "se_source": "loss-rate floor",
+   "t": 22.56,
+   "t_critical_95": 1.96,
+   "significant_95": true
+  },
+  {
    "lookback_min": 5,
    "family": "tennis",
    "trade": "tail SELL",
-   "n": 805,
-   "clusters": 256,
-   "net_cents": 1.719,
-   "se_cents": 0.187
+   "n": 763,
+   "markets": 763,
+   "clusters": 255,
+   "losses": 0,
+   "loss_clusters": 0,
+   "net_cents": 1.724,
+   "se_cents": 0.6,
+   "se_source": "loss-rate floor",
+   "t": 2.87,
+   "t_critical_95": 1.96,
+   "significant_95": true
   },
   {
+   "lookback_min": 10,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 3471,
+   "markets": 3471,
+   "clusters": 442,
    "losses": 136,
-   "lookback_min": 10,
-   "family": "ALL",
-   "trade": "fave BUY",
-   "n": 3612,
-   "clusters": 719,
-   "net_cents": 2.09,
-   "se_cents": 0.512
+   "loss_clusters": 54,
+   "net_cents": 2.038,
+   "se_cents": 0.679,
+   "se_source": "loss-rate floor",
+   "t": 3.0,
+   "t_critical_95": 1.96,
+   "significant_95": true
   },
   {
+   "lookback_min": 10,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 1642,
+   "markets": 1642,
+   "clusters": 393,
    "losses": 12,
+   "loss_clusters": 10,
+   "net_cents": 0.992,
+   "se_cents": 0.26,
+   "se_source": "loss-rate floor",
+   "t": 3.82,
+   "t_critical_95": 1.96,
+   "significant_95": true
+  },
+  {
    "lookback_min": 10,
+   "family": "sports-props",
+   "trade": "fave BUY",
+   "n": 158,
+   "markets": 158,
+   "clusters": 47,
+   "losses": 4,
+   "loss_clusters": 4,
+   "net_cents": 4.252,
+   "se_cents": 1.663,
+   "se_source": "loss-rate floor",
+   "t": 2.56,
+   "t_critical_95": 2.01,
+   "significant_95": true
+  },
+  {
+   "lookback_min": 10,
+   "family": "sports-props",
+   "trade": "tail SELL",
+   "n": 153,
+   "markets": 153,
+   "clusters": 68,
+   "losses": 1,
+   "loss_clusters": 1,
+   "net_cents": 1.087,
+   "se_cents": 1.247,
+   "se_source": "loss-rate floor",
+   "t": 0.87,
+   "t_critical_95": 2.0,
+   "significant_95": false
+  },
+  {
+   "lookback_min": 10,
+   "family": "tennis",
+   "trade": "fave BUY",
+   "n": 1548,
+   "markets": 1548,
+   "clusters": 342,
+   "losses": 15,
+   "loss_clusters": 14,
+   "net_cents": 4.642,
+   "se_cents": 0.278,
+   "se_source": "loss-rate floor",
+   "t": 16.68,
+   "t_critical_95": 1.96,
+   "significant_95": true
+  },
+  {
+   "lookback_min": 10,
+   "family": "tennis",
+   "trade": "tail SELL",
+   "n": 815,
+   "markets": 815,
+   "clusters": 278,
+   "losses": 0,
+   "loss_clusters": 0,
+   "net_cents": 1.897,
+   "se_cents": 0.55,
+   "se_source": "loss-rate floor",
+   "t": 3.45,
+   "t_critical_95": 1.96,
+   "significant_95": true
+  },
+  {
+   "lookback_min": 30,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 3354,
+   "markets": 3354,
+   "clusters": 460,
+   "losses": 229,
+   "loss_clusters": 102,
+   "net_cents": 0.091,
+   "se_cents": 1.0,
+   "se_source": "loss-rate floor",
+   "t": 0.09,
+   "t_critical_95": 1.96,
+   "significant_95": false
+  },
+  {
+   "lookback_min": 30,
    "family": "ALL",
    "trade": "tail SELL",
-   "n": 1747,
-   "clusters": 538,
-   "net_cents": 1.034,
-   "se_cents": 0.279
+   "n": 1314,
+   "markets": 1314,
+   "clusters": 315,
+   "losses": 33,
+   "loss_clusters": 21,
+   "net_cents": -0.666,
+   "se_cents": 0.617,
+   "se_source": "loss-rate floor",
+   "t": -1.08,
+   "t_critical_95": 1.96,
+   "significant_95": false
   },
   {
-   "losses": 34,
-   "lookback_min": 10,
-   "family": "commodities",
+   "lookback_min": 30,
+   "family": "sports-props",
    "trade": "fave BUY",
-   "n": 689,
-   "clusters": 43,
-   "net_cents": -0.11,
-   "se_cents": 0.961
+   "n": 205,
+   "markets": 205,
+   "clusters": 67,
+   "losses": 14,
+   "loss_clusters": 13,
+   "net_cents": 0.496,
+   "se_cents": 2.053,
+   "se_source": "loss-rate floor",
+   "t": 0.24,
+   "t_critical_95": 2.0,
+   "significant_95": false
   },
   {
-   "losses": 6,
-   "lookback_min": 10,
-   "family": "commodities",
+   "lookback_min": 30,
+   "family": "sports-props",
    "trade": "tail SELL",
-   "n": 304,
-   "clusters": 34,
-   "net_cents": -0.521,
-   "se_cents": 2.983
+   "n": 199,
+   "markets": 199,
+   "clusters": 93,
+   "losses": 2,
+   "loss_clusters": 2,
+   "net_cents": 0.74,
+   "se_cents": 1.102,
+   "se_source": "loss-rate floor",
+   "t": 0.67,
+   "t_critical_95": 1.99,
+   "significant_95": false
   },
   {
-   "losses": 38,
-   "lookback_min": 10,
-   "family": "crypto-15M",
+   "lookback_min": 30,
+   "family": "tennis",
    "trade": "fave BUY",
-   "n": 348,
-   "clusters": 131,
-   "net_cents": 0.076,
-   "se_cents": 1.888
+   "n": 1457,
+   "markets": 1457,
+   "clusters": 334,
+   "losses": 64,
+   "loss_clusters": 51,
+   "net_cents": 3.456,
+   "se_cents": 0.621,
+   "se_source": "loss-rate floor",
+   "t": 5.56,
+   "t_critical_95": 1.96,
+   "significant_95": true
   },
   {
+   "lookback_min": 30,
+   "family": "tennis",
+   "trade": "tail SELL",
+   "n": 440,
+   "markets": 440,
+   "clusters": 174,
    "losses": 7,
-   "lookback_min": 10,
-   "family": "crypto-hourly",
+   "loss_clusters": 7,
+   "net_cents": 0.553,
+   "se_cents": 0.713,
+   "se_source": "loss-rate floor",
+   "t": 0.77,
+   "t_critical_95": 1.96,
+   "significant_95": false
+  },
+  {
+   "lookback_min": 60,
+   "family": "ALL",
+   "trade": "fave BUY",
+   "n": 1793,
+   "markets": 1793,
+   "clusters": 355,
+   "losses": 157,
+   "loss_clusters": 88,
+   "net_cents": -0.79,
+   "se_cents": 1.421,
+   "se_source": "loss-rate floor",
+   "t": -0.56,
+   "t_critical_95": 1.96,
+   "significant_95": false
+  },
+  {
+   "lookback_min": 60,
+   "family": "ALL",
+   "trade": "tail SELL",
+   "n": 671,
+   "markets": 671,
+   "clusters": 225,
+   "losses": 28,
+   "loss_clusters": 19,
+   "net_cents": -2.245,
+   "se_cents": 1.289,
+   "se_source": "loss-rate floor",
+   "t": -1.74,
+   "t_critical_95": 1.96,
+   "significant_95": false
+  },
+  {
+   "lookback_min": 60,
+   "family": "sports-props",
    "trade": "fave BUY",
    "n": 187,
-   "clusters": 50,
-   "net_cents": 0.917,
-   "se_cents": 2.041
-  },
-  {
-   "losses": 3,
-   "lookback_min": 10,
-   "family": "crypto-hourly",
-   "trade": "tail SELL",
-   "n": 122,
-   "clusters": 42,
-   "net_cents": -0.97,
-   "se_cents": 2.463
-  },
-  {
-   "losses": 21,
-   "lookback_min": 10,
-   "family": "indices",
-   "trade": "fave BUY",
-   "n": 290,
-   "clusters": 27,
-   "net_cents": -2.028,
-   "se_cents": 1.546
-  },
-  {
-   "losses": 2,
-   "lookback_min": 10,
-   "family": "indices",
-   "trade": "tail SELL",
-   "n": 137,
-   "clusters": 31,
-   "net_cents": 0.002,
-   "se_cents": 1.016
-  },
-  {
-   "losses": 4,
-   "lookback_min": 10,
-   "family": "sports-props",
-   "trade": "fave BUY",
-   "n": 166,
-   "clusters": 48,
-   "net_cents": 4.063,
-   "se_cents": 2.185
-  },
-  {
-   "losses": 1,
-   "lookback_min": 10,
-   "family": "sports-props",
-   "trade": "tail SELL",
-   "n": 172,
-   "clusters": 72,
-   "net_cents": 1.135,
-   "se_cents": 0.571
-  },
-  {
-   "losses": 15,
-   "lookback_min": 10,
-   "family": "tennis",
-   "trade": "fave BUY",
-   "n": 1629,
-   "clusters": 344,
-   "net_cents": 4.639,
-   "se_cents": 0.476
-  },
-  {
-   "losses": 0,
-   "lookback_min": 10,
-   "family": "tennis",
-   "trade": "tail SELL",
-   "n": 862,
-   "clusters": 278,
-   "net_cents": 1.903,
-   "se_cents": 0.174
-  },
-  {
-   "losses": 17,
-   "lookback_min": 10,
-   "family": "weather",
-   "trade": "fave BUY",
-   "n": 303,
-   "clusters": 76,
-   "net_cents": -0.719,
-   "se_cents": 1.862
-  },
-  {
-   "losses": 0,
-   "lookback_min": 10,
-   "family": "weather",
-   "trade": "tail SELL",
-   "n": 140,
-   "clusters": 74,
-   "net_cents": 1.557,
-   "se_cents": 1.075
-  },
-  {
-   "losses": 234,
-   "lookback_min": 30,
-   "family": "ALL",
-   "trade": "fave BUY",
-   "n": 3551,
-   "clusters": 609,
-   "net_cents": 0.158,
-   "se_cents": 0.784
-  },
-  {
-   "losses": 33,
-   "lookback_min": 30,
-   "family": "ALL",
-   "trade": "tail SELL",
-   "n": 1437,
-   "clusters": 474,
-   "net_cents": -0.469,
-   "se_cents": 0.408
-  },
-  {
-   "losses": 76,
-   "lookback_min": 30,
-   "family": "commodities",
-   "trade": "fave BUY",
-   "n": 679,
-   "clusters": 41,
-   "net_cents": -5.344,
-   "se_cents": 1.856
-  },
-  {
-   "losses": 12,
-   "lookback_min": 30,
-   "family": "commodities",
-   "trade": "tail SELL",
-   "n": 226,
-   "clusters": 39,
-   "net_cents": -3.706,
-   "se_cents": 1.992
-  },
-  {
-   "losses": 16,
-   "lookback_min": 30,
-   "family": "crypto-hourly",
-   "trade": "fave BUY",
-   "n": 303,
-   "clusters": 49,
-   "net_cents": 0.334,
-   "se_cents": 1.489
-  },
-  {
-   "losses": 4,
-   "lookback_min": 30,
-   "family": "crypto-hourly",
-   "trade": "tail SELL",
-   "n": 171,
-   "clusters": 42,
-   "net_cents": -0.596,
-   "se_cents": 1.148
-  },
-  {
-   "losses": 28,
-   "lookback_min": 30,
-   "family": "indices",
-   "trade": "fave BUY",
-   "n": 406,
-   "clusters": 24,
-   "net_cents": -0.63,
-   "se_cents": 2.47
-  },
-  {
-   "losses": 6,
-   "lookback_min": 30,
-   "family": "indices",
-   "trade": "tail SELL",
-   "n": 183,
-   "clusters": 38,
-   "net_cents": -1.675,
-   "se_cents": 1.315
-  },
-  {
-   "losses": 14,
-   "lookback_min": 30,
-   "family": "sports-props",
-   "trade": "fave BUY",
-   "n": 211,
-   "clusters": 68,
-   "net_cents": 0.566,
-   "se_cents": 3.353
-  },
-  {
-   "losses": 1,
-   "lookback_min": 30,
-   "family": "sports-props",
-   "trade": "tail SELL",
-   "n": 206,
-   "clusters": 95,
-   "net_cents": 1.255,
-   "se_cents": 0.476
-  },
-  {
-   "losses": 65,
-   "lookback_min": 30,
-   "family": "tennis",
-   "trade": "fave BUY",
-   "n": 1541,
-   "clusters": 337,
-   "net_cents": 3.517,
-   "se_cents": 1.03
-  },
-  {
-   "losses": 7,
-   "lookback_min": 30,
-   "family": "tennis",
-   "trade": "tail SELL",
-   "n": 476,
-   "clusters": 175,
-   "net_cents": 0.667,
-   "se_cents": 0.888
-  },
-  {
-   "losses": 35,
-   "lookback_min": 30,
-   "family": "weather",
-   "trade": "fave BUY",
-   "n": 408,
-   "clusters": 87,
-   "net_cents": -2.963,
-   "se_cents": 2.252
-  },
-  {
-   "losses": 3,
-   "lookback_min": 30,
-   "family": "weather",
-   "trade": "tail SELL",
-   "n": 175,
-   "clusters": 85,
-   "net_cents": -0.027,
-   "se_cents": 0.972
-  },
-  {
-   "losses": 160,
-   "lookback_min": 60,
-   "family": "ALL",
-   "trade": "fave BUY",
-   "n": 1885,
-   "clusters": 419,
-   "net_cents": -0.579,
-   "se_cents": 1.219
-  },
-  {
-   "losses": 28,
-   "lookback_min": 60,
-   "family": "ALL",
-   "trade": "tail SELL",
-   "n": 739,
-   "clusters": 297,
-   "net_cents": -1.907,
-   "se_cents": 0.916
-  },
-  {
-   "losses": 42,
-   "lookback_min": 60,
-   "family": "commodities",
-   "trade": "fave BUY",
-   "n": 355,
-   "clusters": 36,
-   "net_cents": -5.853,
-   "se_cents": 4.345
-  },
-  {
-   "losses": 8,
-   "lookback_min": 60,
-   "family": "commodities",
-   "trade": "tail SELL",
-   "n": 105,
-   "clusters": 36,
-   "net_cents": -6.173,
-   "se_cents": 3.134
-  },
-  {
-   "losses": 29,
-   "lookback_min": 60,
-   "family": "indices",
-   "trade": "fave BUY",
-   "n": 293,
-   "clusters": 18,
-   "net_cents": -3.728,
-   "se_cents": 2.019
-  },
-  {
-   "losses": 6,
-   "lookback_min": 60,
-   "family": "indices",
-   "trade": "tail SELL",
-   "n": 126,
-   "clusters": 28,
-   "net_cents": -3.047,
-   "se_cents": 1.908
-  },
-  {
+   "markets": 187,
+   "clusters": 65,
    "losses": 11,
-   "lookback_min": 60,
-   "family": "sports-props",
-   "trade": "fave BUY",
-   "n": 197,
-   "clusters": 66,
-   "net_cents": 3.452,
-   "se_cents": 1.522
+   "loss_clusters": 11,
+   "net_cents": 3.034,
+   "se_cents": 1.964,
+   "se_source": "loss-rate floor",
+   "t": 1.54,
+   "t_critical_95": 2.0,
+   "significant_95": false
   },
   {
-   "losses": 7,
    "lookback_min": 60,
    "family": "sports-props",
    "trade": "tail SELL",
-   "n": 240,
-   "clusters": 98,
-   "net_cents": -0.993,
-   "se_cents": 1.281
+   "n": 232,
+   "markets": 232,
+   "clusters": 96,
+   "losses": 7,
+   "loss_clusters": 7,
+   "net_cents": -1.079,
+   "se_cents": 1.352,
+   "se_source": "loss-rate floor",
+   "t": -0.8,
+   "t_critical_95": 1.99,
+   "significant_95": false
   },
   {
-   "losses": 77,
    "lookback_min": 60,
    "family": "tennis",
    "trade": "fave BUY",
-   "n": 985,
-   "clusters": 246,
-   "net_cents": 1.348,
-   "se_cents": 1.871
+   "n": 921,
+   "markets": 921,
+   "clusters": 243,
+   "losses": 73,
+   "loss_clusters": 61,
+   "net_cents": 1.323,
+   "se_cents": 1.05,
+   "se_source": "loss-rate floor",
+   "t": 1.26,
+   "t_critical_95": 1.96,
+   "significant_95": false
   },
   {
-   "losses": 7,
    "lookback_min": 60,
    "family": "tennis",
    "trade": "tail SELL",
-   "n": 176,
+   "n": 164,
+   "markets": 164,
    "clusters": 90,
-   "net_cents": -1.568,
-   "se_cents": 2.301
-  },
-  {
-   "losses": 0,
-   "lookback_min": 60,
-   "family": "weather",
-   "trade": "tail SELL",
-   "n": 87,
-   "clusters": 40,
-   "net_cents": 1.521,
-   "se_cents": 1.73
+   "losses": 7,
+   "loss_clusters": 7,
+   "net_cents": -1.847,
+   "se_cents": 1.913,
+   "se_source": "loss-rate floor",
+   "t": -0.97,
+   "t_critical_95": 1.99,
+   "significant_95": false
   }
  ],
- "generated_utc": "2026-08-20T20:58:59+00:00"
+ "cells_tested": 86,
+ "decay": [
+  {
+   "family": "ALL",
+   "trade": "fave BUY",
+   "rows": [
+    {
+     "lookback_min": 2,
+     "n": 2192,
+     "markets": 2192,
+     "clusters": 238,
+     "losses": 75,
+     "loss_rate": 0.03422,
+     "net_cents": 0.205,
+     "se_cents": 0.753,
+     "t": 0.27,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.071
+    },
+    {
+     "lookback_min": 5,
+     "n": 3089,
+     "markets": 3089,
+     "clusters": 367,
+     "losses": 92,
+     "loss_rate": 0.02978,
+     "net_cents": 2.111,
+     "se_cents": 0.606,
+     "t": 3.49,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.128
+    },
+    {
+     "lookback_min": 10,
+     "n": 3471,
+     "markets": 3471,
+     "clusters": 442,
+     "losses": 136,
+     "loss_rate": 0.03918,
+     "net_cents": 2.038,
+     "se_cents": 0.679,
+     "t": 3.0,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.169
+    },
+    {
+     "lookback_min": 30,
+     "n": 3354,
+     "markets": 3354,
+     "clusters": 460,
+     "losses": 229,
+     "loss_rate": 0.06828,
+     "net_cents": 0.091,
+     "se_cents": 1.0,
+     "t": 0.09,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.299
+    },
+    {
+     "lookback_min": 60,
+     "n": 1793,
+     "markets": 1793,
+     "clusters": 355,
+     "losses": 157,
+     "loss_rate": 0.08756,
+     "net_cents": -0.79,
+     "se_cents": 1.421,
+     "t": -0.56,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced": [
+    {
+     "lookback_min": 2,
+     "n": 134,
+     "markets": 134,
+     "clusters": 70,
+     "losses": 1,
+     "loss_rate": 0.00746,
+     "net_cents": 1.847,
+     "se_cents": 1.424,
+     "t": 1.3,
+     "t_critical_95": 2.0,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 5,
+     "n": 134,
+     "markets": 134,
+     "clusters": 70,
+     "losses": 1,
+     "loss_rate": 0.00746,
+     "net_cents": 3.584,
+     "se_cents": 1.424,
+     "t": 2.52,
+     "t_critical_95": 2.0,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 10,
+     "n": 134,
+     "markets": 134,
+     "clusters": 70,
+     "losses": 1,
+     "loss_rate": 0.00746,
+     "net_cents": 5.269,
+     "se_cents": 1.424,
+     "t": 3.7,
+     "t_critical_95": 2.0,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 30,
+     "n": 134,
+     "markets": 134,
+     "clusters": 70,
+     "losses": 1,
+     "loss_rate": 0.00746,
+     "net_cents": 5.708,
+     "se_cents": 1.424,
+     "t": 4.01,
+     "t_critical_95": 2.0,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 60,
+     "n": 134,
+     "markets": 134,
+     "clusters": 70,
+     "losses": 1,
+     "loss_rate": 0.00746,
+     "net_cents": 7.642,
+     "se_cents": 1.424,
+     "t": 5.37,
+     "t_critical_95": 2.0,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced_markets": 134,
+   "missing_lookbacks": []
+  },
+  {
+   "family": "ALL",
+   "trade": "tail SELL",
+   "rows": [
+    {
+     "lookback_min": 2,
+     "n": 1383,
+     "markets": 1383,
+     "clusters": 209,
+     "losses": 18,
+     "loss_rate": 0.01302,
+     "net_cents": 0.102,
+     "se_cents": 0.391,
+     "t": 0.26,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.021
+    },
+    {
+     "lookback_min": 5,
+     "n": 1619,
+     "markets": 1619,
+     "clusters": 343,
+     "losses": 10,
+     "loss_rate": 0.00618,
+     "net_cents": 1.116,
+     "se_cents": 0.235,
+     "t": 4.75,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.034
+    },
+    {
+     "lookback_min": 10,
+     "n": 1642,
+     "markets": 1642,
+     "clusters": 393,
+     "losses": 12,
+     "loss_rate": 0.00731,
+     "net_cents": 0.992,
+     "se_cents": 0.26,
+     "t": 3.82,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.049
+    },
+    {
+     "lookback_min": 30,
+     "n": 1314,
+     "markets": 1314,
+     "clusters": 315,
+     "losses": 33,
+     "loss_rate": 0.02511,
+     "net_cents": -0.666,
+     "se_cents": 0.617,
+     "t": -1.08,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.157
+    },
+    {
+     "lookback_min": 60,
+     "n": 671,
+     "markets": 671,
+     "clusters": 225,
+     "losses": 28,
+     "loss_rate": 0.04173,
+     "net_cents": -2.245,
+     "se_cents": 1.289,
+     "t": -1.74,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced": [
+    {
+     "lookback_min": 2,
+     "n": 11,
+     "markets": 11,
+     "clusters": 9,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.185,
+     "se_cents": 17.0,
+     "t": 0.07,
+     "t_critical_95": 2.36,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 5,
+     "n": 11,
+     "markets": 11,
+     "clusters": 9,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.354,
+     "se_cents": 17.0,
+     "t": 0.08,
+     "t_critical_95": 2.36,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 10,
+     "n": 11,
+     "markets": 11,
+     "clusters": 9,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.779,
+     "se_cents": 17.0,
+     "t": 0.1,
+     "t_critical_95": 2.36,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 30,
+     "n": 11,
+     "markets": 11,
+     "clusters": 9,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 2.203,
+     "se_cents": 17.0,
+     "t": 0.13,
+     "t_critical_95": 2.36,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 60,
+     "n": 11,
+     "markets": 11,
+     "clusters": 9,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.694,
+     "se_cents": 17.0,
+     "t": 0.1,
+     "t_critical_95": 2.36,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced_markets": 11,
+   "missing_lookbacks": []
+  },
+  {
+   "family": "sports-props",
+   "trade": "fave BUY",
+   "rows": [
+    {
+     "lookback_min": 2,
+     "n": 7,
+     "markets": 7,
+     "clusters": 7,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 3.073,
+     "se_cents": 21.857,
+     "t": 0.14,
+     "t_critical_95": 2.57,
+     "overlap_with_longest": 0.005
+    },
+    {
+     "lookback_min": 5,
+     "n": 46,
+     "markets": 46,
+     "clusters": 30,
+     "losses": 2,
+     "loss_rate": 0.04348,
+     "net_cents": 2.2,
+     "se_cents": 4.769,
+     "t": 0.46,
+     "t_critical_95": 2.04,
+     "overlap_with_longest": 0.05
+    },
+    {
+     "lookback_min": 10,
+     "n": 158,
+     "markets": 158,
+     "clusters": 47,
+     "losses": 4,
+     "loss_rate": 0.02532,
+     "net_cents": 4.252,
+     "se_cents": 1.663,
+     "t": 2.56,
+     "t_critical_95": 2.01,
+     "overlap_with_longest": 0.194
+    },
+    {
+     "lookback_min": 30,
+     "n": 205,
+     "markets": 205,
+     "clusters": 67,
+     "losses": 14,
+     "loss_rate": 0.06829,
+     "net_cents": 0.496,
+     "se_cents": 2.053,
+     "t": 0.24,
+     "t_critical_95": 2.0,
+     "overlap_with_longest": 0.371
+    },
+    {
+     "lookback_min": 60,
+     "n": 187,
+     "markets": 187,
+     "clusters": 65,
+     "losses": 11,
+     "loss_rate": 0.05882,
+     "net_cents": 3.034,
+     "se_cents": 1.964,
+     "t": 1.54,
+     "t_critical_95": 2.0,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced": [
+    {
+     "lookback_min": 2,
+     "n": 1,
+     "markets": 1,
+     "clusters": 1,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.863,
+     "se_cents": 153.0,
+     "t": 0.01,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 5,
+     "n": 1,
+     "markets": 1,
+     "clusters": 1,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.863,
+     "se_cents": 153.0,
+     "t": 0.01,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 10,
+     "n": 1,
+     "markets": 1,
+     "clusters": 1,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.863,
+     "se_cents": 153.0,
+     "t": 0.01,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 30,
+     "n": 1,
+     "markets": 1,
+     "clusters": 1,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 7.485,
+     "se_cents": 153.0,
+     "t": 0.05,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 60,
+     "n": 1,
+     "markets": 1,
+     "clusters": 1,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 4.668,
+     "se_cents": 153.0,
+     "t": 0.03,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced_markets": 1,
+   "missing_lookbacks": []
+  },
+  {
+   "family": "sports-props",
+   "trade": "tail SELL",
+   "rows": [
+    {
+     "lookback_min": 2,
+     "n": 9,
+     "markets": 9,
+     "clusters": 9,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.656,
+     "se_cents": 17.0,
+     "t": 0.1,
+     "t_critical_95": 2.36,
+     "overlap_with_longest": 0.004
+    },
+    {
+     "lookback_min": 5,
+     "n": 63,
+     "markets": 63,
+     "clusters": 44,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.819,
+     "se_cents": 3.477,
+     "t": 0.52,
+     "t_critical_95": 2.02,
+     "overlap_with_longest": 0.035
+    },
+    {
+     "lookback_min": 10,
+     "n": 153,
+     "markets": 153,
+     "clusters": 68,
+     "losses": 1,
+     "loss_rate": 0.00654,
+     "net_cents": 1.087,
+     "se_cents": 1.247,
+     "t": 0.87,
+     "t_critical_95": 2.0,
+     "overlap_with_longest": 0.088
+    },
+    {
+     "lookback_min": 30,
+     "n": 199,
+     "markets": 199,
+     "clusters": 93,
+     "losses": 2,
+     "loss_rate": 0.01005,
+     "net_cents": 0.74,
+     "se_cents": 1.102,
+     "t": 0.67,
+     "t_critical_95": 1.99,
+     "overlap_with_longest": 0.221
+    },
+    {
+     "lookback_min": 60,
+     "n": 232,
+     "markets": 232,
+     "clusters": 96,
+     "losses": 7,
+     "loss_rate": 0.03017,
+     "net_cents": -1.079,
+     "se_cents": 1.352,
+     "t": -0.8,
+     "t_critical_95": 1.99,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced": [],
+   "balanced_markets": 0,
+   "missing_lookbacks": []
+  },
+  {
+   "family": "tennis",
+   "trade": "fave BUY",
+   "rows": [
+    {
+     "lookback_min": 2,
+     "n": 541,
+     "markets": 541,
+     "clusters": 188,
+     "losses": 1,
+     "loss_rate": 0.00185,
+     "net_cents": 3.842,
+     "se_cents": 0.353,
+     "t": 10.89,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.118
+    },
+    {
+     "lookback_min": 5,
+     "n": 1222,
+     "markets": 1222,
+     "clusters": 286,
+     "losses": 3,
+     "loss_rate": 0.00245,
+     "net_cents": 4.474,
+     "se_cents": 0.198,
+     "t": 22.56,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.208
+    },
+    {
+     "lookback_min": 10,
+     "n": 1548,
+     "markets": 1548,
+     "clusters": 342,
+     "losses": 15,
+     "loss_rate": 0.00969,
+     "net_cents": 4.642,
+     "se_cents": 0.278,
+     "t": 16.68,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.252
+    },
+    {
+     "lookback_min": 30,
+     "n": 1457,
+     "markets": 1457,
+     "clusters": 334,
+     "losses": 64,
+     "loss_rate": 0.04393,
+     "net_cents": 3.456,
+     "se_cents": 0.621,
+     "t": 5.56,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.397
+    },
+    {
+     "lookback_min": 60,
+     "n": 921,
+     "markets": 921,
+     "clusters": 243,
+     "losses": 73,
+     "loss_rate": 0.07926,
+     "net_cents": 1.323,
+     "se_cents": 1.05,
+     "t": 1.26,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced": [
+    {
+     "lookback_min": 2,
+     "n": 90,
+     "markets": 90,
+     "clusters": 54,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 2.271,
+     "se_cents": 2.833,
+     "t": 0.8,
+     "t_critical_95": 2.01,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 5,
+     "n": 90,
+     "markets": 90,
+     "clusters": 54,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 4.0,
+     "se_cents": 2.833,
+     "t": 1.41,
+     "t_critical_95": 2.01,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 10,
+     "n": 90,
+     "markets": 90,
+     "clusters": 54,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 6.309,
+     "se_cents": 2.833,
+     "t": 2.23,
+     "t_critical_95": 2.01,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 30,
+     "n": 90,
+     "markets": 90,
+     "clusters": 54,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 7.0,
+     "se_cents": 2.833,
+     "t": 2.47,
+     "t_critical_95": 2.01,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 60,
+     "n": 90,
+     "markets": 90,
+     "clusters": 54,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 8.948,
+     "se_cents": 2.833,
+     "t": 3.16,
+     "t_critical_95": 2.01,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced_markets": 90,
+   "missing_lookbacks": []
+  },
+  {
+   "family": "tennis",
+   "trade": "tail SELL",
+   "rows": [
+    {
+     "lookback_min": 2,
+     "n": 334,
+     "markets": 334,
+     "clusters": 154,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.682,
+     "se_cents": 0.994,
+     "t": 1.69,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.044
+    },
+    {
+     "lookback_min": 5,
+     "n": 763,
+     "markets": 763,
+     "clusters": 255,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.724,
+     "se_cents": 0.6,
+     "t": 2.87,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.05
+    },
+    {
+     "lookback_min": 10,
+     "n": 815,
+     "markets": 815,
+     "clusters": 278,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.897,
+     "se_cents": 0.55,
+     "t": 3.45,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.048
+    },
+    {
+     "lookback_min": 30,
+     "n": 440,
+     "markets": 440,
+     "clusters": 174,
+     "losses": 7,
+     "loss_rate": 0.01591,
+     "net_cents": 0.553,
+     "se_cents": 0.713,
+     "t": 0.77,
+     "t_critical_95": 1.96,
+     "overlap_with_longest": 0.146
+    },
+    {
+     "lookback_min": 60,
+     "n": 164,
+     "markets": 164,
+     "clusters": 90,
+     "losses": 7,
+     "loss_rate": 0.04268,
+     "net_cents": -1.847,
+     "se_cents": 1.913,
+     "t": -0.97,
+     "t_critical_95": 1.99,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced": [
+    {
+     "lookback_min": 2,
+     "n": 3,
+     "markets": 3,
+     "clusters": 3,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.241,
+     "se_cents": 51.0,
+     "t": 0.02,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 5,
+     "n": 3,
+     "markets": 3,
+     "clusters": 3,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.241,
+     "se_cents": 51.0,
+     "t": 0.02,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 10,
+     "n": 3,
+     "markets": 3,
+     "clusters": 3,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 3.108,
+     "se_cents": 51.0,
+     "t": 0.06,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 30,
+     "n": 3,
+     "markets": 3,
+     "clusters": 3,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 2.174,
+     "se_cents": 51.0,
+     "t": 0.04,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    },
+    {
+     "lookback_min": 60,
+     "n": 3,
+     "markets": 3,
+     "clusters": 3,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "net_cents": 1.863,
+     "se_cents": 51.0,
+     "t": 0.04,
+     "t_critical_95": 12.71,
+     "overlap_with_longest": 1.0
+    }
+   ],
+   "balanced_markets": 3,
+   "missing_lookbacks": []
+  }
+ ],
+ "parlay_sample": {
+  "file_rows": 4000,
+  "parlays": 3776,
+  "non_parlay_rows": 224,
+  "no_candles": 1654,
+  "no_actionable_book": 2122,
+  "actionable": 0,
+  "actionable_any_age": 0,
+  "actionable_share": 0.0,
+  "staleness_limit_s": 180
+ },
+ "provenance": {
+  "history_files": [
+   "/Users/mike/kalshi-audit/settled_compact.jsonl.gz",
+   "/Users/mike/kalshi-audit/settled_slices/settled_to_2026-07-14.jsonl.gz",
+   "/Users/mike/kalshi-audit/settled_slices/settled_to_2026-07-19.jsonl.gz",
+   "/Users/mike/kalshi-audit/settled_slices/settled_to_2026-07-24.jsonl.gz",
+   "/Users/mike/kalshi-audit/settled_slices/settled_to_2026-07-29.jsonl.gz",
+   "/Users/mike/kalshi-audit/settled_slices/settled_to_2026-08-03.jsonl.gz",
+   "/Users/mike/kalshi-audit/settled_slices/settled_to_2026-08-08.jsonl.gz"
+  ],
+  "corpus_lines": 19760357,
+  "corpus_unique_tickers": 19758880,
+  "duplicate_tickers_across_history_files": 1477,
+  "candle_files": [
+   {
+    "path": "/Users/mike/kalshi-audit/candles.jsonl",
+    "kept": 9839,
+    "duplicates": 0
+   },
+   {
+    "path": "/Users/mike/kalshi-audit/candles_breadth.jsonl",
+    "kept": 14147,
+    "duplicates": 852
+   },
+   {
+    "path": "/Users/mike/kalshi-audit/candles_tennis.jsonl",
+    "kept": 3564,
+    "duplicates": 350
+   },
+   {
+    "path": "/Users/mike/kalshi-audit/candles_other.jsonl",
+    "kept": 3963,
+    "duplicates": 37
+   }
+  ],
+  "candle_rows_read": 32752,
+  "duplicate_tickers_dropped": 1239,
+  "unique_markets": 31513,
+  "lookbacks_min": [
+   2,
+   5,
+   10,
+   30,
+   60
+  ],
+  "min_contracts": 60,
+  "min_clusters": 20,
+  "cells_tested": 86,
+  "cells_reported": 27,
+  "multiplicity_note": "The two TRADES were pre-specified. The horizon and the family were not: 86 cells were computed and 27 clear the size gates. No multiplicity adjustment is applied, so roughly 4 would clear a 95% threshold by chance. Read the table as a screen, not as a result."
+ },
+ "generated_utc": "2026-08-20T21:59:59+00:00"
 }

@@ -1,4 +1,11 @@
-"""What Kalshi is actually made of, counted rather than assumed."""
+"""What Kalshi is actually made of, counted rather than assumed.
+
+Every number on this page comes out of `data/exchange_census.json`, which
+`build_exchange_census.py` regenerates from the crawl. Nothing here is typed.
+That rule exists because this page used to carry a hand-typed decay table that
+disagreed with the generated table rendered directly above it - including on
+the SIGN of the number the page's conclusion rested on.
+"""
 
 from __future__ import annotations
 
@@ -11,6 +18,13 @@ import streamlit as st
 DATA = Path(__file__).resolve().parents[1] / "data" / "exchange_census.json"
 census = json.loads(DATA.read_text())
 
+parlays = census.get("parlays_excluded", 0)
+traded = census["total_markets"]
+zero_volume = census.get("dropped_zero_volume", 0)
+no_result = census.get("dropped_no_result", 0)
+crawled = parlays + traded + zero_volume + no_result
+real = traded + zero_volume + no_result
+
 st.title("The anatomy of the exchange")
 st.caption(
     "A full crawl of settled markets, not a sample of the famous ones. "
@@ -21,24 +35,63 @@ st.caption(f"Generated {census['generated_utc']} · "
            f"{census['distinct_days']} distinct settlement days, "
            f"{census['day_span'][0]} to {census['day_span'][1]}")
 
-st.header("94% of the exchange is parlays")
-st.markdown(
-    """
-Crawling every settled market with volume over a month returns **19.76 million**
-of them. **18.48 million are MVE parlay products** - multi-leg combination
-tickets, mostly `KXMVECROSSCATEGORY` and `KXMVESPORTSMULTIGAMEEXTENDED`.
+if parlays:
+    share = parlays / crawled
+    st.header(f"{share:.0%} of the exchange is parlays")
+    st.markdown(
+        f"""
+Crawling every settled market over the window returns **{crawled:,}** of them.
+**{parlays:,} are MVE parlay products** - multi-leg combination tickets, mostly
+`KXMVECROSSCATEGORY` and `KXMVESPORTSMULTIGAMEEXTENDED`.
 
 They carry volume and they are not tradeable in the sense this project cares
-about. A targeted sample of 4,000 of the highest-volume ones found:
+about.
+"""
+    )
+else:
+    st.header("Parlays")
+    st.warning(
+        "This census was built from a corpus with **no parlay tickets in it**, "
+        "so the parlay share cannot be shown. Rebuild against the full crawl "
+        "(`settled_compact.jsonl.gz`) to populate it. The exclusion used to "
+        "happen silently upstream while a `parlay-EXCLUDE` family sat in the "
+        "code that had never once matched a record.",
+        icon="⚠️",
+    )
 
-* 1,658 with no candlestick history at all,
-* 2,089 showing a placeholder book five minutes before close,
-* **39 with an actionable two-sided book.**
+sample = census.get("parlay_sample")
 
-One percent. The parlay tickets are a retail product that prints a price when
-someone buys one, not a market with a resting book you can quote into. Any
-"Kalshi volume" figure that does not separate them is describing a different
-business than the one a market maker can participate in.
+if sample:
+    st.markdown(
+        f"""
+A targeted sample of **{sample['parlays']:,}** parlay tickets (out of
+{sample['file_rows']:,} rows in that file, {sample['non_parlay_rows']:,} of
+which were not parlays) found:
+
+* **{sample['no_candles']:,}** with no candlestick history at all,
+* **{sample['no_actionable_book']:,}** with no actionable two-sided book five
+  minutes before close,
+* **{sample['actionable']:,}** with an actionable book
+  ({sample['actionable_share']:.1%}).
+
+Those three categories are exhaustive and sum to {sample['parlays']:,}.
+"""
+    )
+
+    if sample["actionable_any_age"] > sample["actionable"]:
+        st.caption(
+            f"Dropping the staleness limit ({sample['staleness_limit_s']}s) "
+            f"raises the actionable count to {sample['actionable_any_age']:,}. "
+            f"Those extra books were real quotes from minutes or hours earlier, "
+            f"not prices available five minutes before close."
+        )
+
+st.markdown(
+    f"""
+The parlay tickets are a retail product that prints a price when someone buys
+one, not a market with a resting book you can quote into. Any "Kalshi volume"
+figure that does not separate them is describing a different business than the
+one a market maker can participate in.
 """
 )
 
@@ -47,20 +100,22 @@ families = families[families["markets"] > 0].copy()
 families["share"] = (families["share"] * 100).round(2)
 families = families.rename(columns={
     "family": "family", "markets": "markets", "series": "distinct series",
-    "share": "% of markets"})
+    "share": "% of traded non-parlay markets"})
 st.dataframe(families, hide_index=True)
 
 st.caption(
-    "Parlays are excluded from every other page and from the calibration work. "
-    "They are counted here because the exclusion is itself a finding."
+    f"Denominator is the {traded:,} settled non-parlay markets that actually "
+    f"traded - NOT the {crawled:,} crawled. Parlays are excluded from every "
+    f"other page and from the calibration work; they are counted above because "
+    f"the exclusion is itself a finding."
 )
 
 st.header("Where tradeable breadth actually lives")
 st.markdown(
     f"""
-Strip the parlays and 1.28 million real settled markets remain, of which
-**{census['total_markets']:,} actually traded**, across
-{census['distinct_days']} days. Of those,
+Strip the parlays and {real:,} real settled markets remain, of which
+**{traded:,} actually traded** ({zero_volume:,} settled with zero volume),
+across {census['distinct_days']} days. Of those,
 **{census['breadth_total']} series** settle at least 100 markets across at
 least 5 distinct days with at least 50 markets landing in the tails.
 
@@ -74,11 +129,15 @@ temperatures settle on genuinely different things.
 
 breadth = pd.DataFrame(census["breadth"]).rename(columns={
     "series": "series", "family": "family", "markets": "settled",
-    "days": "days", "per_day": "per day", "tails": "tail-priced",
-    "faves": "favourite-priced", "avg_volume": "avg volume"})
+    "days": "days", "per_day": "per day",
+    "tails_lastprice": "tail-priced (last print)",
+    "faves_lastprice": "favourite-priced (last print)",
+    "avg_volume": "avg volume"})
 st.dataframe(breadth, hide_index=True)
 
-st.header("The calibration question, and its replication failure")
+st.warning(census["breadth_basis"], icon="⚠️")
+
+st.header("The calibration question")
 st.markdown(
     """
 Kalshi charges takers `7% x P x (1-P)` and charges makers nothing. Settlement
@@ -88,83 +147,141 @@ because there is no exit.
 
 That makes tail mispricing the natural thing to hunt. Two trades were fixed in
 advance - **sell YES on anything priced at or under 5c**, and **buy YES on
-anything at or above 80c**, both held to settlement - so there was no choosing
-a winner from a grid of buckets afterwards. Prices are taken from the book at a
-fixed time before close, never the last print, and errors cluster on
-series-by-day because consecutive windows ride one underlying path.
+anything at or above 80c**, both held to settlement. Prices are taken from the
+book at a fixed time before close, never the last print, the book must be no
+more than three minutes stale, and errors cluster on series-by-day - or
+family-by-day for crypto, indices, commodities and weather, whose members ride
+one underlying and are not separate draws.
 """
 )
 
 pooled = pd.DataFrame(census["pooled"])
 
 if not pooled.empty:
-    pooled["t"] = (pooled["net_cents"] / pooled["se_cents"]).round(1)
-    view = pooled[["lookback_min", "family", "trade", "n", "clusters",
-                   "losses", "net_cents", "se_cents", "t"]].rename(columns={
+    view = pooled[["lookback_min", "family", "trade", "n", "markets",
+                   "clusters", "losses", "loss_clusters", "net_cents",
+                   "se_cents", "t", "t_critical_95", "significant_95",
+                   "se_source"]].rename(columns={
         "lookback_min": "lookback (min)", "family": "family", "trade": "trade",
-        "n": "contracts", "clusters": "clusters", "losses": "losses",
-        "net_cents": "net (c)", "se_cents": "se (c)"})
+        "n": "contracts", "markets": "markets", "clusters": "clusters",
+        "losses": "losses", "loss_clusters": "losing clusters",
+        "net_cents": "net (c)", "se_cents": "se (c)", "t": "t",
+        "t_critical_95": "95% crit", "significant_95": "sig?",
+        "se_source": "se from"})
     st.dataframe(view, hide_index=True)
 
+provenance = census.get("provenance", {})
+
 st.warning(
-    "Read the **losses** column before any t-statistic. These trades win small "
-    "and often and lose big and rarely, so a cell with no losses in sample has "
-    "no variance and its error bar collapses. Tennis first printed t=24.6 off "
-    "ZERO losses in 344 contracts. Every error bar here is now floored by the "
-    "uncertainty in the loss RATE (rule of three, in money), which is what "
-    "brought that to t=3.8.",
+    "Read the **losses** and **losing clusters** columns before any "
+    "t-statistic. These trades win small and often and lose big and rarely, so "
+    "a cell with no losses in sample has no variance and its error bar "
+    "collapses. Every error bar is floored by the uncertainty in the loss "
+    "RATE, counted in CLUSTERS rather than contracts - one tennis match takes "
+    "down every contract riding it, so the Poisson count that matters is the "
+    "count of loss EVENTS. Counting it in contracts, as an earlier version "
+    "did, understated the floor about threefold.",
     icon="⚠️",
 )
 
-st.error(
-    "**The last idea died here, and this is how.** 'Five minutes before close' "
-    "is not a constant amount of remaining uncertainty. For a 15-minute "
-    "Bitcoin window it is a third of the window with real price risk left. For "
-    "a tennis match it is the final game - typical paths run 0.53 -> 0.26 -> "
-    "0.04, and only 2% of tennis markets sit within a cent of their T-60 "
-    "price. So a positive number at a short horizon may be measuring nothing "
-    "but 'the outcome is already known'.",
-    icon="🚨",
-)
+if provenance.get("multiplicity_note"):
+    st.info(provenance["multiplicity_note"], icon="🔎")
 
-st.subheader("The decay curve, which is the diagnostic")
+st.header("The decay curve, and why it does not settle the question")
 st.markdown(
     """
-Run the same trade at every horizon and watch the observed loss rate. Tennis,
-which had the largest apparent edge and by far the largest capacity in the
-whole study:
-
-    T-minus   trade       n    losses   loss rate     net
-       2m     fave BUY   306      0       0.00%     +4.06c
-       5m     fave BUY   719      2       0.28%     +4.43c
-      10m     fave BUY   876     10       1.14%     +4.36c
-      30m     fave BUY   841     35       4.16%     +3.60c
-      60m     fave BUY   533     50       9.38%     -0.57c
-
-The loss rate climbs monotonically and the return goes negative. At 60 minutes
-- the only horizon with genuine uncertainty and a real sample of losses - the
-trade loses money. The apparent edge at 2 minutes rests on **zero observed
-losses**, which is not evidence of a low rate, only of a short sample.
-
 A real mispricing should survive a longer horizon. A convergence artifact
-cannot, because it was only ever measuring resolution. **This curve is the
-test, and every tail trade in this study fails it.**
+cannot, because it was only ever measuring resolution. So run the trade at
+every horizon and watch the loss rate: that was meant to be the transferable
+test this whole project produced.
+
+It does not work on this data, and the reason is in the **`% same markets`**
+column below. A market only enters a horizon if it had an actionable book that
+far out *and* sat in the zone at that moment. The rows are therefore different
+populations, not one population observed at different times - at the short
+horizons they share a small minority of their markets with the long ones. Any
+monotone pattern across those rows is confounded with who is in them.
+
+The **balanced** rows hold the market set fixed at the markets present in every
+horizon, which is the only controlled comparison available. Two things happen:
+the sample collapses to a handful of markets, and the sign of the slope
+reverses. Both say the same thing - **this dataset cannot identify the decay**,
+so it neither confirms the edge nor kills it.
 """
+)
+
+for panel in census.get("decay", []):
+    st.subheader(f"{panel['family']} · {panel['trade']}")
+
+    if panel["missing_lookbacks"]:
+        missing = ", ".join(f"{m}m" for m in panel["missing_lookbacks"])
+        st.error(
+            f"**No data at T-{missing}.** These markets do not exist that far "
+            f"before they close, so the decay test cannot be run on this "
+            f"family at all - it is untested here, not failed.",
+            icon="🚨",
+        )
+
+    raw = pd.DataFrame(panel["rows"])
+
+    if not raw.empty:
+        raw["loss_rate"] = (raw["loss_rate"] * 100).round(2)
+        raw["overlap_with_longest"] = (raw["overlap_with_longest"] * 100).round(0)
+        st.dataframe(raw[["lookback_min", "n", "markets", "clusters", "losses",
+                          "loss_rate", "net_cents", "se_cents", "t",
+                          "overlap_with_longest"]].rename(columns={
+            "lookback_min": "lookback (min)", "n": "contracts",
+            "markets": "markets", "clusters": "clusters", "losses": "losses",
+            "loss_rate": "loss rate %", "net_cents": "net (c)",
+            "se_cents": "se (c)", "t": "t",
+            "overlap_with_longest": "% same markets"}), hide_index=True)
+
+    balanced = pd.DataFrame(panel["balanced"])
+
+    if not balanced.empty:
+        count = panel["balanced_markets"]
+        st.caption(
+            f"Balanced panel: the {count} "
+            f"{'market' if count == 1 else 'markets'} present at every "
+            f"horizon.")
+        balanced["loss_rate"] = (balanced["loss_rate"] * 100).round(2)
+        st.dataframe(balanced[["lookback_min", "n", "clusters", "losses",
+                               "loss_rate", "net_cents", "se_cents",
+                               "t"]].rename(columns={
+            "lookback_min": "lookback (min)", "n": "contracts",
+            "clusters": "clusters", "losses": "losses",
+            "loss_rate": "loss rate %", "net_cents": "net (c)",
+            "se_cents": "se (c)", "t": "t"}), hide_index=True)
+    else:
+        st.caption("No market is present at every horizon, so no balanced "
+                   "panel exists for this trade.")
+
+st.error(
+    "**The balanced panel is not an estimate either.** Requiring a market to "
+    "sit in the zone at every horizon selects markets that were already "
+    "settled-looking an hour out and stayed that way, which is its own "
+    "conditioning on the outcome. It is a diagnostic showing the raw curve is "
+    "not identified, not a replacement for it.",
+    icon="🚨",
 )
 
 st.markdown(
     """
 The right conditioner is *fraction of the event's uncertainty still
 outstanding*, not wall-clock minutes, and that has to be built per family
-before any of these numbers can be compared. Until it is, the only honest
-statement is that crypto ladders show a modest tail edge that commodities and
-indices do not reproduce.
+before any of these numbers can be compared. "Five minutes before close" is a
+third of a 15-minute Bitcoin window and the final game of a tennis match.
+Until that exists, the honest statement is that the tail and favourite trades
+are **unresolved on this data** - positive at short horizons where convergence
+bias lives, indistinguishable from zero at the long ones, and measured on
+samples that barely overlap.
 
-This is the fourth idea in this project to look good on one slice and vanish on
-the next. The taker scan crowned a different winner in each of three periods.
-The order-imbalance gate was null offline and null live. A weather model lost
-to the market's own forecast. The pattern is consistent enough to be the real
-finding: **on this fee schedule, apparent edges are usually the measurement.**
+This is the fourth idea in this project to look good on one slice and behave
+differently on the next. The taker scan crowned a different winner in each of
+three periods. The order-imbalance gate was null offline and null live. A
+weather model lost to the market's own forecast. The pattern is consistent
+enough to be the real finding: **on this fee schedule, apparent edges are
+usually the measurement.**
 """
 )
 
@@ -180,13 +297,17 @@ Put the pieces together and the exchange has a coherent shape:
    volume leaders are alien disclosure, presidential nominees and the Super
    Bowl. The exchange converts recreational interest into fees.
 3. **The professional lane needs a hedge you cannot buy retail.** A binary near
-   expiry is a digital option; hedging one \$1 contract five minutes out takes
-   about \$259 of underlying. Firms that quote these ladders export the
+   expiry is a digital option; hedging one \\$1 contract five minutes out takes
+   about \\$259 of underlying. Firms that quote these ladders export the
    directional risk elsewhere and keep the spread. Without that leg, spread
    capture is real (+0.4c per fill, measured) and realised profit is zero
    (measured over 68 live cycles).
 4. **The retail-accessible edge, if any, is diversification rather than
    prediction** - many small independent settlements, no crossing, no exit.
-   That is the one idea still standing, and it has not replicated yet.
+   That is the one idea still standing, and this data cannot yet tell whether
+   it is real.
 """
 )
+
+with st.expander("Provenance"):
+    st.json(provenance)
