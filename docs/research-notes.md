@@ -1414,3 +1414,38 @@ and trading is currently stopped by choice.
 The project's own lesson applied to itself one last time: the error that
 survived longest was the one that flattered the author - in this case, me,
 because "conclusively dead" closed the story cleanly and "undecided" does not.
+
+
+---
+
+# The front-facing idea, tested and dead in one afternoon (2026-08-20)
+
+The last open question was whether prediction-side forecasting could work where
+microstructure could not: does the public NBM forecast beat the Kalshi
+NYC-high-temperature market? `scripts/weather_edge_study.py`, decision rule
+written before the run: market better or tie means dead, no live test.
+
+402 settled KXHIGHNY bracket-markets over 67 days. NBM day-ahead max-temp
+forecasts (convention calibrated against actuals, not assumed: bias +1.2F,
+sigma 2.5F, MAE 2.1F - the model is genuinely good). Market probability taken
+from candlestick mids at 12Z, forecast probability from
+Normal(forecast - bias, sigma) mass on each bracket. Brier scored, clustered
+by day:
+
+    market  0.0984
+    NBM     0.1309
+    per-day difference +0.0324 +/- 0.0108  (market better, t ~ 3)
+    NBM wins 23 of 67 days
+
+**The market beats the strongest free public forecast by a wide, significant
+margin.** The 12Z snapshot does give the market ~10 hours of information the
+00Z model run lacks - stated, and not close to explaining a t of 3.
+
+This is the same finding as every other test in this project, in its cleanest
+form: **Kalshi's prices already impound the public information stack.** Spot
+does not lead the book, the book's own imbalance is priced within fees, and the
+best public weather model loses to the market that can read it. Whatever edge
+exists on this exchange belongs to someone holding information that is not
+public, at a scale this account was never going to reach.
+
+Project closed. All of it.

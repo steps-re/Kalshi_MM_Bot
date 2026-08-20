@@ -1,0 +1,25 @@
+402 settled KXHIGHNY bracket-markets over 67 days
+actual highs loaded for 231 days
+
+NBM txn convention calibration (key = mapping + days ahead):
+  key     n    bias   sigma    MAE
+   A0    68   +1.12    2.48   2.15
+   A1    67   +1.18    2.54   2.13
+   A2    66   +1.24    2.97   2.45
+   B1    67   +1.13    5.48   4.18
+   B2    66   +1.20    5.60   4.26
+chosen: A1 (bias +1.18, sigma 2.54)
+
+pulling market snapshots (one candlestick call per market)...
+402 markets with a 12Z quote
+
+============================================================
+402 markets, 67 days. Brier (lower is better):
+  market  0.0984
+  NBM     0.1309
+  per-day difference (NBM - market): +0.0324 +/- 0.0108  (market better)
+  NBM wins 23/67 days
+
+The market quote is from AFTER the forecast run (its info advantage,
+stated). NBM materially better -> a real lead worth a live design.
+Tie or market better -> the idea is dead, no live test follows.
