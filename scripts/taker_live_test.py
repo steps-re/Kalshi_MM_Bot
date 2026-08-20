@@ -98,7 +98,12 @@ EXIT_REST_SECONDS = 40.0   # rest the exit before crossing whatever is left
 # --- hard limits --------------------------------------------------------------
 SIZE = 1                                # contracts. Not configurable on purpose.
 COOLDOWN_SECONDS = 60.0                 # per ticker
-MAX_FEED_SILENCE = 20.0
+# Time without a book update before the run is declared broken. This only has
+# to be short enough to catch a dead socket, and a dead socket does not recover,
+# so detecting it 40 seconds later costs nothing. A false positive costs the
+# whole evening's sample, which makes the trade wildly asymmetric - 20s was
+# tight enough that a quiet strike could trip it mid-run.
+MAX_FEED_SILENCE = 60.0
 
 
 def now() -> float:
@@ -601,9 +606,20 @@ async def run(args) -> None:
             markets.update(fresh)
 
             if added:
+                # Reset the silence clock HERE, not after the subscribe lands.
+                # The guard fires on `markets` being non-empty, and `markets`
+                # becomes non-empty on the line above - so between here and the
+                # pump draining the queue there is a window where the guard sees
+                # subscribed markets and a last_event still stamped at startup.
+                # The ladder is out of the window ~48 minutes an hour, so that
+                # gap is routinely minutes wide and the guard fired instantly on
+                # the first market of the run: "feed silent for 485s", 0 book
+                # updates, run over before it traded once.
+                stats["last_event"] = now()
                 await subscribe_queue.put(tuple(added))
 
     if initial:
+        stats["last_event"] = now()
         await subscribe_queue.put(initial)
 
     shadow_tasks: set = set()
