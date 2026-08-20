@@ -1336,3 +1336,47 @@ survivor" chapter was in, and the lesson from that chapter applies here: a
 split found in one period and absent in an underpowered second one is a
 hypothesis, not a finding. Worth pre-registering before the next live run.
 Not worth restricting a strategy on today.
+
+
+---
+
+# Closed, this time with the exploit run (2026-08-20)
+
+The measurement program ended with one fair objection standing: every session
+had been spent measuring, never exploiting. So the last run stacked everything
+learned into the single best configuration and just traded it - commodity
+venues only (GOLD, SOL, WTI, SILVER; DOGE and the crypto majors excluded on
+their measured toxicity), OBI gate at 90, passive exits, reduce-only into the
+close, 1-lot, $25 floor.
+
+29 cycles:
+
+    cash        -$1.64 ledger / -$0.56 balance ($36.01 -> $35.45)
+    per cycle   -5.7c +/- 8.8c  (t = -0.64, statistically zero)
+    markout     positive in 28 of 29 cycles, ~+0.4c per fill
+
+The terminal signature of the whole project, reproduced one last time in its
+best configuration: **the paper says a small edge, the cash says zero.** The
+markout is real - the fills are slightly good - and everything between fill and
+bank (inventory carry, exit costs, settlement) eats exactly all of it. Not
+dramatically, not through any single leak left unfixed. Just, on net, to zero.
+
+Stopped by choice at 29 cycles, well above the floor. Final balance **$35.45 of
+the original $50**: the complete program - two audits, a recovered corpus, four
+hostile reviews, a live fill-quality test, a randomised exit experiment, a gate
+A/B, and this run - cost $14.55.
+
+What the money bought, since it was never going to be the returns:
+
+- **A validated signal.** Order-book imbalance forecasts the next 30 seconds at
+  +0.6 to +0.9c against a flat control, monotone across 640 markets, robust to
+  every adversarial attack including three we could not think of ourselves.
+- **A measured "no".** The signal is worth less than any available round trip
+  on this fee schedule, at this scale, in every construction tried - and each
+  "no" is a number with a standard error, not an opinion.
+- **The instrument.** Extract -> dose-response with a no-signal control ->
+  placebo null -> power-checked replication -> guarded live test. It re-answers
+  "is there an edge here?" for any order-book venue in an evening, and it is
+  packaged as the `venue-audit` skill.
+
+The account keeps the $35.45. The map is the deliverable.

@@ -11,11 +11,15 @@ st.caption(
 )
 
 st.warning(
-    "**Re-audited 2026-08-19 against the full 62-hour archive.** The verdict below "
-    "held and is better supported than when it was written. Several numbers on "
-    "this page did not survive, and are corrected on **The audit**. The one "
-    "condition that changes the answer is on **Where the money might be**.",
-    icon="🔬",
+    "**Re-audited 2026-08-19, closed for good 2026-08-20.** The verdict below "
+    "held and is better supported than when it was written; corrections are on "
+    "**The audit**. The final act was an exploit run of the best configuration "
+    "found - commodity venues, the imbalance gate, passive exits: 29 cycles, "
+    "-5.7c \u00b1 8.8c per cycle, statistically zero, with positive markout in 28 "
+    "of 29. The paper edge is real and everything between fill and bank eats "
+    "exactly all of it. Final balance \\$35.45 of \\$50; the complete measured "
+    "program cost \\$14.55.",
+    icon="🏁",
 )
 
 st.header("The one-sentence version")

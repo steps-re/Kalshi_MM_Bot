@@ -421,6 +421,18 @@ anti-correlated, so the edge does not scale by simply pressing harder.
 """
     )
 
+st.header("Epilogue: the exploit run (2026-08-20)")
+st.markdown(
+    r"""
+The fair objection to everything above was that no session ever just *traded*
+the best configuration. So the last one did: commodity venues only, gate at 90,
+passive exits, 1-lot, \$25 floor. **29 cycles: -5.7c ± 8.8c per cycle,
+statistically zero, markout positive in 28 of 29.** The paper edge survives its
+final test; the cash never arrives. Stopped by choice, \$35.45 of the original
+\$50 remaining, \$14.55 for the complete map.
+"""
+)
+
 st.header("Why this might still be nothing")
 st.markdown(
     """
