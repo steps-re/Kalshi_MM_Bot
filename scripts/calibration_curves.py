@@ -45,13 +45,31 @@ BUCKETS = ((0.0, 0.01), (0.01, 0.02), (0.02, 0.03), (0.03, 0.05),
            (0.05, 0.10), (0.10, 0.20), (0.20, 0.35), (0.35, 0.50),
            (0.50, 0.65), (0.65, 0.80), (0.80, 0.90), (0.90, 0.95),
            (0.95, 0.97), (0.97, 0.98), (0.98, 0.99), (0.99, 1.0))
+# Families rebuilt from what actually settles, repeatedly, with populated
+# tails - see the 161-series census. The first version's "other" bucket was
+# 94% MVE parlay products, which carry volume but no continuous two-sided
+# book: of 4,000 sampled, 2,089 had a placeholder book five minutes out and
+# only 39 were actionable. They are excluded by name rather than by accident.
+PARLAY_PREFIXES = ("KXMVE",)
 FAMILIES = {
+    # One underlying, many strikes: these do NOT diversify against each other.
     "crypto-15M": lambda s: s.endswith("15M"),
-    "crypto-hourly": lambda s: s in ("KXBTCD", "KXETHD", "KXSOLD", "KXXRPD"),
-    "sports": lambda s: s in ("KXMLB", "KXMLBGAME", "KXNBA", "KXNFL",
-                              "KXNFLGAME", "KXNCAAF", "KXSB", "KXPGATOUR"),
-    "weather": lambda s: s.startswith(("KXHIGH", "KXRAIN")) and
-                         "INFLATION" not in s and "YTVIEWS" not in s,
+    "crypto-hourly": lambda s: s in ("KXBTCD", "KXETHD", "KXSOLD", "KXXRPD",
+                                     "KXBTC", "KXETH", "KXSOL", "KXXRP"),
+    # Per-game and per-player props. Genuinely independent settlements, which
+    # is the whole point of the diversification argument.
+    "sports-props": lambda s: (s.startswith(("KXMLB", "KXNBA", "KXNFL",
+                                             "KXNCAA", "KXCLUBF", "KXWNBA"))
+                               or s in ("KXSB", "KXPGATOUR")),
+    "tennis": lambda s: s.startswith(("KXITF", "KXATP", "KXWTA")),
+    # Daily, per-city. Correlated within a weather system, independent across
+    # continents - partial diversification, unlike a single ladder.
+    "weather": lambda s: (s.startswith(("KXTEMP", "KXHIGH", "KXRAIN", "KXLOW"))
+                          and "INFLATION" not in s and "YTVIEWS" not in s),
+    "commodities": lambda s: s.startswith(("KXGOLD", "KXSILVER", "KXWTI",
+                                           "KXNG", "KXCORN", "KXCOPPER")),
+    "indices": lambda s: s.startswith(("KXDJI", "KXNASDAQ", "KXINX", "KXSPX")),
+    "parlay-EXCLUDE": lambda s: s.startswith(PARLAY_PREFIXES),
 }
 
 
