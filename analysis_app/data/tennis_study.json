@@ -1,0 +1,467 @@
+{
+ "headline_t10": {
+  "n": 1545,
+  "clusters": 342,
+  "losses": 15,
+  "loss_rate": 0.00971,
+  "ev_cents": 4.632,
+  "se_cents": 0.279,
+  "t": 16.61,
+  "avg_ask_cents": 94.02,
+  "breakeven_loss_rate": 0.05586,
+  "return_on_capital": 0.04927,
+  "days": 43,
+  "markets_per_day": 35.9
+ },
+ "horizon_curve": [
+  {
+   "n": 9589,
+   "clusters": 376,
+   "losses": 43,
+   "loss_rate": 0.00448,
+   "ev_cents": 4.383,
+   "se_cents": 0.132,
+   "t": 33.13,
+   "horizon": "0-10"
+  },
+  {
+   "n": 15812,
+   "clusters": 415,
+   "losses": 180,
+   "loss_rate": 0.01138,
+   "ev_cents": 4.94,
+   "se_cents": 0.207,
+   "t": 23.84,
+   "horizon": "10-20"
+  },
+  {
+   "n": 28236,
+   "clusters": 413,
+   "losses": 1039,
+   "loss_rate": 0.0368,
+   "ev_cents": 3.965,
+   "se_cents": 0.407,
+   "t": 9.75,
+   "horizon": "20-40"
+  },
+  {
+   "n": 42399,
+   "clusters": 403,
+   "losses": 4218,
+   "loss_rate": 0.09948,
+   "ev_cents": -0.671,
+   "se_cents": 0.936,
+   "t": -0.72,
+   "horizon": "40-90"
+  }
+ ],
+ "price_horizon_grid": [
+  {
+   "price": "80-90c",
+   "cells": [
+    {
+     "n": 1956,
+     "clusters": 288,
+     "losses": 36,
+     "loss_rate": 0.0184,
+     "ev_cents": 10.319,
+     "se_cents": 0.465,
+     "t": 22.2,
+     "horizon": "0-10"
+    },
+    {
+     "n": 4602,
+     "clusters": 361,
+     "losses": 134,
+     "loss_rate": 0.02912,
+     "ev_cents": 9.646,
+     "se_cents": 0.469,
+     "t": 20.57,
+     "horizon": "10-20"
+    },
+    {
+     "n": 11678,
+     "clusters": 395,
+     "losses": 740,
+     "loss_rate": 0.06337,
+     "ev_cents": 6.521,
+     "se_cents": 0.715,
+     "t": 9.11,
+     "horizon": "20-40"
+    },
+    {
+     "n": 22822,
+     "clusters": 394,
+     "losses": 3091,
+     "loss_rate": 0.13544,
+     "ev_cents": -0.407,
+     "se_cents": 1.299,
+     "t": -0.31,
+     "horizon": "40-90"
+    }
+   ]
+  },
+  {
+   "price": "90-95c",
+   "cells": [
+    {
+     "n": 2243,
+     "clusters": 296,
+     "losses": 5,
+     "loss_rate": 0.00223,
+     "ev_cents": 5.463,
+     "se_cents": 0.146,
+     "t": 37.31,
+     "horizon": "0-10"
+    },
+    {
+     "n": 4136,
+     "clusters": 347,
+     "losses": 32,
+     "loss_rate": 0.00774,
+     "ev_cents": 5.172,
+     "se_cents": 0.201,
+     "t": 25.71,
+     "horizon": "10-20"
+    },
+    {
+     "n": 7735,
+     "clusters": 346,
+     "losses": 203,
+     "loss_rate": 0.02624,
+     "ev_cents": 3.405,
+     "se_cents": 0.43,
+     "t": 7.91,
+     "horizon": "20-40"
+    },
+    {
+     "n": 12013,
+     "clusters": 288,
+     "losses": 839,
+     "loss_rate": 0.06984,
+     "ev_cents": -0.791,
+     "se_cents": 0.994,
+     "t": -0.79,
+     "horizon": "40-90"
+    }
+   ]
+  },
+  {
+   "price": "95-98c",
+   "cells": [
+    {
+     "n": 3187,
+     "clusters": 316,
+     "losses": 2,
+     "loss_rate": 0.00063,
+     "ev_cents": 2.367,
+     "se_cents": 0.069,
+     "t": 34.39,
+     "horizon": "0-10"
+    },
+    {
+     "n": 4494,
+     "clusters": 312,
+     "losses": 12,
+     "loss_rate": 0.00267,
+     "ev_cents": 2.254,
+     "se_cents": 0.165,
+     "t": 13.68,
+     "horizon": "10-20"
+    },
+    {
+     "n": 6559,
+     "clusters": 281,
+     "losses": 75,
+     "loss_rate": 0.01143,
+     "ev_cents": 1.444,
+     "se_cents": 0.29,
+     "t": 4.97,
+     "horizon": "20-40"
+    },
+    {
+     "n": 6604,
+     "clusters": 173,
+     "losses": 224,
+     "loss_rate": 0.03392,
+     "ev_cents": -0.628,
+     "se_cents": 0.775,
+     "t": -0.81,
+     "horizon": "40-90"
+    }
+   ]
+  },
+  {
+   "price": "98-100c",
+   "cells": [
+    {
+     "n": 2203,
+     "clusters": 264,
+     "losses": 0,
+     "loss_rate": 0.0,
+     "ev_cents": 0.931,
+     "se_cents": 0.58,
+     "t": 1.61,
+     "horizon": "0-10"
+    },
+    {
+     "n": 2580,
+     "clusters": 245,
+     "losses": 2,
+     "loss_rate": 0.00078,
+     "ev_cents": 0.853,
+     "se_cents": 0.085,
+     "t": 10.03,
+     "horizon": "10-20"
+    },
+    {
+     "n": 2264,
+     "clusters": 165,
+     "losses": 21,
+     "loss_rate": 0.00928,
+     "ev_cents": 0.003,
+     "se_cents": 0.399,
+     "t": 0.01,
+     "horizon": "20-40"
+    },
+    {
+     "n": 960,
+     "clusters": 86,
+     "losses": 64,
+     "loss_rate": 0.06667,
+     "ev_cents": -5.736,
+     "se_cents": 2.269,
+     "t": -2.53,
+     "horizon": "40-90"
+    }
+   ]
+  }
+ ],
+ "implementable": [
+  {
+   "n": 96048,
+   "clusters": 473,
+   "losses": 5481,
+   "loss_rate": 0.05707,
+   "ev_cents": 2.12,
+   "se_cents": 0.508,
+   "t": 4.18,
+   "rule": "any actionable minute",
+   "share_last_40min": 0.5587
+  },
+  {
+   "n": 68462,
+   "clusters": 466,
+   "losses": 4084,
+   "loss_rate": 0.05965,
+   "ev_cents": 2.175,
+   "se_cents": 0.564,
+   "t": 3.86,
+   "rule": "volume printed this minute",
+   "share_last_40min": 0.6131
+  },
+  {
+   "n": 88611,
+   "clusters": 468,
+   "losses": 4979,
+   "loss_rate": 0.05619,
+   "ev_cents": 2.251,
+   "se_cents": 0.515,
+   "t": 4.37,
+   "rule": "volume in the last 5 min",
+   "share_last_40min": 0.5783
+  },
+  {
+   "n": 45042,
+   "clusters": 408,
+   "losses": 2745,
+   "loss_rate": 0.06094,
+   "ev_cents": 2.01,
+   "se_cents": 0.593,
+   "t": 3.39,
+   "rule": "heavy tape (>=2000 in 5 min)",
+   "share_last_40min": 0.6722
+  },
+  {
+   "n": 23732,
+   "clusters": 432,
+   "losses": 1210,
+   "loss_rate": 0.05099,
+   "ev_cents": 2.61,
+   "se_cents": 0.594,
+   "t": 4.4,
+   "rule": "open interest flat (<1%/5min)",
+   "share_last_40min": 0.504
+  }
+ ],
+ "tiers": [
+  {
+   "tier": "Challenger",
+   "markets": 202,
+   "losses": 1,
+   "loss_rate": 0.00495,
+   "ev_cents": 5.492
+  },
+  {
+   "tier": "ITF Futures",
+   "markets": 1007,
+   "losses": 12,
+   "loss_rate": 0.01192,
+   "ev_cents": 4.214
+  },
+  {
+   "tier": "Tour / other",
+   "markets": 336,
+   "losses": 2,
+   "loss_rate": 0.00595,
+   "ev_cents": 5.37
+  }
+ ],
+ "stops": [
+  {
+   "stop": "none",
+   "ev_cents": 4.632,
+   "stopped_out": 0,
+   "stopped_that_would_have_won": 0,
+   "worst_cents": -98.1,
+   "mean_loss_cents": -88.9
+  },
+  {
+   "stop": "80c",
+   "ev_cents": 3.255,
+   "stopped_out": 128,
+   "stopped_that_would_have_won": 115,
+   "worst_cents": -97.2,
+   "mean_loss_cents": -16.1
+  },
+  {
+   "stop": "70c",
+   "ev_cents": 4.344,
+   "stopped_out": 42,
+   "stopped_that_would_have_won": 29,
+   "worst_cents": -97.2,
+   "mean_loss_cents": -32.3
+  },
+  {
+   "stop": "60c",
+   "ev_cents": 4.609,
+   "stopped_out": 26,
+   "stopped_that_would_have_won": 13,
+   "worst_cents": -97.2,
+   "mean_loss_cents": -43.2
+  },
+  {
+   "stop": "50c",
+   "ev_cents": 4.865,
+   "stopped_out": 15,
+   "stopped_that_would_have_won": 2,
+   "worst_cents": -97.2,
+   "mean_loss_cents": -55.9
+  }
+ ],
+ "lookahead": {
+  "live": {
+   "observations": 768,
+   "median_days_ahead": 14.36,
+   "min_days_ahead": 12.21,
+   "max_days_ahead": 14.96,
+   "examples": [
+    {
+     "ticker": "KXATPCHALLENGERMATCH-26AUG20HARLLA-HAR",
+     "close_time_live": "2026-09-03T21:30:00Z",
+     "observed_utc": "2026-08-20T23:55:33+00:00"
+    },
+    {
+     "ticker": "KXATPCHALLENGERMATCH-26AUG20MAGWON-WON",
+     "close_time_live": "2026-09-03T21:10:00Z",
+     "observed_utc": "2026-08-20T23:55:33+00:00"
+    },
+    {
+     "ticker": "KXITFMATCH-26AUG19MATJAS-JAS",
+     "close_time_live": "2026-09-03T03:30:00Z",
+     "observed_utc": "2026-08-20T23:55:33+00:00"
+    }
+   ]
+  }
+ },
+ "depth": {
+  "snapshots": 6991,
+  "markets": 52,
+  "by_series": [
+   {
+    "series": "KXITFMATCH",
+    "snapshots": 3059,
+    "median_touch": 1895,
+    "median_within_1c": 3249,
+    "p10_touch": 1
+   },
+   {
+    "series": "KXATPCHALLENGERMATCH",
+    "snapshots": 1400,
+    "median_touch": 10628,
+    "median_within_1c": 30847,
+    "p10_touch": 446
+   },
+   {
+    "series": "KXITFWMATCH",
+    "snapshots": 960,
+    "median_touch": 200,
+    "median_within_1c": 1144,
+    "p10_touch": 134
+   },
+   {
+    "series": "KXWTAMATCH",
+    "snapshots": 424,
+    "median_touch": 13436,
+    "median_within_1c": 16901,
+    "p10_touch": 159
+   },
+   {
+    "series": "KXATPMATCH",
+    "snapshots": 381,
+    "median_touch": 44286,
+    "median_within_1c": 73618,
+    "p10_touch": 6891
+   },
+   {
+    "series": "KXITFDOUBLES",
+    "snapshots": 347,
+    "median_touch": 33,
+    "median_within_1c": 125,
+    "p10_touch": 8
+   },
+   {
+    "series": "KXWTASETWINNER",
+    "snapshots": 264,
+    "median_touch": 1348,
+    "median_within_1c": 4249,
+    "p10_touch": 24
+   },
+   {
+    "series": "KXATPSETWINNER",
+    "snapshots": 156,
+    "median_touch": 52444,
+    "median_within_1c": 106082,
+    "p10_touch": 51351
+   }
+  ],
+  "fave_zone_touch": {
+   "snapshots": 2930,
+   "p10": 25,
+   "median": 1600,
+   "p90": 12313
+  }
+ },
+ "provenance": {
+  "candle_files": [
+   "/private/tmp/claude-501/-Users-mike-Documents-Claude/e094ac58-4be2-4949-b182-66a626a7e6d4/scratchpad/corpus/candles.jsonl",
+   "/private/tmp/claude-501/-Users-mike-Documents-Claude/e094ac58-4be2-4949-b182-66a626a7e6d4/scratchpad/corpus/candles_breadth.jsonl",
+   "/private/tmp/claude-501/-Users-mike-Documents-Claude/e094ac58-4be2-4949-b182-66a626a7e6d4/scratchpad/corpus/candles_tennis.jsonl"
+  ],
+  "unique_markets": 27550,
+  "duplicate_tickers_dropped": 1202,
+  "book_file": "/Users/mike/kalshi-audit/tennis_book.jsonl",
+  "settled_file": null
+ },
+ "generated_utc": "2026-08-20T23:59:52+00:00"
+}

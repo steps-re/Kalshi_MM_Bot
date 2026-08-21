@@ -93,17 +93,35 @@ ceiling.
 st.divider()
 st.subheader("What I would do next, in order")
 
+st.caption(
+    "The original five-step list is done and has been retired: the fee model "
+    "was calibrated against real fills, the recorder was pointed at the viable "
+    "markets, markout was read before P&L, the walk-forward was run, and the "
+    "strategy went live small. All of it is on the earlier pages. This is "
+    "where the project actually stands."
+)
+
 st.markdown(
     """
-1. **Calibrate the fee model** against real fills. One session. It decides
-   whether any of the rest matters.
-2. **Point the recorder at the viable markets** — MLB props and temperature, not
-   crypto strikes — and collect several sessions.
-3. **Read the markout before the P&L.** If markout is negative at every horizon,
-   fix that before touching anything else.
-4. **Walk-forward** across the sessions. Near-zero out-of-sample retention means
-   there is no edge yet, and more tuning will not create one.
-5. Only then go live, small, with `RiskLimits.conservative()`.
+1. **Measure the pre-match hours.** A recorder is capturing the whole life of
+   every quoting tennis market. The one surviving lead pays +2.12c per entry
+   over the final ninety minutes, but that window was defined by a close time
+   nobody can see live, and the hours before it have never been priced. This
+   decides the lead. See **The tennis lead**.
+2. **Do not commit money until step 1 lands.** Depth is not the blocker -
+   the books are deep enough - and the edge replicated out of sample. The
+   blocker is that the entry condition is not observable in time to act on it.
+3. **Pre-register the tier hypothesis before testing it.** ITF Futures runs
+   about double the favourite-loss rate of the tours, and its women's book is
+   an order of magnitude thinner. Picking the clean tiers off the same sample
+   that suggested them is the selection error this project keeps making.
+4. **If step 1 clears, test size live**: 25-contract orders against the
+   displayed ask, with the kill rule fixed in advance - stop if the median
+   fills worse than 1.5c from the touch.
+5. **Build the uncertainty-fraction conditioner.** "Five minutes before close"
+   is a third of a crypto window and the final game of a tennis match. Until
+   horizons are expressed as fraction-of-event-remaining, no cross-family
+   comparison on any of these pages means what it appears to mean.
 """
 )
 
@@ -126,6 +144,13 @@ python scripts/analyze_session.py recordings/<session>
 python scripts/analyze_session.py recordings/* --walk-forward
 
 # dry run against live data, no orders sent
-python scripts/live_trade.py TICKER --strategy horizon""",
+python scripts/live_trade.py TICKER --strategy horizon
+
+# the open question: record whole tennis market lives, public book, no key
+python scripts/tennis_depth_recorder.py --out ~/kalshi-audit/tennis_book.jsonl
+
+# rebuild the study pages from the corpus
+python analysis_app/build_exchange_census.py --history ... --candles ...
+python analysis_app/build_tennis_study.py --candles ... --book ...""",
     language="bash",
 )

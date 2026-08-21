@@ -151,6 +151,13 @@ def list_candidates() -> list[dict]:
                     "open_interest": num(m.get("open_interest_fp")),
                     "last": num(m.get("last_price_dollars")),
                     "mid": (bid + ask) / 2,
+                    # Recorded so the file proves the look-ahead itself: this is
+                    # the close_time visible while the market is TRADEABLE. It
+                    # is a scheduled placeholder, often weeks out, and Kalshi
+                    # overwrites it with the real match-end at settlement. Any
+                    # "T-minus-X" rule built on the settled value is indexed to
+                    # a number that did not exist at the moment of the trade.
+                    "close_time_live": m.get("close_time"),
                 })
 
             cursor = data.get("cursor")
