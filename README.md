@@ -126,6 +126,36 @@ charges takers, and public summaries say most standard markets carry **no maker
 fee**. If that applies to the account, most of the exchange opens up.
 `calibrate_from_fills` settles it with one session of real fills.
 
+## Where the data lives (moved to GCS 2026-08-20)
+
+The ~33GB Kalshi corpus is **no longer on the laptop**. It was archived to cold
+storage, verified byte-exact (853 files / 32,997,666,273 bytes) before deletion.
+
+    archive:  gs://steps-cold-archive-2026/kalshi-audit/
+    project:  forge-steps-ventures
+    account:  mike@stepsventures.com
+
+Every study script reads `~/kalshi-audit/...`, which is now a **local cache**,
+not a source of truth. Restore only what a run needs:
+
+```bash
+python scripts/fetch_corpus.py --list              # what is in the archive
+python scripts/fetch_corpus.py --bundle candles    # the calibration inputs
+python scripts/fetch_corpus.py --bundle slices     # every settled-history slice
+```
+
+It skips files already cached, so re-running a study does not re-download 33GB.
+Delete `~/kalshi-audit` whenever you like.
+
+**A 403 here is not a 404.** The archive resolves for `mike@stepsventures.com`
+and returns 403 on the Airloom account. That distinction has already cost this
+project one wrongly-written audit section - a 403 was read as "the data is
+gone" and a conclusion was published on top of it.
+
+Live order-book recording is a separate, ongoing stream: `tennis-book.service`
+on the `kalshi-collector` VM writes to `~/kalshi-data/tennis_book.jsonl` there
+and syncs to `gs://steps-kalshi-book/tennis/`.
+
 ## Setup
 
 Requires Python 3.14+ and a `.env` file in the project root:

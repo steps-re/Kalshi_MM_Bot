@@ -98,17 +98,59 @@ for row in grid:
 st.dataframe(pd.DataFrame(table), hide_index=True)
 st.caption("Cents per contract, buying at the ask and holding to settlement.")
 
-st.header("What you could actually trade")
+st.header("What you could actually trade: nothing, so far")
+
+st.error(
+    "**An earlier version of this page said the clock-free rule pays +2.12c. "
+    "That was wrong and the error was mine.** It counted every actionable "
+    "MINUTE as a separate entry. A market only stays in the favourite zone "
+    "while it is winning, so counting minutes weights by how obviously decided "
+    "a market already was. Weight each market once - which is what a bot "
+    "actually does - and the edge is gone.",
+    icon="🚨",
+)
+
+pm = study.get("per_market", {})
+zone = pm.get("zone_minutes", {})
+
+if zone:
+    st.markdown(
+        f"""
+The mechanism, in one line: markets that **won** sat at 80c or better for a
+median of **{zone['won_median_minutes']} minutes**; markets that **lost** sat
+there for **{zone['lost_median_minutes']}**. Winners are
+{zone['winners_share_of_markets']:.0%} of markets but supply
+{zone['winners_share_of_minutes']:.0%} of the minutes. Counting minutes as
+entries is a slow way of counting winners twice.
+"""
+    )
+
+if pm.get("rules"):
+    rules = pd.DataFrame(pm["rules"])
+    rules["loss_rate"] = (rules["loss_rate"] * 100).round(2)
+    st.dataframe(rules[["rule", "n", "clusters", "loss_rate", "ev_cents",
+                        "se_cents", "t", "median_entry_age_min"]].rename(
+        columns={"rule": "one entry per market", "n": "markets",
+                 "clusters": "clusters", "loss_rate": "loss %",
+                 "ev_cents": "EV (c)", "se_cents": "se (c)", "t": "t",
+                 "median_entry_age_min": "median entry (min out)"}),
+        hide_index=True)
+
 st.markdown(
     """
-Drop the clock entirely and buy every actionable favourite while the market is
-trading. That rule needs no knowledge of match-end, and it still pays - about
-half the headline, and still several standard errors from zero.
+The best clock-free rule - buy the first time you ever see the market at 80c or
+better - is **statistically zero**. Enter any later and it is firmly negative,
+because by then you are buying the markets that are about to fall out of the
+zone. And the loss rate tells the story: **13%** of markets that touch 80c at
+some point go on to lose, against **0.97%** of markets sitting at 80c
+specifically ten minutes before the end. That gap *is* the clock. It is the
+whole edge, and it is not observable.
 
-The other rows are pre-specified proxies for "late in the match", tested to see
-whether any observable substitutes for the clock. **None does**: the share of
-entries falling in the profitable last-40-minute window barely moves. They are
-reported because the failure is the finding.
+Below is the time-weighted version for completeness, alongside four
+pre-specified proxies for "late in the match". None of them substitutes for the
+clock - the share of entries landing in the profitable window barely moves -
+and all of them inherit the same weighting flaw. They are kept on the page
+because the failure is the finding.
 """
 )
 
@@ -197,22 +239,26 @@ st.caption(
     "what kills strategies. The worst single outcome barely improves, because "
     "a few markets do gap with no tradeable price in between.")
 
-st.header("What happens next")
+st.header("Where this leaves it")
 st.markdown(
     """
-A recorder is running against the public order book, capturing the **whole
-life** of every quoting tennis market rather than the final ninety minutes the
-candle data covered. It answers the one question that now decides this:
+The edge is real, it replicated out of sample, and the books are deep enough to
+trade it. It is still not a trade, because the only thing that separates the
+profitable population from the unprofitable one is *how close the match is to
+finishing*, and Kalshi does not publish that until after it has finished.
 
-**What does the blind rule earn including the pre-match hours?** Markets open
-roughly a day before the match. The candle data never saw that period, so the
-+2c above is measured only over a window that itself required knowing the
-close. If the pre-match quote is fairly priced, the blind rule is diluted; if
-it is worse than fair, the rule goes negative.
+That is a narrower and more useful failure than the ones before it. The taker
+scan died of noise. The imbalance gate died of being null. This one is alive
+and unreachable, and it names exactly what would reach it: **a source of live
+match state that Kalshi does not provide.** A scoreboard feed that says "5-4,
+40-30, third set" turns an unobservable clock into an observable one. Whether
+that is worth buying is a different question from whether the edge is there,
+and for the first time in this project those two questions are separate.
 
-Until that is measured, no money should be committed. The honest status is a
-real, replicated, adequately deep edge whose entry condition nobody can yet
-observe in time to act on it.
+The order-book recorder keeps running. It can no longer rescue the blind rule -
+that is settled above - but it still prices the pre-match hours, which is the
+one part of a market's life this project has never seen, and it is the natural
+place to test any live-state feed against.
 """
 )
 

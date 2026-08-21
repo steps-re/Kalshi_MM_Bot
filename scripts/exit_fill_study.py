@@ -1,5 +1,6 @@
 """Would the resting exit have filled? The fill-rate question, on recorded books.
 
+    python scripts/fetch_corpus.py --list   # corpus lives in GCS, not on disk
     python scripts/exit_fill_study.py ~/kalshi-audit/recs2 --hold 30 --rest 45
 
 The candidate cell pays about +0.69c when the exit rests and fills and about

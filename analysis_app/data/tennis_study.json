@@ -1,55 +1,55 @@
 {
  "headline_t10": {
-  "n": 1545,
+  "n": 1548,
   "clusters": 342,
   "losses": 15,
-  "loss_rate": 0.00971,
-  "ev_cents": 4.632,
-  "se_cents": 0.279,
-  "t": 16.61,
-  "avg_ask_cents": 94.02,
-  "breakeven_loss_rate": 0.05586,
-  "return_on_capital": 0.04927,
+  "loss_rate": 0.00969,
+  "ev_cents": 4.642,
+  "se_cents": 0.278,
+  "t": 16.68,
+  "avg_ask_cents": 94.01,
+  "breakeven_loss_rate": 0.05593,
+  "return_on_capital": 0.04938,
   "days": 43,
-  "markets_per_day": 35.9
+  "markets_per_day": 36.0
  },
  "horizon_curve": [
   {
-   "n": 9589,
+   "n": 9616,
    "clusters": 376,
    "losses": 43,
-   "loss_rate": 0.00448,
-   "ev_cents": 4.383,
+   "loss_rate": 0.00447,
+   "ev_cents": 4.391,
    "se_cents": 0.132,
-   "t": 33.13,
+   "t": 33.25,
    "horizon": "0-10"
   },
   {
-   "n": 15812,
-   "clusters": 415,
-   "losses": 180,
-   "loss_rate": 0.01138,
-   "ev_cents": 4.94,
+   "n": 15841,
+   "clusters": 416,
+   "losses": 182,
+   "loss_rate": 0.01149,
+   "ev_cents": 4.936,
    "se_cents": 0.207,
-   "t": 23.84,
+   "t": 23.83,
    "horizon": "10-20"
   },
   {
-   "n": 28236,
-   "clusters": 413,
-   "losses": 1039,
-   "loss_rate": 0.0368,
-   "ev_cents": 3.965,
+   "n": 28288,
+   "clusters": 414,
+   "losses": 1049,
+   "loss_rate": 0.03708,
+   "ev_cents": 3.943,
    "se_cents": 0.407,
-   "t": 9.75,
+   "t": 9.7,
    "horizon": "20-40"
   },
   {
-   "n": 42399,
+   "n": 42411,
    "clusters": 403,
-   "losses": 4218,
-   "loss_rate": 0.09948,
-   "ev_cents": -0.671,
+   "losses": 4222,
+   "loss_rate": 0.09955,
+   "ev_cents": -0.676,
    "se_cents": 0.936,
    "t": -0.72,
    "horizon": "40-90"
@@ -60,43 +60,43 @@
    "price": "80-90c",
    "cells": [
     {
-     "n": 1956,
+     "n": 1967,
      "clusters": 288,
      "losses": 36,
-     "loss_rate": 0.0184,
-     "ev_cents": 10.319,
-     "se_cents": 0.465,
-     "t": 22.2,
+     "loss_rate": 0.0183,
+     "ev_cents": 10.331,
+     "se_cents": 0.462,
+     "t": 22.35,
      "horizon": "0-10"
     },
     {
-     "n": 4602,
-     "clusters": 361,
-     "losses": 134,
-     "loss_rate": 0.02912,
-     "ev_cents": 9.646,
-     "se_cents": 0.469,
-     "t": 20.57,
+     "n": 4617,
+     "clusters": 362,
+     "losses": 135,
+     "loss_rate": 0.02924,
+     "ev_cents": 9.639,
+     "se_cents": 0.468,
+     "t": 20.62,
      "horizon": "10-20"
     },
     {
-     "n": 11678,
-     "clusters": 395,
-     "losses": 740,
-     "loss_rate": 0.06337,
-     "ev_cents": 6.521,
-     "se_cents": 0.715,
+     "n": 11713,
+     "clusters": 396,
+     "losses": 745,
+     "loss_rate": 0.0636,
+     "ev_cents": 6.499,
+     "se_cents": 0.714,
      "t": 9.11,
      "horizon": "20-40"
     },
     {
-     "n": 22822,
+     "n": 22834,
      "clusters": 394,
-     "losses": 3091,
-     "loss_rate": 0.13544,
-     "ev_cents": -0.407,
-     "se_cents": 1.299,
-     "t": -0.31,
+     "losses": 3095,
+     "loss_rate": 0.13554,
+     "ev_cents": -0.416,
+     "se_cents": 1.298,
+     "t": -0.32,
      "horizon": "40-90"
     }
    ]
@@ -105,33 +105,33 @@
    "price": "90-95c",
    "cells": [
     {
-     "n": 2243,
-     "clusters": 296,
+     "n": 2249,
+     "clusters": 297,
      "losses": 5,
-     "loss_rate": 0.00223,
-     "ev_cents": 5.463,
+     "loss_rate": 0.00222,
+     "ev_cents": 5.467,
      "se_cents": 0.146,
-     "t": 37.31,
+     "t": 37.43,
      "horizon": "0-10"
     },
     {
-     "n": 4136,
-     "clusters": 347,
-     "losses": 32,
-     "loss_rate": 0.00774,
-     "ev_cents": 5.172,
-     "se_cents": 0.201,
-     "t": 25.71,
+     "n": 4145,
+     "clusters": 348,
+     "losses": 33,
+     "loss_rate": 0.00796,
+     "ev_cents": 5.148,
+     "se_cents": 0.202,
+     "t": 25.49,
      "horizon": "10-20"
     },
     {
-     "n": 7735,
-     "clusters": 346,
-     "losses": 203,
-     "loss_rate": 0.02624,
-     "ev_cents": 3.405,
-     "se_cents": 0.43,
-     "t": 7.91,
+     "n": 7751,
+     "clusters": 347,
+     "losses": 207,
+     "loss_rate": 0.02671,
+     "ev_cents": 3.361,
+     "se_cents": 0.433,
+     "t": 7.76,
      "horizon": "20-40"
     },
     {
@@ -150,33 +150,33 @@
    "price": "95-98c",
    "cells": [
     {
-     "n": 3187,
+     "n": 3193,
      "clusters": 316,
      "losses": 2,
      "loss_rate": 0.00063,
      "ev_cents": 2.367,
      "se_cents": 0.069,
-     "t": 34.39,
+     "t": 34.45,
      "horizon": "0-10"
     },
     {
-     "n": 4494,
+     "n": 4498,
      "clusters": 312,
      "losses": 12,
      "loss_rate": 0.00267,
-     "ev_cents": 2.254,
+     "ev_cents": 2.255,
      "se_cents": 0.165,
-     "t": 13.68,
+     "t": 13.69,
      "horizon": "10-20"
     },
     {
-     "n": 6559,
-     "clusters": 281,
-     "losses": 75,
-     "loss_rate": 0.01143,
-     "ev_cents": 1.444,
-     "se_cents": 0.29,
-     "t": 4.97,
+     "n": 6560,
+     "clusters": 282,
+     "losses": 76,
+     "loss_rate": 0.01159,
+     "ev_cents": 1.429,
+     "se_cents": 0.291,
+     "t": 4.91,
      "horizon": "20-40"
     },
     {
@@ -195,7 +195,7 @@
    "price": "98-100c",
    "cells": [
     {
-     "n": 2203,
+     "n": 2207,
      "clusters": 264,
      "losses": 0,
      "loss_rate": 0.0,
@@ -205,13 +205,13 @@
      "horizon": "0-10"
     },
     {
-     "n": 2580,
+     "n": 2581,
      "clusters": 245,
      "losses": 2,
-     "loss_rate": 0.00078,
+     "loss_rate": 0.00077,
      "ev_cents": 0.853,
      "se_cents": 0.085,
-     "t": 10.03,
+     "t": 10.04,
      "horizon": "10-20"
     },
     {
@@ -239,61 +239,117 @@
  ],
  "implementable": [
   {
-   "n": 96048,
+   "n": 96168,
    "clusters": 473,
-   "losses": 5481,
-   "loss_rate": 0.05707,
-   "ev_cents": 2.12,
-   "se_cents": 0.508,
-   "t": 4.18,
+   "losses": 5497,
+   "loss_rate": 0.05716,
+   "ev_cents": 2.114,
+   "se_cents": 0.507,
+   "t": 4.17,
    "rule": "any actionable minute",
-   "share_last_40min": 0.5587
+   "share_last_40min": 0.5591
   },
   {
-   "n": 68462,
-   "clusters": 466,
-   "losses": 4084,
-   "loss_rate": 0.05965,
-   "ev_cents": 2.175,
-   "se_cents": 0.564,
-   "t": 3.86,
+   "n": 68581,
+   "clusters": 467,
+   "losses": 4100,
+   "loss_rate": 0.05978,
+   "ev_cents": 2.166,
+   "se_cents": 0.563,
+   "t": 3.85,
    "rule": "volume printed this minute",
-   "share_last_40min": 0.6131
+   "share_last_40min": 0.6136
   },
   {
-   "n": 88611,
-   "clusters": 468,
-   "losses": 4979,
-   "loss_rate": 0.05619,
-   "ev_cents": 2.251,
-   "se_cents": 0.515,
-   "t": 4.37,
+   "n": 88731,
+   "clusters": 469,
+   "losses": 4995,
+   "loss_rate": 0.05629,
+   "ev_cents": 2.244,
+   "se_cents": 0.514,
+   "t": 4.36,
    "rule": "volume in the last 5 min",
-   "share_last_40min": 0.5783
+   "share_last_40min": 0.5787
   },
   {
-   "n": 45042,
-   "clusters": 408,
-   "losses": 2745,
-   "loss_rate": 0.06094,
-   "ev_cents": 2.01,
-   "se_cents": 0.593,
-   "t": 3.39,
+   "n": 45147,
+   "clusters": 409,
+   "losses": 2757,
+   "loss_rate": 0.06107,
+   "ev_cents": 2.002,
+   "se_cents": 0.592,
+   "t": 3.38,
    "rule": "heavy tape (>=2000 in 5 min)",
-   "share_last_40min": 0.6722
+   "share_last_40min": 0.6728
   },
   {
-   "n": 23732,
-   "clusters": 432,
-   "losses": 1210,
-   "loss_rate": 0.05099,
-   "ev_cents": 2.61,
+   "n": 23763,
+   "clusters": 433,
+   "losses": 1225,
+   "loss_rate": 0.05155,
+   "ev_cents": 2.558,
    "se_cents": 0.594,
-   "t": 4.4,
+   "t": 4.31,
    "rule": "open interest flat (<1%/5min)",
-   "share_last_40min": 0.504
+   "share_last_40min": 0.5045
   }
  ],
+ "per_market": {
+  "rules": [
+   {
+    "n": 3310,
+    "clusters": 473,
+    "losses": 435,
+    "loss_rate": 0.13142,
+    "ev_cents": 0.224,
+    "se_cents": 0.916,
+    "t": 0.24,
+    "rule": "first sighting at >=80c",
+    "median_entry_age_min": 53.2
+   },
+   {
+    "n": 3258,
+    "clusters": 467,
+    "losses": 418,
+    "loss_rate": 0.1283,
+    "ev_cents": 0.347,
+    "se_cents": 0.913,
+    "t": 0.38,
+    "rule": "first sighting with volume printing",
+    "median_entry_age_min": 51.4
+   },
+   {
+    "n": 3310,
+    "clusters": 473,
+    "losses": 435,
+    "loss_rate": 0.13142,
+    "ev_cents": -4.595,
+    "se_cents": 0.916,
+    "t": -5.02,
+    "rule": "middle of its >=80c window",
+    "median_entry_age_min": 29.2
+   },
+   {
+    "n": 3310,
+    "clusters": 473,
+    "losses": 435,
+    "loss_rate": 0.13142,
+    "ev_cents": -4.253,
+    "se_cents": 0.916,
+    "t": -4.64,
+    "rule": "every minute, equal weight per market",
+    "median_entry_age_min": 29.2
+   }
+  ],
+  "zone_minutes": {
+   "won_markets": 2875,
+   "lost_markets": 435,
+   "won_median_minutes": 27,
+   "lost_median_minutes": 8,
+   "winners_share_of_minutes": 0.9428,
+   "winners_share_of_markets": 0.8686
+  }
+ },
  "tiers": [
   {
    "tier": "Challenger",
@@ -304,23 +360,23 @@
   },
   {
    "tier": "ITF Futures",
-   "markets": 1007,
+   "markets": 1009,
    "losses": 12,
-   "loss_rate": 0.01192,
-   "ev_cents": 4.214
+   "loss_rate": 0.01189,
+   "ev_cents": 4.223
   },
   {
    "tier": "Tour / other",
-   "markets": 336,
+   "markets": 337,
    "losses": 2,
-   "loss_rate": 0.00595,
-   "ev_cents": 5.37
+   "loss_rate": 0.00593,
+   "ev_cents": 5.385
   }
  ],
  "stops": [
   {
    "stop": "none",
-   "ev_cents": 4.632,
+   "ev_cents": 4.642,
    "stopped_out": 0,
    "stopped_that_would_have_won": 0,
    "worst_cents": -98.1,
@@ -328,15 +384,15 @@
   },
   {
    "stop": "80c",
-   "ev_cents": 3.255,
-   "stopped_out": 128,
-   "stopped_that_would_have_won": 115,
+   "ev_cents": 3.247,
+   "stopped_out": 129,
+   "stopped_that_would_have_won": 116,
    "worst_cents": -97.2,
-   "mean_loss_cents": -16.1
+   "mean_loss_cents": -16.2
   },
   {
    "stop": "70c",
-   "ev_cents": 4.344,
+   "ev_cents": 4.354,
    "stopped_out": 42,
    "stopped_that_would_have_won": 29,
    "worst_cents": -97.2,
@@ -344,7 +400,7 @@
   },
   {
    "stop": "60c",
-   "ev_cents": 4.609,
+   "ev_cents": 4.618,
    "stopped_out": 26,
    "stopped_that_would_have_won": 13,
    "worst_cents": -97.2,
@@ -352,7 +408,7 @@
   },
   {
    "stop": "50c",
-   "ev_cents": 4.865,
+   "ev_cents": 4.873,
    "stopped_out": 15,
    "stopped_that_would_have_won": 2,
    "worst_cents": -97.2,
@@ -454,14 +510,15 @@
  },
  "provenance": {
   "candle_files": [
-   "/private/tmp/claude-501/-Users-mike-Documents-Claude/e094ac58-4be2-4949-b182-66a626a7e6d4/scratchpad/corpus/candles.jsonl",
-   "/private/tmp/claude-501/-Users-mike-Documents-Claude/e094ac58-4be2-4949-b182-66a626a7e6d4/scratchpad/corpus/candles_breadth.jsonl",
-   "/private/tmp/claude-501/-Users-mike-Documents-Claude/e094ac58-4be2-4949-b182-66a626a7e6d4/scratchpad/corpus/candles_tennis.jsonl"
+   "/Users/mike/kalshi-audit/candles.jsonl",
+   "/Users/mike/kalshi-audit/candles_breadth.jsonl",
+   "/Users/mike/kalshi-audit/candles_other.jsonl",
+   "/Users/mike/kalshi-audit/candles_tennis.jsonl"
   ],
-  "unique_markets": 27550,
-  "duplicate_tickers_dropped": 1202,
+  "unique_markets": 31513,
+  "duplicate_tickers_dropped": 1239,
   "book_file": "/Users/mike/kalshi-audit/tennis_book.jsonl",
   "settled_file": null
  },
- "generated_utc": "2026-08-20T23:59:52+00:00"
+ "generated_utc": "2026-08-21T00:33:15+00:00"
 }

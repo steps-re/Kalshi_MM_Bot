@@ -1,5 +1,6 @@
 """Freeze the corrected audit into the JSON the findings site renders.
 
+    python scripts/fetch_corpus.py --list   # corpus lives in GCS, not on disk
     python scripts/export_audit_data.py ~/kalshi-audit/triggers.jsonl \
         --obi ~/kalshi-audit/obi.json \
         --out analysis_app/data/audit.json

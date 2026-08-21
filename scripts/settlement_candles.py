@@ -1,5 +1,6 @@
 """Stage 2: prices at a FIXED time before close, for clean calibration.
 
+    python scripts/fetch_corpus.py --bundle settled   # corpus lives in GCS, not on disk
     python scripts/settlement_candles.py ~/kalshi-audit/settled_compact.jsonl.gz \\
         --out ~/kalshi-audit/candles.jsonl --per-family 2500
 

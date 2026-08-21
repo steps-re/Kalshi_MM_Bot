@@ -1,8 +1,10 @@
 """Bake the tennis favourite-BUY study into site data.
 
+    # the corpus lives in GCS, not on disk
+    python scripts/fetch_corpus.py --bundle candles
+
     python analysis_app/build_tennis_study.py \\
         --candles ~/kalshi-audit/candles*.jsonl \\
-        --settled ~/kalshi-audit/settled_compact.jsonl.gz \\
         --book ~/kalshi-audit/tennis_book.jsonl
 
 Same rule as everywhere else in this app: figures are derived by a script that
@@ -267,6 +269,83 @@ def implementable(rows) -> list[dict]:
     return out
 
 
+def per_market(rows) -> dict:
+    """One entry per market - what a live bot would actually do.
+
+    The `implementable` block counts every actionable MINUTE as an entry, which
+    is how the +2.12c figure was first produced. That is a trap. A market only
+    stays in the favourite zone while it is winning, so counting minutes
+    weights by how obviously decided a market already was: winners sit at 80c+
+    for a median 27 minutes, losers for 8, and winners supply 94% of all
+    minutes while being 87% of markets.
+
+    Weight each market once and the edge disappears. These rows are the honest
+    answer to "can this be traded without knowing when the match ends".
+    """
+
+    by_market: dict = defaultdict(list)
+    meta: dict = {}
+
+    for r in rows:
+        by_market[r["ticker"]].append(r)
+        meta[r["ticker"]] = (r["cluster"], r["lost"])
+
+    for entries in by_market.values():
+        entries.sort(key=lambda r: -r["age"])
+
+    def run(pick, label):
+        cells: dict = defaultdict(lambda: [0.0, 0, 0])
+        ages = []
+
+        for ticker, entries in by_market.items():
+            chosen = pick(entries)
+
+            if chosen is None:
+                continue
+
+            cluster, lost = meta[ticker]
+            slot = cells[cluster]
+            slot[0] += chosen["pnl"] if isinstance(chosen, dict) else chosen
+            slot[1] += 1
+            slot[2] += lost
+            ages.append(chosen["age"] if isinstance(chosen, dict) else 0)
+
+        row = stat(cells)
+        row["rule"] = label
+        row["median_entry_age_min"] = round(
+            sorted(ages)[len(ages) // 2], 1) if ages else None
+        return row
+
+    zone_minutes = {"won": [], "lost": []}
+
+    for ticker, entries in by_market.items():
+        zone_minutes["lost" if meta[ticker][1] else "won"].append(len(entries))
+
+    won = sorted(zone_minutes["won"])
+    lost = sorted(zone_minutes["lost"])
+
+    return {
+        "rules": [
+            run(lambda e: e[0], "first sighting at >=80c"),
+            run(lambda e: next((x for x in e if x["trailing"][0] > 0), None),
+                "first sighting with volume printing"),
+            run(lambda e: e[len(e) // 2], "middle of its >=80c window"),
+            run(lambda e: {"pnl": sum(x["pnl"] for x in e) / len(e),
+                           "age": e[len(e) // 2]["age"]},
+                "every minute, equal weight per market"),
+        ],
+        "zone_minutes": {
+            "won_markets": len(won), "lost_markets": len(lost),
+            "won_median_minutes": won[len(won) // 2] if won else None,
+            "lost_median_minutes": lost[len(lost) // 2] if lost else None,
+            "winners_share_of_minutes": round(
+                sum(won) / max(sum(won) + sum(lost), 1), 4),
+            "winners_share_of_markets": round(
+                len(won) / max(len(won) + len(lost), 1), 4),
+        },
+    }
+
+
 def tiers_and_stops(rows, records) -> tuple[list[dict], list[dict]]:
     by_tier = defaultdict(lambda: [0.0, 0, 0])
     entries = []
@@ -507,6 +586,7 @@ def main() -> None:
         "horizon_curve": study["horizon_curve"],
         "price_horizon_grid": study["price_horizon_grid"],
         "implementable": implementable(rows),
+        "per_market": per_market(rows),
         "tiers": tier_rows,
         "stops": stops,
         "lookahead": lookahead(book, settled),

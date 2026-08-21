@@ -1,5 +1,6 @@
 """Calibration at a FIXED time before close - the clean test.
 
+    python scripts/fetch_corpus.py --bundle candles   # corpus lives in GCS, not on disk
     python scripts/calibration_at_t.py ~/kalshi-audit/candles.jsonl [more.jsonl]
 
 For each settled market, read the book from the 1-minute candle ending at or

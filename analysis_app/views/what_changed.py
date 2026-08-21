@@ -103,14 +103,16 @@ st.caption(
 
 st.markdown(
     """
-1. **Measure the pre-match hours.** A recorder is capturing the whole life of
-   every quoting tennis market. The one surviving lead pays +2.12c per entry
-   over the final ninety minutes, but that window was defined by a close time
-   nobody can see live, and the hours before it have never been priced. This
-   decides the lead. See **The tennis lead**.
-2. **Do not commit money until step 1 lands.** Depth is not the blocker -
-   the books are deep enough - and the edge replicated out of sample. The
-   blocker is that the entry condition is not observable in time to act on it.
+1. **Price live match state, or drop the tennis lead.** The edge is real and
+   replicated, the books are deep enough, and it is still not tradeable: every
+   clock-free entry rule lands at zero or below, because the only thing
+   separating the profitable markets from the rest is how close the match is to
+   ending, and Kalshi publishes that only after it ends. A scoreboard feed
+   would make it observable. Cost that before anything else. See
+   **The tennis lead**.
+2. **Do not commit money on a clock-free version.** Buying the first sighting
+   at 80c or better is statistically zero; entering later is firmly negative.
+   There is no version of this that works without live match state.
 3. **Pre-register the tier hypothesis before testing it.** ITF Futures runs
    about double the favourite-loss rate of the tours, and its women's book is
    an order of magnitude thinner. Picking the clean tiers off the same sample

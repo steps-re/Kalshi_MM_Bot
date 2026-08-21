@@ -1,9 +1,15 @@
 """Bake the settled-history census and calibration results into site data.
 
+    # the corpus lives in GCS, not on disk
+    python scripts/fetch_corpus.py --bundle candles --bundle slices
+
     python analysis_app/build_exchange_census.py \\
-        ~/kalshi-audit/settled_history.jsonl.gz \\
-        ~/kalshi-audit/candles.jsonl ~/kalshi-audit/candles_breadth.jsonl \\
-        ~/kalshi-audit/candles_tennis.jsonl ~/kalshi-audit/candles_other.jsonl
+        --history ~/kalshi-audit/settled_compact.jsonl.gz \\
+                  ~/kalshi-audit/settled_slices/*.gz \\
+        --candles ~/kalshi-audit/candles*.jsonl
+
+The parlay share is only right if EVERY history file is passed: the crawl ships
+as one compact file plus dated slices, and the slices share their boundary days.
 
 The raw corpus is ~10M markets and lives outside the repo. The site needs the
 summary, not the corpus, so this reduces it once and writes

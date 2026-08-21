@@ -1,5 +1,6 @@
 """Which real fills lost money, and how much would each gate level have saved?
 
+    python scripts/fetch_corpus.py --list   # corpus lives in GCS, not on disk
     python scripts/gate_dose_study.py ~/kalshi-audit/journals2 \\
         ~/kalshi-audit/recs2 ~/kalshi-audit/recs
 

@@ -1,5 +1,6 @@
 """Are Kalshi's prices calibrated? Zeroth pass, from the settled-market list.
 
+    python scripts/fetch_corpus.py --bundle settled   # corpus lives in GCS, not on disk
     python scripts/calibration_curves.py ~/kalshi-audit/settled_compact.jsonl.gz
 
 For each last-traded-price bucket: how often did YES actually happen? A 4c

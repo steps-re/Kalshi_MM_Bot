@@ -1,5 +1,6 @@
 """Capacity and fragility of the two pooled calibration trades.
 
+    python scripts/fetch_corpus.py --bundle candles   # corpus lives in GCS, not on disk
     python scripts/calibration_diagnostics.py ~/kalshi-audit/candles.jsonl \\
         [more.jsonl ...] --settled ~/kalshi-audit/settled_history.jsonl.gz
 

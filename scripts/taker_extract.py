@@ -1,5 +1,6 @@
 """One corrected pass over the recordings -> a compact trigger cache.
 
+    python scripts/fetch_corpus.py --list   # corpus lives in GCS, not on disk
     python scripts/taker_extract.py ~/kalshi-audit/recs --out ~/kalshi-audit/triggers.jsonl
 
 Replaces the book-walking half of the original `taker_expectancy.py`. That scan
